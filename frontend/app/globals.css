@@ -1,0 +1,240 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Space+Mono:wght@400;700&family=Orbitron:wght@400;500;600;700;900&display=swap');
+@import "tailwindcss";
+
+:root {
+  /* Core palette */
+  --bg-primary:    #000000;
+  --bg-secondary:  #080808;
+  --bg-tertiary:   #0f0f0f;
+  --bg-card:       #111111;
+
+  /* Borders */
+  --border:        rgba(255,255,255,0.07);
+  --border-hover:  rgba(255,255,255,0.14);
+  --border-active: rgba(0,212,255,0.3);
+
+  /* Text */
+  --text-primary:  #f0f0f0;
+  --text-secondary: #888888;
+  --text-muted:    #444444;
+
+  /* Accents */
+  --cyan:          #00d4ff;
+  --cyan-dim:      rgba(0,212,255,0.15);
+  --cyan-glow:     0 0 20px rgba(0,212,255,0.4), 0 0 60px rgba(0,212,255,0.15);
+  --amber:         #ffb347;
+  --amber-dim:     rgba(255,179,71,0.15);
+  --red:           #ff4757;
+  --red-dim:       rgba(255,71,87,0.15);
+  --green:         #2ed573;
+  --green-dim:     rgba(46,213,115,0.15);
+
+  /* Glass */
+  --glass:         rgba(255,255,255,0.03);
+  --glass-border:  rgba(255,255,255,0.07);
+  --glass-hover:   rgba(255,255,255,0.06);
+}
+
+/* ─── Reset ──────────────────────────────────────────────────────────────── */
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  scroll-behavior: smooth;
+  color-scheme: dark;
+}
+
+body {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  overflow-x: hidden;
+}
+
+/* ─── Typography ─────────────────────────────────────────────────────────── */
+.font-display {
+  font-family: 'Orbitron', sans-serif;
+}
+.font-mono {
+  font-family: 'Space Mono', monospace;
+}
+
+/* ─── Glass card ─────────────────────────────────────────────────────────── */
+.glass-card {
+  background: var(--glass);
+  border: 1px solid var(--glass-border);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-radius: 16px;
+  transition: border-color 200ms, background 200ms, box-shadow 200ms;
+}
+.glass-card:hover {
+  border-color: var(--border-hover);
+  background: var(--glass-hover);
+}
+
+/* ─── Labels ─────────────────────────────────────────────────────────────── */
+.label {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+  color: var(--text-muted);
+}
+
+/* ─── Cyan glow ──────────────────────────────────────────────────────────── */
+.glow-cyan {
+  box-shadow: var(--cyan-glow);
+}
+.text-cyan { color: var(--cyan); }
+.text-amber { color: var(--amber); }
+.text-red   { color: var(--red); }
+.text-green { color: var(--green); }
+
+/* ─── Scrollbar ──────────────────────────────────────────────────────────── */
+::-webkit-scrollbar { width: 4px; height: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--text-muted); border-radius: 2px; }
+::-webkit-scrollbar-thumb:hover { background: var(--text-secondary); }
+
+/* ─── Aurora blobs ───────────────────────────────────────────────────────── */
+@keyframes aurora-1 {
+  0%, 100% { transform: translate(0%,  0%) scale(1); }
+  50%       { transform: translate(4%, -6%) scale(1.06); }
+}
+@keyframes aurora-2 {
+  0%, 100% { transform: translate(0%,  0%) scale(1); }
+  50%       { transform: translate(-5%, 4%) scale(1.08); }
+}
+@keyframes aurora-3 {
+  0%, 100% { transform: translate(0%,  0%) scale(1); }
+  33%       { transform: translate(3%,  5%) scale(0.96); }
+  66%       { transform: translate(-3%,-4%) scale(1.04); }
+}
+.aurora-1 { animation: aurora-1 20s ease-in-out infinite; }
+.aurora-2 { animation: aurora-2 26s ease-in-out infinite; }
+.aurora-3 { animation: aurora-3 32s ease-in-out infinite; }
+
+/* ─── Skeleton pulse ─────────────────────────────────────────────────────── */
+@keyframes skeleton-pulse {
+  0%, 100% { opacity: 0.3; }
+  50%       { opacity: 0.7; }
+}
+.skeleton {
+  background: var(--bg-tertiary);
+  border-radius: 8px;
+  animation: skeleton-pulse 1.8s ease-in-out infinite;
+}
+
+/* ─── Live dot ───────────────────────────────────────────────────────────── */
+@keyframes live-ping {
+  0%   { transform: scale(1);   opacity: 1; }
+  100% { transform: scale(2.5); opacity: 0; }
+}
+.live-dot {
+  position: relative;
+  display: inline-flex;
+  width: 8px;
+  height: 8px;
+}
+.live-dot::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: var(--green);
+  animation: live-ping 1.2s ease-out infinite;
+}
+.live-dot::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: var(--green);
+}
+
+/* ─── Packet dot ─────────────────────────────────────────────────────────── */
+@keyframes packet-flow {
+  from { stroke-dashoffset: 1000; }
+  to   { stroke-dashoffset: 0; }
+}
+
+/* ─── Typewriter cursor ──────────────────────────────────────────────────── */
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0; }
+}
+.typewriter-cursor {
+  display: inline-block;
+  width: 2px;
+  height: 1em;
+  background: var(--cyan);
+  margin-left: 2px;
+  vertical-align: text-bottom;
+  animation: blink 1s step-end infinite;
+}
+
+/* ─── Scan line (NOC vibe) ───────────────────────────────────────────────── */
+@keyframes scan {
+  from { transform: translateY(-100%); }
+  to   { transform: translateY(100vh); }
+}
+.scan-line {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 9998;
+  background: linear-gradient(to bottom, transparent 0%, rgba(0,212,255,0.03) 50%, transparent 100%);
+  height: 200px;
+  animation: scan 8s linear infinite;
+}
+
+/* ─── Status badge ───────────────────────────────────────────────────────── */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 10px;
+  border-radius: 100px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.badge-healthy  { background: var(--green-dim); color: var(--green); }
+.badge-warning  { background: var(--amber-dim); color: var(--amber); }
+.badge-fault    { background: var(--red-dim);   color: var(--red);   }
+.badge-info     { background: var(--cyan-dim);  color: var(--cyan);  }
+
+/* ─── Control toggle ─────────────────────────────────────────────────────── */
+.toggle-track {
+  width: 44px;
+  height: 24px;
+  border-radius: 12px;
+  cursor: pointer;
+  position: relative;
+  transition: background 200ms;
+  border: 1px solid var(--border);
+}
+.toggle-thumb {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  transition: transform 200ms, background 200ms;
+}
+
+/* ─── Reduced motion ─────────────────────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
