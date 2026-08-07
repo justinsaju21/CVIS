@@ -71,19 +71,19 @@
 ---
 
 ## Phase 7 — Documentation Pack (Week 7–8)
-- [ ] Architecture diagrams (pending — Phase 7)
-- [ ] Sequence diagrams (pending — Phase 7)
-- [ ] Packet flow diagrams (pending — Phase 7)
+- [x] Architecture diagrams → docs/architecture-diagrams.md
+- [x] Sequence diagrams → docs/architecture-diagrams.md
+- [x] Packet flow diagrams → docs/architecture-diagrams.md
 - [x] API documentation → docs/api-reference.md
 - [x] Installation guide → docs/installation-guide.md
-- [ ] User manual (pending frontend build)
-- [ ] Testing documentation (pending — Phase 7)
+- [x] User manual → docs/user-manual.md
+- [x] Testing documentation → docs/testing-documentation.md
 - [x] Security analysis → docs/security-analysis.md
-- [ ] Performance analysis (pending — Phase 7)
-- [ ] IEEE-style project report (pending — Phase 7)
-- [ ] PowerPoint presentation (pending — Phase 7)
-- [ ] Demo script (pending — Phase 7)
-- [ ] Viva Q&A (pending — Phase 7)
+- [x] Performance analysis → docs/performance-analysis.md
+- [x] IEEE-style project report → docs/ieee-report.md
+- [ ] PowerPoint presentation (manual — create from ieee-report.md)
+- [x] Demo script → docs/demo-script.md
+- [x] Viva Q&A → docs/viva-qa.md
 - [x] CCNS Unit 1–5 mapping table (docs/ccns-mapping.md) — 34 features mapped
 
 ---

@@ -137,8 +137,7 @@ export default function AdminPage() {
   return (
     <>
       <CustomCursor />
-      <div className="scan-line" />
-      <Navbar wsConnected={connected} />
+      <Navbar wsConnected={stats?.server.websocket_clients !== undefined} />
 
       <main style={{ paddingTop: 60, minHeight: '100vh' }}>
         <div style={{ maxWidth: 1400, margin: '0 auto', padding: '28px 20px' }}>

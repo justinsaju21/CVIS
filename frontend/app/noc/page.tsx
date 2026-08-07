@@ -352,7 +352,6 @@ export default function NocPage() {
   return (
     <>
       <CustomCursor />
-      <div className="scan-line" />
       <Navbar wsConnected={connected} />
 
       <main style={{ paddingTop: 60, minHeight: '100vh' }}>

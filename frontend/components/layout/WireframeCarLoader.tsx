@@ -11,38 +11,35 @@ interface Props {
 // Wireframe car SVG paths — side profile of a sedan
 // Broken into segments that light up one by one
 const CAR_PATHS = [
-  // 1. Lower body line and bumpers
-  { d: 'M 50 160 C 45 160 40 155 40 150 C 40 135 50 125 65 120', delay: 0, dur: 0.5 }, // rear bumper
-  { d: 'M 65 120 C 80 115 100 112 110 110', delay: 0.5, dur: 0.4 }, // rear trunk lid
-  { d: 'M 110 110 C 130 95 160 75 200 65', delay: 0.9, dur: 0.6 }, // rear window
-  { d: 'M 200 65 C 240 55 280 55 310 65', delay: 1.5, dur: 0.5 }, // roof
-  { d: 'M 310 65 C 340 75 365 95 385 110', delay: 2.0, dur: 0.6 }, // windshield
-  { d: 'M 385 110 C 410 115 430 120 445 130', delay: 2.6, dur: 0.5 }, // hood
-  { d: 'M 445 130 C 455 135 460 145 455 155 C 450 160 440 160 430 160', delay: 3.1, dur: 0.4 }, // front bumper
-  
-  // 2. Wheel arches
-  { d: 'M 430 160 L 390 160', delay: 3.5, dur: 0.2 }, // front overhang
-  { d: 'M 390 160 C 390 128 340 128 340 160', delay: 3.7, dur: 0.5 }, // front wheel arch
-  { d: 'M 340 160 L 160 160', delay: 4.2, dur: 0.5 }, // side skirt
-  { d: 'M 160 160 C 160 128 110 128 110 160', delay: 4.7, dur: 0.5 }, // rear wheel arch
-  { d: 'M 110 160 L 50 160', delay: 5.2, dur: 0.3 }, // rear overhang
+  // 1. Outline segments (Cybertruck profile)
+  { d: 'M 40 100 L 220 50', delay: 0.0, dur: 0.6 }, // Vault (roof to tailgate)
+  { d: 'M 220 50 L 330 95 L 420 115', delay: 0.6, dur: 0.8 }, // Windshield & Hood
+  { d: 'M 420 115 L 420 130 L 410 140 L 395 145', delay: 1.4, dur: 0.5 }, // Nose & Front Bumper
+  { d: 'M 395 145 L 380 110 L 325 110 L 310 145', delay: 1.9, dur: 0.6 }, // Front Arch (Angular)
+  { d: 'M 310 145 L 155 145', delay: 2.5, dur: 0.5 }, // Side skirt
+  { d: 'M 155 145 L 140 110 L 85 110 L 70 145', delay: 3.0, dur: 0.6 }, // Rear Arch (Angular)
+  { d: 'M 70 145 L 55 145 L 45 140 L 40 100', delay: 3.6, dur: 0.6 }, // Rear bumper & tailgate
 
-  // 3. Windows / Greenhouse
-  { d: 'M 130 112 C 150 98 175 80 205 72 C 240 64 275 64 300 72 C 325 80 345 98 360 112 C 365 115 365 118 360 118 L 135 118 C 130 118 128 115 130 112 Z', delay: 1.5, dur: 1.5 }, // window outline
-  { d: 'M 240 70 L 240 118', delay: 3.0, dur: 0.3 }, // B-pillar
+  // 2. Windows / Greenhouse (Angular)
+  { d: 'M 220 58 L 150 82 L 150 97 L 315 97 L 330 87 Z', delay: 1.0, dur: 1.5 }, // Window outline
+  { d: 'M 230 65 L 235 97', delay: 2.5, dur: 0.3 }, // B-pillar
+
+  // 3. Wheels (Chunky Hex/Circles)
+  { d: 'M 327.5 145 A 25 25 0 1 0 377.5 145 A 25 25 0 1 0 327.5 145', delay: 4.0, dur: 0.6 }, // front wheel
+  { d: 'M 352.5 135 L 361 140 L 361 150 L 352.5 155 L 344 150 L 344 140 Z', delay: 4.2, dur: 0.5 }, // front hex hub
+  { d: 'M 87.5 145 A 25 25 0 1 0 137.5 145 A 25 25 0 1 0 87.5 145', delay: 4.5, dur: 0.6 }, // rear wheel
+  { d: 'M 112.5 135 L 121 140 L 121 150 L 112.5 155 L 104 150 L 104 140 Z', delay: 4.7, dur: 0.5 }, // rear hex hub
+
+  // 4. Character Lines & Details
+  { d: 'M 420 115 L 40 100', delay: 5.0, dur: 1.0 }, // Main angular body crease
+  { d: 'M 235 97 L 235 145', delay: 5.5, dur: 0.3 }, // Front door gap
+  { d: 'M 160 97 L 160 145', delay: 5.7, dur: 0.3 }, // Rear door gap
   
-  // 4. Wheels
-  { d: 'M 345 160 A 20 20 0 1 1 385 160 A 20 20 0 1 1 345 160', delay: 4.0, dur: 0.6 }, // front wheel
-  { d: 'M 355 160 A 10 10 0 1 1 375 160 A 10 10 0 1 1 355 160', delay: 4.2, dur: 0.4 }, // front alloy
-  { d: 'M 115 160 A 20 20 0 1 1 155 160 A 20 20 0 1 1 115 160', delay: 5.0, dur: 0.6 }, // rear wheel
-  { d: 'M 125 160 A 10 10 0 1 1 145 160 A 10 10 0 1 1 125 160', delay: 5.2, dur: 0.4 }, // rear alloy
-  
-  // 5. Details
-  { d: 'M 110 125 C 200 125 300 125 370 125', delay: 5.5, dur: 0.8 }, // character line / shoulder
-  { d: 'M 435 135 L 415 130 L 410 135', delay: 6.0, dur: 0.2 }, // headlight
-  { d: 'M 45 135 L 60 130 L 60 135', delay: 6.2, dur: 0.2 }, // taillight
-  { d: 'M 170 118 L 178 118', delay: 6.4, dur: 0.1 }, // door handle rear
-  { d: 'M 260 118 L 268 118', delay: 6.5, dur: 0.1 }, // door handle front
+  // 5. Door Handles & Lights
+  { d: 'M 175 105 L 185 105', delay: 6.0, dur: 0.1 }, // Rear door handle
+  { d: 'M 250 105 L 260 105', delay: 6.1, dur: 0.1 }, // Front door handle
+  { d: 'M 420 115 L 410 115', delay: 6.2, dur: 0.2 }, // Headlight slit
+  { d: 'M 40 100 L 45 102', delay: 6.3, dur: 0.2 }, // Taillight slit
 ]
 
 const TOTAL_DURATION = 7.0
@@ -159,7 +156,7 @@ export default function WireframeCarLoader({ onComplete, message = 'Connecting t
             >
               {/* Dark fill */}
               <path
-                d="M 40 150 C 40 135 50 125 65 120 C 80 115 100 112 110 110 C 130 95 160 75 200 65 C 240 55 280 55 310 65 C 340 75 365 95 385 110 C 410 115 430 120 445 130 C 455 135 460 145 455 155 C 450 160 440 160 430 160 L 390 160 C 390 128 340 128 340 160 L 160 160 C 160 128 110 128 110 160 L 50 160 C 45 160 40 155 40 150 Z"
+                d="M 50 160 C 45 160 40 155 40 145 C 40 125 45 115 55 112 C 60 110 70 108 80 108 C 120 95 180 65 240 55 C 270 52 290 55 315 65 C 340 75 360 90 380 105 C 410 115 435 125 440 135 C 445 140 445 155 430 160 L 405 160 C 405 128 345 128 345 160 L 145 160 C 145 128 85 128 85 160 L 50 160 Z"
                 fill="rgba(0,212,255,0.02)"
                 stroke="none"
               />
@@ -192,23 +189,14 @@ export default function WireframeCarLoader({ onComplete, message = 'Connecting t
                 )
               })}
 
-              {/* Scan line effect */}
-              {phase !== 'done' && (
-                <motion.line
-                  x1="0" y1="0" x2="440" y2="0"
-                  stroke="rgba(0,212,255,0.3)"
-                  strokeWidth="1"
-                  animate={{ y1: [0, 230, 0], y2: [0, 230, 0] }}
-                  transition={{ duration: 2.5, repeat: Infinity, ease: 'linear' }}
-                />
-              )}
+
 
               {/* Node dots at key points */}
               {[
-                { cx: 135, cy: 160 }, { cx: 365, cy: 160 },  // wheel centers
-                { cx: 240, cy: 70 },                           // B-pillar top
-                { cx: 200, cy: 65 },                          // C-pillar top
-                { cx: 435, cy: 135 },                         // Headlight
+                { cx: 115, cy: 160 }, { cx: 375, cy: 160 },  // wheel centers
+                { cx: 245, cy: 62 },                           // B-pillar top
+                { cx: 200, cy: 70 },                          // C-pillar top
+                { cx: 440, cy: 135 },                         // Headlight tip
               ].map((pt, i) => (
                 <motion.circle
                   key={i}

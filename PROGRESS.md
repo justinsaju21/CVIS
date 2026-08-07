@@ -90,6 +90,30 @@ Frontend (`/admin`) deferred until user provides UI reference.
 
 ---
 
+## Phase 7 — Documentation Pack
+**Status:** ✅ Complete (all docs except PowerPoint, which must be created manually)
+**Target:** Week 7–8
+
+### What was built
+| Document | File | Notes |
+|---|---|---|
+| Architecture Diagrams | `docs/architecture-diagrams.md` | System overview, security flow, packet lifecycle, NOC control flow (Mermaid) |
+| User Manual | `docs/user-manual.md` | All three views, controls, demo scenarios |
+| Testing Documentation | `docs/testing-documentation.md` | All 4 test scripts, full matrix, browser checklist |
+| Performance Analysis | `docs/performance-analysis.md` | Latency, AI timing, WebSocket throughput, SQLite |
+| IEEE Report | `docs/ieee-report.md` | Full academic paper with abstract, references, CCNS mapping |
+| Demo Script | `docs/demo-script.md` | 15-minute step-by-step demo with talking points |
+| Viva Q&A | `docs/viva-qa.md` | 20 questions + detailed answers across all 5 CCNS units |
+
+### What's deferred
+| Item | Status |
+|---|---|
+| PowerPoint presentation | Manual — create slides from `docs/ieee-report.md` |
+| ESP32 hardware test | Pending hardware |
+| MQTT live broker test | Pending `mosquitto` install |
+
+---
+
 ## What's deferred
 
 | Item | Phase | Status |
@@ -97,10 +121,8 @@ Frontend (`/admin`) deferred until user provides UI reference.
 | ESP32 hardware test | Phase 1 | Pending hardware |
 | Mosquitto MQTT broker setup + test | Phase 2 | Pending `mosquitto` install |
 | Ollama live AI test | Phase 3 | Pending `ollama serve` |
-| Frontend: `/driver` view | Phase 1 UI | ✅ Built (React/Next.js) |
-| Frontend: `/noc` view | Phase 4 UI | ✅ Built (React/Next.js) |
-| Frontend: `/admin` view | Phase 5 UI | ✅ Built (React/Next.js) |
+| PowerPoint presentation | Phase 7 | Manual — create from ieee-report.md |
 
 ---
 
-*Last updated: Phase 2–5 backend build*
+*Last updated: Phase 7 complete — documentation pack shipped*

@@ -128,6 +128,7 @@ export default function DriverPage() {
     fetchRecent(60).then((rows: unknown) => {
       const data = (rows as TelemetryRow[]).slice(-30).reverse()
       setHistory(data.map((r) => ({
+        id:    r.received_at + Math.random(), // Guarantee unique X
         time:  new Date(r.received_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
         batt:  r.battery_pct,
         speed: r.speed_kmh,
@@ -145,6 +146,7 @@ export default function DriverPage() {
         setLatest(r)
         setHistory((prev) => {
           const next = [...prev.slice(-59), {
+            id:    r.received_at + Math.random(),
             time:  new Date(r.received_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
             batt:  r.battery_pct,
             speed: r.speed_kmh,
@@ -225,7 +227,6 @@ export default function DriverPage() {
   return (
     <>
       <CustomCursor />
-      <div className="scan-line" />
       <Navbar wsConnected={connected} />
 
       {/* Aurora background */}
@@ -325,9 +326,10 @@ export default function DriverPage() {
                     </linearGradient>
                   </defs>
                   <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" vertical={false} />
-                  <XAxis dataKey="time" hide />
+                  <XAxis dataKey="id" hide />
                   <YAxis domain={[0, 100]} tick={{ fill: 'var(--text-muted)', fontSize: 10 }} tickLine={false} axisLine={false} width={28} />
                   <Tooltip
+                    labelFormatter={(_, payload) => payload?.[0]?.payload?.time ?? ''}
                     contentStyle={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 8, fontSize: 11 }}
                     labelStyle={{ color: 'var(--text-muted)' }}
                   />
@@ -361,9 +363,10 @@ export default function DriverPage() {
                     </linearGradient>
                   </defs>
                   <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" vertical={false} />
-                  <XAxis dataKey="time" hide />
+                  <XAxis dataKey="id" hide />
                   <YAxis tick={{ fill: 'var(--text-muted)', fontSize: 10 }} tickLine={false} axisLine={false} width={28} />
                   <Tooltip
+                    labelFormatter={(_, payload) => payload?.[0]?.payload?.time ?? ''}
                     contentStyle={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 8, fontSize: 11 }}
                   />
                   <Area type="monotone" dataKey="speed" stroke="var(--cyan)" strokeWidth={2} fill="url(#speedGrad)" dot={false} name="Speed km/h" />
