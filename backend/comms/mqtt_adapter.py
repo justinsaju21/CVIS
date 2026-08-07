@@ -41,7 +41,7 @@ import paho.mqtt.client as mqtt
 
 logger = logging.getLogger("cvis.mqtt")
 
-BROKER_HOST = "localhost"
+BROKER_HOST = "test.mosquitto.org"
 BROKER_PORT = 1883
 TOPIC_TELEMETRY = "cvis/telemetry/+"
 TOPIC_CONFIG_PROTOCOL   = "cvis/config/protocol"

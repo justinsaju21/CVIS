@@ -111,13 +111,13 @@ async def get_auth_logs(
     db = await get_db()
     if event_type:
         async with db.execute(
-            "SELECT id AS log_id, timestamp, device_id, event_type, source_ip, details FROM auth_logs WHERE event_type = ? ORDER BY id DESC LIMIT ?",
+            "SELECT id AS log_id, timestamp, device_id, event_type, ip_address AS source_ip, details FROM auth_logs WHERE event_type = ? ORDER BY id DESC LIMIT ?",
             (event_type, limit),
         ) as cur:
             rows = await cur.fetchall()
     else:
         async with db.execute(
-            "SELECT id AS log_id, timestamp, device_id, event_type, source_ip, details FROM auth_logs ORDER BY id DESC LIMIT ?",
+            "SELECT id AS log_id, timestamp, device_id, event_type, ip_address AS source_ip, details FROM auth_logs ORDER BY id DESC LIMIT ?",
             (limit,),
         ) as cur:
             rows = await cur.fetchall()
