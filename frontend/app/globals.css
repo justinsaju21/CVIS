@@ -4,35 +4,35 @@
 :root {
   /* Core palette */
   --bg-primary:    #000000;
-  --bg-secondary:  #080808;
-  --bg-tertiary:   #0f0f0f;
-  --bg-card:       #111111;
+  --bg-secondary:  #040608;
+  --bg-tertiary:   #0a0d10;
+  --bg-card:       #0d1117;
 
   /* Borders */
-  --border:        rgba(255,255,255,0.07);
-  --border-hover:  rgba(255,255,255,0.14);
-  --border-active: rgba(0,212,255,0.3);
+  --border:        rgba(0,212,255,0.08);
+  --border-hover:  rgba(0,212,255,0.18);
+  --border-active: rgba(0,212,255,0.35);
 
   /* Text */
-  --text-primary:  #f0f0f0;
-  --text-secondary: #888888;
-  --text-muted:    #444444;
+  --text-primary:  #ffffff;
+  --text-secondary: rgba(255, 255, 255, 0.65);
+  --text-muted:    rgba(255, 255, 255, 0.4);
 
   /* Accents */
   --cyan:          #00d4ff;
-  --cyan-dim:      rgba(0,212,255,0.15);
+  --cyan-dim:      rgba(0,212,255,0.1);
   --cyan-glow:     0 0 20px rgba(0,212,255,0.4), 0 0 60px rgba(0,212,255,0.15);
   --amber:         #ffb347;
-  --amber-dim:     rgba(255,179,71,0.15);
+  --amber-dim:     rgba(255,179,71,0.12);
   --red:           #ff4757;
-  --red-dim:       rgba(255,71,87,0.15);
+  --red-dim:       rgba(255,71,87,0.12);
   --green:         #2ed573;
-  --green-dim:     rgba(46,213,115,0.15);
+  --green-dim:     rgba(46,213,115,0.12);
 
   /* Glass */
-  --glass:         rgba(255,255,255,0.03);
-  --glass-border:  rgba(255,255,255,0.07);
-  --glass-hover:   rgba(255,255,255,0.06);
+  --glass:         rgba(0,212,255,0.02);
+  --glass-border:  rgba(0,212,255,0.08);
+  --glass-hover:   rgba(0,212,255,0.05);
 }
 
 /* ─── Reset ──────────────────────────────────────────────────────────────── */
@@ -49,6 +49,7 @@ html {
 
 body {
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-weight: 600;
   background: var(--bg-primary);
   color: var(--text-primary);
   -webkit-font-smoothing: antialiased;
@@ -70,7 +71,7 @@ body {
   border: 1px solid var(--glass-border);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
-  border-radius: 16px;
+  border-radius: 12px;
   transition: border-color 200ms, background 200ms, box-shadow 200ms;
 }
 .glass-card:hover {
@@ -78,29 +79,80 @@ body {
   background: var(--glass-hover);
 }
 
-/* ─── Labels ─────────────────────────────────────────────────────────────── */
-.label {
-  font-size: 10px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.16em;
-  color: var(--text-muted);
+/* ─── HUD panel (for driver view) ───────────────────────────────────────── */
+.hud-panel {
+  background: rgba(0,10,16,0.85);
+  border: 1px solid rgba(0,212,255,0.15);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border-radius: 4px;
+  position: relative;
+  overflow: hidden;
 }
 
-/* ─── Cyan glow ──────────────────────────────────────────────────────────── */
+/* Corner brackets on HUD panels */
+.hud-panel::before,
+.hud-panel::after {
+  content: '';
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  border-color: var(--cyan);
+  border-style: solid;
+}
+.hud-panel::before {
+  top: 4px;
+  left: 4px;
+  border-width: 1px 0 0 1px;
+  opacity: 0.6;
+}
+.hud-panel::after {
+  bottom: 4px;
+  right: 4px;
+  border-width: 0 1px 1px 0;
+  opacity: 0.6;
+}
+
+/* ─── HUD value display ──────────────────────────────────────────────────── */
+.hud-value {
+  font-family: 'Space Mono', monospace;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1;
+}
+
+/* ─── HUD grid line background ───────────────────────────────────────────── */
+.hud-grid-bg {
+  background-image:
+    linear-gradient(rgba(0,212,255,0.025) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0,212,255,0.025) 1px, transparent 1px);
+  background-size: 40px 40px;
+}
+
+/* ─── Labels ─────────────────────────────────────────────────────────────── */
+.label {
+  font-family: 'Space Mono', monospace;
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+  color: rgba(255,255,255,0.32);
+}
+
+/* ─── Glow utilities ─────────────────────────────────────────────────────── */
 .glow-cyan {
   box-shadow: var(--cyan-glow);
 }
-.text-cyan { color: var(--cyan); }
+.text-cyan  { color: var(--cyan); }
 .text-amber { color: var(--amber); }
 .text-red   { color: var(--red); }
 .text-green { color: var(--green); }
 
 /* ─── Scrollbar ──────────────────────────────────────────────────────────── */
-::-webkit-scrollbar { width: 4px; height: 4px; }
+::-webkit-scrollbar { width: 3px; height: 3px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: var(--text-muted); border-radius: 2px; }
-::-webkit-scrollbar-thumb:hover { background: var(--text-secondary); }
+::-webkit-scrollbar-thumb { background: rgba(0,212,255,0.2); border-radius: 2px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(0,212,255,0.4); }
 
 /* ─── Aurora blobs ───────────────────────────────────────────────────────── */
 @keyframes aurora-1 {
@@ -158,12 +210,6 @@ body {
   background: var(--green);
 }
 
-/* ─── Packet dot ─────────────────────────────────────────────────────────── */
-@keyframes packet-flow {
-  from { stroke-dashoffset: 1000; }
-  to   { stroke-dashoffset: 0; }
-}
-
 /* ─── Typewriter cursor ──────────────────────────────────────────────────── */
 @keyframes blink {
   0%, 100% { opacity: 1; }
@@ -189,9 +235,9 @@ body {
   inset: 0;
   pointer-events: none;
   z-index: 9998;
-  background: linear-gradient(to bottom, transparent 0%, rgba(0,212,255,0.03) 50%, transparent 100%);
+  background: linear-gradient(to bottom, transparent 0%, rgba(0,212,255,0.025) 50%, transparent 100%);
   height: 200px;
-  animation: scan 8s linear infinite;
+  animation: scan 10s linear infinite;
 }
 
 /* ─── Status badge ───────────────────────────────────────────────────────── */
@@ -200,35 +246,72 @@ body {
   align-items: center;
   gap: 5px;
   padding: 3px 10px;
-  border-radius: 100px;
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.06em;
+  border-radius: 3px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
+  font-family: 'Space Mono', monospace;
 }
-.badge-healthy  { background: var(--green-dim); color: var(--green); }
-.badge-warning  { background: var(--amber-dim); color: var(--amber); }
-.badge-fault    { background: var(--red-dim);   color: var(--red);   }
-.badge-info     { background: var(--cyan-dim);  color: var(--cyan);  }
+.badge-healthy  { background: var(--green-dim);  color: var(--green);  border: 1px solid rgba(46,213,115,0.2); }
+.badge-warning  { background: var(--amber-dim);  color: var(--amber);  border: 1px solid rgba(255,179,71,0.2); }
+.badge-fault    { background: var(--red-dim);    color: var(--red);    border: 1px solid rgba(255,71,87,0.2); }
+.badge-info     { background: var(--cyan-dim);   color: var(--cyan);   border: 1px solid rgba(0,212,255,0.2); }
 
-/* ─── Control toggle ─────────────────────────────────────────────────────── */
-.toggle-track {
-  width: 44px;
-  height: 24px;
-  border-radius: 12px;
-  cursor: pointer;
-  position: relative;
-  transition: background 200ms;
-  border: 1px solid var(--border);
+/* ─── NOC Data table ─────────────────────────────────────────────────────── */
+.noc-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: 'Space Mono', monospace;
+  font-size: 11px;
 }
-.toggle-thumb {
+.noc-table th {
+  padding: 8px 12px;
+  text-align: left;
+  font-size: 8px;
+  color: var(--text-muted);
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+  background: rgba(0,212,255,0.02);
+}
+.noc-table td {
+  padding: 7px 12px;
+  border-bottom: 1px solid rgba(0,212,255,0.04);
+  vertical-align: middle;
+}
+.noc-table tbody tr {
+  cursor: pointer;
+  transition: background 120ms;
+}
+.noc-table tbody tr:hover {
+  background: rgba(0,212,255,0.04);
+}
+
+/* ─── Packet dot animation ───────────────────────────────────────────────── */
+@keyframes packet-flow {
+  from { stroke-dashoffset: 1000; }
+  to   { stroke-dashoffset: 0; }
+}
+
+/* ─── Pulse ring (for active node) ──────────────────────────────────────── */
+@keyframes pulse-ring {
+  0%   { transform: scale(0.8); opacity: 0.8; }
+  100% { transform: scale(2.2); opacity: 0; }
+}
+.pulse-ring {
   position: absolute;
-  top: 3px;
-  left: 3px;
-  width: 16px;
-  height: 16px;
+  inset: 0;
   border-radius: 50%;
-  transition: transform 200ms, background 200ms;
+  border: 1px solid var(--cyan);
+  animation: pulse-ring 1.6s ease-out infinite;
+}
+
+/* ─── Gauge arc animation ────────────────────────────────────────────────── */
+@keyframes gauge-fill {
+  from { stroke-dashoffset: 565; }
 }
 
 /* ─── Reduced motion ─────────────────────────────────────────────────────── */

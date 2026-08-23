@@ -32,18 +32,62 @@ from db import get_db
 router = APIRouter(prefix="/api/v1/control", tags=["control"])
 logger = logging.getLogger("cvis.control")
 
-# ─── AI service kill-switch ───────────────────────────────────────────────
+# ─── Fleet definition (canonical 4 vehicles) ─────────────────────────────
+FLEET = [
+    {
+        "device_id":   "ESP32-ALPHA",
+        "name":        "Alpha",
+        "description": "Urban Commuter",
+        "color":       "#00d4ff",
+        "personality": "City driving — heavy traffic & charging cycles",
+        "start_mode":  0,
+        "cycle_secs":  12,
+    },
+    {
+        "device_id":   "ESP32-BETA",
+        "name":        "Beta",
+        "description": "Performance Driver",
+        "color":       "#ff4757",
+        "personality": "High-speed sport — motor fault risk",
+        "start_mode":  2,
+        "cycle_secs":  10,
+    },
+    {
+        "device_id":   "ESP32-GAMMA",
+        "name":        "Gamma",
+        "description": "Eco Ranger",
+        "color":       "#2ed573",
+        "personality": "Eco-focused — long range, low stress",
+        "start_mode":  1,
+        "cycle_secs":  18,
+    },
+    {
+        "device_id":   "ESP32-DELTA",
+        "name":        "Delta",
+        "description": "Test Node",
+        "color":       "#ffb347",
+        "personality": "Cycles all 8 modes — used for demo & debug",
+        "start_mode":  4,
+        "cycle_secs":  8,
+    },
+]
+
+
+# ─── AI service kill-switch (global + per-vehicle override) ───────────────
 _ai_service_enabled: bool = True
+_vehicle_ai_override: dict[str, bool] = {}  # device_id -> enabled
 
 
-def is_ai_enabled() -> bool:
+def is_ai_enabled(device_id: str | None = None) -> bool:
+    if device_id and device_id in _vehicle_ai_override:
+        return _vehicle_ai_override[device_id]
     return _ai_service_enabled
 
 
 def set_ai_enabled(value: bool) -> None:
     global _ai_service_enabled
     _ai_service_enabled = value
-    logger.info(f"[CONTROL] AI service {'STARTED' if value else 'STOPPED'}")
+    logger.info(f"[CONTROL] AI service {'STARTED' if value else 'STOPPED'} (global)")
 
 
 # ─── Disconnect vehicle ────────────────────────────────────────────────────
@@ -186,4 +230,69 @@ async def set_ai_service(body: AiServiceRequest) -> dict:
 
 @router.get("/ai-service", summary="Get AI service status")
 async def get_ai_service_status() -> dict:
-    return {"ai_service_enabled": _ai_service_enabled}
+    return {"ai_service_enabled": _ai_service_enabled, "vehicle_overrides": _vehicle_ai_override}
+
+
+# ─── Fleet registry ────────────────────────────────────────────────────────
+
+@router.get("/vehicles", summary="Get the canonical fleet of 4 vehicles")
+async def get_vehicles() -> list[dict]:
+    """Return the static fleet definition enriched with live device status from DB."""
+    db = await get_db()
+    result = []
+    for v in FLEET:
+        async with db.execute(
+            """
+            SELECT d.active,
+                   t.mode AS last_mode, t.battery_pct AS last_battery,
+                   t.motor_temp_c AS last_temp, t.received_at AS last_seen
+            FROM devices d
+            LEFT JOIN (
+                SELECT device_id, mode, battery_pct, motor_temp_c, received_at,
+                       ROW_NUMBER() OVER (PARTITION BY device_id ORDER BY id DESC) as rn
+                FROM telemetry
+            ) t ON t.device_id = d.device_id AND t.rn = 1
+            WHERE d.device_id = ?
+            """,
+            (v["device_id"],),
+        ) as cur:
+            row = await cur.fetchone()
+        entry = {**v}
+        if row:
+            entry["active"]       = bool(row["active"])
+            entry["last_mode"]    = row["last_mode"]
+            entry["last_battery"] = row["last_battery"]
+            entry["last_temp"]    = row["last_temp"]
+            entry["last_seen"]    = row["last_seen"]
+            entry["ai_enabled"]   = is_ai_enabled(v["device_id"])
+        else:
+            entry["active"]       = False
+            entry["last_mode"]    = None
+            entry["last_battery"] = None
+            entry["last_temp"]    = None
+            entry["last_seen"]    = None
+            entry["ai_enabled"]   = is_ai_enabled(v["device_id"])
+        result.append(entry)
+    return result
+
+
+# ─── Per-vehicle AI service toggle ─────────────────────────────────────────
+
+class VehicleAiRequest(BaseModel):
+    device_id: str  = Field(..., description="Vehicle to toggle AI for")
+    enabled:   bool = Field(..., description="True = AI on for this vehicle")
+
+
+@router.post("/ai-service/vehicle", summary="Enable or disable AI for a specific vehicle")
+async def set_vehicle_ai_service(body: VehicleAiRequest) -> dict:
+    """Override AI service state for a specific vehicle without affecting others."""
+    _vehicle_ai_override[body.device_id] = body.enabled
+    logger.info(f"[CONTROL] AI for {body.device_id} set to {'ENABLED' if body.enabled else 'DISABLED'}")
+    from ws_manager import manager
+    await manager.broadcast({
+        "event": "vehicle_ai_status",
+        "device_id": body.device_id,
+        "enabled": body.enabled,
+    })
+    return {"device_id": body.device_id, "ai_enabled": body.enabled, "status": "ok"}
+

@@ -105,21 +105,35 @@ async def ingest_telemetry(
     "/telemetry/recent",
     summary="Fetch the N most recent telemetry rows",
 )
-async def get_recent_telemetry(limit: int = 10) -> list[dict]:
+async def get_recent_telemetry(limit: int = 10, device_id: Optional[str] = None) -> list[dict]:
     """Return the most recent telemetry records for WS backfill on connect."""
     db = await get_db()
     limit = max(1, min(limit, 100))
-    async with db.execute(
-        """
-        SELECT t.*, p.protocol, p.size_bytes
-        FROM   telemetry t
-        JOIN   packets   p ON p.id = t.packet_id
-        ORDER  BY t.id DESC
-        LIMIT  ?
-        """,
-        (limit,),
-    ) as cur:
-        rows = await cur.fetchall()
+    if device_id:
+        async with db.execute(
+            """
+            SELECT t.*, p.protocol, p.size_bytes
+            FROM   telemetry t
+            JOIN   packets   p ON p.id = t.packet_id
+            WHERE  t.device_id = ?
+            ORDER  BY t.id DESC
+            LIMIT  ?
+            """,
+            (device_id, limit),
+        ) as cur:
+            rows = await cur.fetchall()
+    else:
+        async with db.execute(
+            """
+            SELECT t.*, p.protocol, p.size_bytes
+            FROM   telemetry t
+            JOIN   packets   p ON p.id = t.packet_id
+            ORDER  BY t.id DESC
+            LIMIT  ?
+            """,
+            (limit,),
+        ) as cur:
+            rows = await cur.fetchall()
     return [dict(row) for row in rows]
 
 
@@ -127,19 +141,33 @@ async def get_recent_telemetry(limit: int = 10) -> list[dict]:
     "/telemetry/packets",
     summary="Fetch raw packet log (for NOC packet table)",
 )
-async def get_packets(limit: int = 50) -> list[dict]:
+async def get_packets(limit: int = 50, device_id: Optional[str] = None) -> list[dict]:
     """Return the most recent raw packet log entries for the NOC packet table."""
     db = await get_db()
     limit = max(1, min(limit, 500))
-    async with db.execute(
-        """
-        SELECT id as packet_id, received_at as timestamp, device_id, protocol, direction,
-               size_bytes, status, raw_json as raw_payload, 'ok' as auth_status, 0 as encrypted
-        FROM packets
-        ORDER BY id DESC
-        LIMIT ?
-        """,
-        (limit,),
-    ) as cur:
-        rows = await cur.fetchall()
+    if device_id:
+        async with db.execute(
+            """
+            SELECT id as packet_id, received_at as timestamp, device_id, protocol, direction,
+                   size_bytes, status, raw_json as raw_payload, 'ok' as auth_status, 0 as encrypted
+            FROM packets
+            WHERE device_id = ?
+            ORDER BY id DESC
+            LIMIT ?
+            """,
+            (device_id, limit),
+        ) as cur:
+            rows = await cur.fetchall()
+    else:
+        async with db.execute(
+            """
+            SELECT id as packet_id, received_at as timestamp, device_id, protocol, direction,
+                   size_bytes, status, raw_json as raw_payload, 'ok' as auth_status, 0 as encrypted
+            FROM packets
+            ORDER BY id DESC
+            LIMIT ?
+            """,
+            (limit,),
+        ) as cur:
+            rows = await cur.fetchall()
     return [dict(r) for r in rows]

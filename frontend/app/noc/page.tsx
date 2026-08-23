@@ -1,15 +1,13 @@
 'use client'
 
-import { useState, useCallback, useEffect, useRef } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
-  Shield, ShieldOff, Lock, Unlock, Wifi, WifiOff, Zap, ZapOff,
-  RefreshCw, StopCircle, BrainCircuit, ChevronDown, ChevronUp,
-  AlertTriangle, CheckCircle, XCircle, Info, Eye
+  Shield, Lock, Wifi, WifiOff, RefreshCw, BrainCircuit,
+  AlertTriangle, CheckCircle, XCircle, Eye, Activity, ChevronRight
 } from 'lucide-react'
 import { toast } from 'sonner'
 
-import WireframeCarLoader from '@/components/layout/WireframeCarLoader'
 import Navbar from '@/components/layout/Navbar'
 import CustomCursor from '@/components/layout/CustomCursor'
 import { useWebSocket } from '@/hooks/useWebSocket'
@@ -20,186 +18,199 @@ import {
 } from '@/lib/api'
 import type { ServerConfig, PacketRow, WsEvent, TelemetryRow } from '@/lib/types'
 
-// ─── Packet dot animation ─────────────────────────────────────────────────
-// Interpolate points along a bezier curve manually (no CSS offset-path)
-function bezier(t: number, p0: number, p1: number, p2: number, p3: number) {
-  const u = 1 - t
-  return u * u * u * p0 + 3 * u * u * t * p1 + 3 * u * t * t * p2 + t * t * t * p3
-}
-
-function PacketFlow({ protocol }: { protocol: 'http' | 'mqtt' }) {
-  const color  = protocol === 'mqtt' ? 'var(--amber)' : 'var(--cyan)'
-  const W = 520, H = 80
-
-  // Control points for the bezier path
-  const p = { x0: 20, y0: H/2, x1: 120, y1: H/2, x2: 400, y2: H/2, x3: W-20, y3: H/2 }
-  // Gentle wave: mid-points go up/down
-  const pathD = `M ${p.x0} ${p.y0} C ${p.x1} ${p.y0} 200 20 260 ${H/2} C 320 ${H-20} ${p.x2} ${H/2} ${p.x3} ${p.y3}`
-
-  const dots = [0, 0.33, 0.66]
+// ─── Packet flow topology ──────────────────────────────────────────────────
+function PacketFlow({ protocol, connected }: { protocol: 'http' | 'mqtt'; connected: boolean }) {
+  const color = protocol === 'mqtt' ? '#ffb347' : '#00d4ff'
+  const W = 520, H = 100
 
   return (
-    <div style={{ width: '100%', overflow: 'hidden' }}>
-      <svg viewBox={`0 0 ${W} ${H}`} style={{ width: '100%' }}>
-        {/* Path glow */}
-        <path d={pathD} fill="none" stroke={`rgba(${protocol === 'mqtt' ? '255,179,71' : '0,212,255'},0.12)`} strokeWidth={2} />
-        <path d={pathD} fill="none" stroke={`rgba(${protocol === 'mqtt' ? '255,179,71' : '0,212,255'},0.3)`} strokeWidth={1} strokeDasharray="6 4" />
+    <div style={{ width: '100%' }}>
+      <svg viewBox={`0 0 ${W} ${H}`} style={{ width: '100%', overflow: 'visible' }}>
+        {/* Connection line */}
+        <line x1={60} y1={H/2} x2={W-60} y2={H/2}
+          stroke={`${color}18`} strokeWidth={2} />
+        <line x1={60} y1={H/2} x2={W-60} y2={H/2}
+          stroke={`${color}40`} strokeWidth={1} strokeDasharray="6 6" />
 
-        {/* Labels */}
-        <text x={20}     y={H/2 - 10} fill="var(--text-muted)" fontSize={10} fontFamily="Space Mono">ESP32</text>
-        <text x={W - 20} y={H/2 - 10} fill="var(--text-muted)" fontSize={10} fontFamily="Space Mono" textAnchor="end">BACKEND</text>
+        {/* Nodes */}
+        {/* ESP32 node */}
+        <rect x={10} y={H/2 - 20} width={48} height={40} rx={4}
+          fill="rgba(0,0,0,0.6)" stroke={color} strokeWidth={1} strokeOpacity={0.5} />
+        <text x={34} y={H/2 - 4} textAnchor="middle" fill={color} fontSize={8}
+          fontFamily="Space Mono" opacity={0.8}>ESP32</text>
+        <text x={34} y={H/2 + 8} textAnchor="middle" fill="rgba(255,255,255,0.3)" fontSize={7}
+          fontFamily="Space Mono">NODE</text>
 
         {/* Protocol label */}
-        <text x={W/2} y={14} fill={color} fontSize={9} fontFamily="Space Mono" textAnchor="middle" letterSpacing={2}>
-          {protocol.toUpperCase()}
-        </text>
+        <rect x={W/2 - 22} y={H/2 - 9} width={44} height={18} rx={3}
+          fill={`${color}15`} stroke={`${color}40`} strokeWidth={0.8} />
+        <text x={W/2} y={H/2 + 4} textAnchor="middle" fill={color} fontSize={8}
+          fontFamily="Space Mono" letterSpacing={2}>{protocol.toUpperCase()}</text>
 
-        {/* Animated dots via keyframes on cx using motion.circle */}
-        {dots.map((offset, i) => (
-          <motion.circle
-            key={i}
-            r={4}
-            fill={color}
-            style={{ filter: `drop-shadow(0 0 4px ${color})` }}
-            animate={{
-              cx: [20, 260, W - 20],
-              cy: [H/2, H/2, H/2],
-            }}
-            transition={{
-              duration: 2.5,
-              delay: offset * 2.5,
-              repeat: Infinity,
-              ease: 'linear',
-              times: [0, 0.5, 1],
-            }}
+        {/* Backend node */}
+        <rect x={W-58} y={H/2 - 20} width={48} height={40} rx={4}
+          fill="rgba(0,0,0,0.6)" stroke={color} strokeWidth={1} strokeOpacity={0.5} />
+        <text x={W-34} y={H/2 - 4} textAnchor="middle" fill={color} fontSize={8}
+          fontFamily="Space Mono" opacity={0.8}>FastAPI</text>
+        <text x={W-34} y={H/2 + 8} textAnchor="middle" fill="rgba(255,255,255,0.3)" fontSize={7}
+          fontFamily="Space Mono">SERVER</text>
+
+        {/* Animated packets */}
+        {connected && [0, 0.35, 0.7].map((offset, i) => (
+          <motion.circle key={i} r={4} fill={color}
+            style={{ filter: `drop-shadow(0 0 5px ${color})` }}
+            animate={{ cx: [64, W - 64], cy: [H/2, H/2] }}
+            transition={{ duration: 2.2, delay: offset * 2.2, repeat: Infinity, ease: 'linear' }}
           />
         ))}
-
-        {/* Node circles */}
-        <circle cx={20}     cy={H/2} r={6} fill="rgba(0,0,0,0.8)" stroke={color} strokeWidth={1.5} />
-        <circle cx={W - 20} cy={H/2} r={6} fill="rgba(0,0,0,0.8)" stroke={color} strokeWidth={1.5} />
       </svg>
     </div>
   )
 }
 
-// ─── Toggle switch ────────────────────────────────────────────────────────
-function Toggle({ on, onChange, disabled = false }: { on: boolean; onChange: (v: boolean) => void; disabled?: boolean }) {
+// ─── Control toggle ──────────────────────────────────────────────────────────
+function Toggle({ on, onChange, disabled = false, accentColor = '#00d4ff' }:
+  { on: boolean; onChange: (v: boolean) => void; disabled?: boolean; accentColor?: string }) {
   return (
-    <button
-      onClick={() => !disabled && onChange(!on)}
-      disabled={disabled}
+    <button onClick={() => !disabled && onChange(!on)} disabled={disabled}
       style={{
-        width: 44, height: 24, borderRadius: 12,
-        background: on ? 'rgba(0,212,255,0.3)' : 'rgba(255,255,255,0.08)',
-        border: `1px solid ${on ? 'var(--cyan)' : 'var(--border)'}`,
+        width: 40, height: 22, borderRadius: 3,
+        background: on ? `${accentColor}18` : 'rgba(255,255,255,0.04)',
+        border: `1px solid ${on ? accentColor + '50' : 'rgba(255,255,255,0.08)'}`,
         cursor: disabled ? 'not-allowed' : 'pointer',
         position: 'relative',
-        transition: 'background 200ms, border-color 200ms',
+        transition: 'all 150ms',
         flexShrink: 0,
         opacity: disabled ? 0.4 : 1,
       }}
     >
       <motion.div
-        animate={{ x: on ? 20 : 2 }}
+        animate={{ x: on ? 18 : 2 }}
         transition={{ type: 'spring', stiffness: 500, damping: 30 }}
         style={{
-          position: 'absolute', top: 3, width: 16, height: 16, borderRadius: '50%',
-          background: on ? 'var(--cyan)' : 'var(--text-muted)',
-          boxShadow: on ? '0 0 6px rgba(0,212,255,0.6)' : 'none',
+          position: 'absolute', top: 3, width: 14, height: 14, borderRadius: 2,
+          background: on ? accentColor : 'rgba(255,255,255,0.2)',
+          boxShadow: on ? `0 0 8px ${accentColor}80` : 'none',
         }}
       />
     </button>
   )
 }
 
-// ─── Control row ──────────────────────────────────────────────────────────
-function ControlRow({ icon: Icon, label, sublabel, children }:
-  { icon: React.FC<{ size: number; color?: string }>; label: string; sublabel?: string; children: React.ReactNode }) {
-  return (
-    <div style={{
-      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-      padding: '14px 0', borderBottom: '1px solid var(--border)',
-    }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-        <Icon size={14} color="var(--text-muted)" />
-        <div>
-          <div style={{ fontSize: 12, color: 'var(--text-primary)', fontWeight: 500 }}>{label}</div>
-          {sublabel && <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 1 }}>{sublabel}</div>}
-        </div>
-      </div>
-      {children}
-    </div>
-  )
-}
-
-// ─── Packet inspector ──────────────────────────────────────────────────────
+// ─── Packet inspector modal ──────────────────────────────────────────────────
 function PacketInspector({ packet, onClose }: { packet: PacketRow; onClose: () => void }) {
   let parsed: unknown = null
   try { parsed = JSON.parse(packet.raw_payload) } catch { parsed = packet.raw_payload }
-
-  const authColor = packet.auth_status === 'ok' || packet.auth_status === 'no_auth'
-    ? 'var(--green)' : 'var(--red)'
+  const isOk = packet.auth_status === 'ok' || packet.auth_status === 'no_auth'
 
   return (
     <motion.div
-      initial={{ opacity: 0, scale: 0.97, y: 10 }}
-      animate={{ opacity: 1, scale: 1, y: 0 }}
-      exit={{ opacity: 0, scale: 0.97 }}
-      transition={{ duration: 0.2 }}
+      initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+      transition={{ duration: 0.15 }}
       style={{
         position: 'fixed', inset: 0, zIndex: 300,
         display: 'flex', alignItems: 'center', justifyContent: 'center',
-        background: 'rgba(0,0,0,0.8)', backdropFilter: 'blur(8px)',
+        background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(10px)',
         padding: 24,
       }}
       onClick={onClose}
     >
-      <div
+      <motion.div
+        initial={{ scale: 0.95, y: 16 }} animate={{ scale: 1, y: 0 }}
+        exit={{ scale: 0.95, opacity: 0 }}
+        transition={{ duration: 0.2, ease: 'easeOut' }}
         onClick={(e) => e.stopPropagation()}
         style={{
-          background: 'var(--bg-card)', border: '1px solid var(--border-active)',
-          borderRadius: 16, padding: 28, width: '100%', maxWidth: 560, maxHeight: '80vh',
+          background: '#040810',
+          border: '1px solid rgba(0,212,255,0.2)',
+          borderRadius: 8, padding: 28,
+          width: '100%', maxWidth: 580, maxHeight: '82vh',
           overflowY: 'auto',
-          boxShadow: '0 24px 80px rgba(0,0,0,0.6), 0 0 40px rgba(0,212,255,0.05)',
+          boxShadow: '0 24px 80px rgba(0,0,0,0.8), 0 0 0 1px rgba(0,212,255,0.05)',
+          position: 'relative',
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
+        {/* Corner decorations */}
+        {[
+          { top: 6, left: 6, borderWidth: '1px 0 0 1px' },
+          { top: 6, right: 6, borderWidth: '1px 1px 0 0' },
+          { bottom: 6, left: 6, borderWidth: '0 0 1px 1px' },
+          { bottom: 6, right: 6, borderWidth: '0 1px 1px 0' },
+        ].map((s, i) => (
+          <div key={i} style={{
+            position: 'absolute', width: 12, height: 12,
+            borderStyle: 'solid', borderColor: 'rgba(0,212,255,0.4)',
+            ...s,
+          }} />
+        ))}
+
+        {/* Header */}
+        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 20 }}>
           <div>
-            <div className="label">Packet Inspector</div>
-            <div className="font-mono" style={{ fontSize: 16, color: 'var(--cyan)', marginTop: 4 }}>
+            <div className="label" style={{ marginBottom: 6 }}>Packet Inspector</div>
+            <div className="font-mono" style={{ fontSize: 20, color: 'var(--cyan)', letterSpacing: '0.05em' }}>
               #{packet.packet_id}
             </div>
           </div>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: 20 }}>×</button>
+          <div style={{ textAlign: 'right' }}>
+            <div style={{
+              display: 'inline-flex', alignItems: 'center', gap: 5,
+              padding: '4px 10px', borderRadius: 3,
+              background: isOk ? 'rgba(46,213,115,0.1)' : 'rgba(255,71,87,0.1)',
+              border: `1px solid ${isOk ? 'rgba(46,213,115,0.25)' : 'rgba(255,71,87,0.25)'}`,
+            }}>
+              {isOk
+                ? <CheckCircle size={11} color="#2ed573" />
+                : <XCircle size={11} color="#ff4757" />}
+              <span style={{ fontSize: 10, color: isOk ? '#2ed573' : '#ff4757',
+                fontFamily: 'Space Mono', letterSpacing: '0.08em' }}>
+                {packet.auth_status.toUpperCase()}
+              </span>
+            </div>
+            <button onClick={onClose}
+              style={{ display: 'block', marginTop: 8, marginLeft: 'auto', background: 'none',
+                border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: 18 }}>
+              ×
+            </button>
+          </div>
         </div>
 
         {/* Meta grid */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 20 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginBottom: 20 }}>
           {[
-            { label: 'Device', value: packet.device_id },
-            { label: 'Protocol', value: packet.protocol.toUpperCase() },
-            { label: 'Timestamp', value: new Date(packet.timestamp).toLocaleString() },
-            { label: 'Size', value: `${packet.size_bytes} B` },
-            { label: 'Auth', value: packet.auth_status, color: authColor },
-            { label: 'Encrypted', value: packet.encrypted ? 'AES-256-GCM' : 'Plaintext' },
-            { label: 'Status', value: packet.status },
+            { label: 'Device',    value: packet.device_id },
+            { label: 'Protocol',  value: packet.protocol.toUpperCase(),
+              color: packet.protocol === 'mqtt' ? '#ffb347' : '#00d4ff' },
+            { label: 'Size',      value: `${packet.size_bytes} B` },
+            { label: 'Timestamp', value: new Date(packet.timestamp).toLocaleTimeString(), span: 2 },
+            { label: 'Encrypted', value: packet.encrypted ? 'AES-256-GCM' : 'Plaintext',
+              color: packet.encrypted ? '#2ed573' : 'var(--text-muted)' },
           ].map((f) => (
-            <div key={f.label} style={{ padding: '10px 14px', background: 'var(--glass)', borderRadius: 8, border: '1px solid var(--border)' }}>
+            <div key={f.label}
+              style={{
+                padding: '10px 12px',
+                background: 'rgba(0,212,255,0.03)',
+                borderRadius: 4, border: '1px solid rgba(0,212,255,0.08)',
+                gridColumn: (f as { span?: number }).span ? `span ${(f as { span?: number }).span}` : undefined,
+              }}>
               <div className="label" style={{ marginBottom: 4 }}>{f.label}</div>
-              <div className="font-mono" style={{ fontSize: 12, color: (f as { color?: string }).color ?? 'var(--text-primary)' }}>{f.value}</div>
+              <div className="font-mono" style={{ fontSize: 12,
+                color: (f as { color?: string }).color ?? 'var(--text-primary)' }}>
+                {f.value}
+              </div>
             </div>
           ))}
         </div>
 
         {/* Payload */}
-        <div className="label" style={{ marginBottom: 8 }}>Payload</div>
+        <div className="label" style={{ marginBottom: 8 }}>Raw Payload</div>
         <pre style={{
-          background: 'var(--bg-secondary)', borderRadius: 8, padding: '14px',
-          border: '1px solid var(--border)', fontSize: 11, color: 'var(--text-secondary)',
+          background: '#020406', borderRadius: 4, padding: '14px 16px',
+          border: '1px solid rgba(0,212,255,0.08)', fontSize: 11,
+          color: 'rgba(0,212,255,0.7)',
           overflowX: 'auto', whiteSpace: 'pre-wrap', wordBreak: 'break-all',
-          fontFamily: 'Space Mono, monospace', lineHeight: 1.6,
-          maxHeight: 200, overflowY: 'auto',
+          fontFamily: 'Space Mono, monospace', lineHeight: 1.7,
+          maxHeight: 180, overflowY: 'auto',
         }}>
           {typeof parsed === 'object' ? JSON.stringify(parsed, null, 2) : String(parsed)}
         </pre>
@@ -207,80 +218,60 @@ function PacketInspector({ packet, onClose }: { packet: PacketRow; onClose: () =
         {/* AI response */}
         {packet.ai_response && (
           <>
-            <div className="label" style={{ marginBottom: 8, marginTop: 16 }}>AI Response</div>
+            <div className="label" style={{ marginBottom: 8, marginTop: 16 }}>AI Analysis</div>
             <div style={{
-              background: 'var(--cyan-dim)', borderRadius: 8, padding: 14,
-              border: '1px solid var(--border-active)', fontSize: 12, color: 'var(--text-primary)', lineHeight: 1.6,
+              background: 'rgba(0,212,255,0.05)', borderRadius: 4, padding: '12px 14px',
+              border: '1px solid rgba(0,212,255,0.15)', fontSize: 12,
+              color: 'var(--text-secondary)', lineHeight: 1.7, fontFamily: 'Inter',
             }}>
               {packet.ai_response}
             </div>
           </>
         )}
-      </div>
+      </motion.div>
     </motion.div>
   )
 }
 
-// ─── Packet table row ──────────────────────────────────────────────────────
-function PacketTableRow({ packet, onClick }: { packet: PacketRow; onClick: () => void }) {
-  const statusColor = packet.status === 'ok' ? 'var(--green)' : 'var(--red)'
-  const authColor   = packet.auth_status === 'ok' ? 'var(--green)' : packet.auth_status === 'no_auth' ? 'var(--amber)' : 'var(--red)'
-  const protoColor  = packet.protocol === 'mqtt' ? 'var(--amber)' : 'var(--cyan)'
-
+// ─── Chip selector ─────────────────────────────────────────────────────────
+function ChipSelector({ options, value, onChange, disabled, color = '#00d4ff' }:
+  { options: (string | number)[]; value: string | number; onChange: (v: string | number) => void; disabled?: boolean; color?: string }) {
   return (
-    <motion.tr
-      onClick={onClick}
-      whileHover={{ backgroundColor: 'rgba(255,255,255,0.03)' }}
-      style={{ cursor: 'pointer', borderBottom: '1px solid var(--border)' }}
-    >
-      <td className="font-mono" style={{ padding: '8px 10px', fontSize: 11, color: 'var(--text-muted)' }}>#{packet.packet_id}</td>
-      <td style={{ padding: '8px 10px', fontSize: 11, color: 'var(--text-secondary)' }}>
-        {new Date(packet.timestamp).toLocaleTimeString()}
-      </td>
-      <td style={{ padding: '8px 10px' }}>
-        <span style={{ fontSize: 10, color: protoColor, fontFamily: 'Space Mono', letterSpacing: '0.05em' }}>
-          {packet.protocol.toUpperCase()}
-        </span>
-      </td>
-      <td style={{ padding: '8px 10px', fontSize: 11, color: 'var(--text-primary)' }}>{packet.device_id}</td>
-      <td className="font-mono" style={{ padding: '8px 10px', fontSize: 11, color: 'var(--text-muted)' }}>{packet.size_bytes}B</td>
-      <td style={{ padding: '8px 10px' }}>
-        <span style={{ fontSize: 10, color: authColor }}>{packet.auth_status}</span>
-      </td>
-      <td style={{ padding: '8px 10px' }}>
-        <span style={{ fontSize: 10, color: packet.encrypted ? 'var(--green)' : 'var(--text-muted)' }}>
-          {packet.encrypted ? 'AES' : 'plain'}
-        </span>
-      </td>
-      <td style={{ padding: '8px 10px' }}>
-        <span style={{ fontSize: 10, color: statusColor }}>●</span>
-        <span style={{ fontSize: 10, color: 'var(--text-muted)', marginLeft: 4 }}>{packet.status}</span>
-      </td>
-      <td style={{ padding: '8px 10px' }}>
-        <Eye size={12} color="var(--text-muted)" />
-      </td>
-    </motion.tr>
+    <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+      {options.map((o) => (
+        <button key={o} onClick={() => onChange(o)} disabled={disabled || value === o}
+          style={{
+            padding: '3px 9px', borderRadius: 3, fontSize: 10, cursor: 'pointer',
+            fontFamily: 'Space Mono', letterSpacing: '0.05em',
+            background: value === o ? `${color}18` : 'transparent',
+            border: `1px solid ${value === o ? `${color}55` : 'rgba(255,255,255,0.08)'}`,
+            color: value === o ? color : 'var(--text-muted)',
+            opacity: disabled ? 0.5 : 1,
+            transition: 'all 120ms',
+          }}
+        >
+          {o}
+        </button>
+      ))}
+    </div>
   )
 }
 
-// ─── Main NOC page ────────────────────────────────────────────────────────
+// ─── Main NOC page ───────────────────────────────────────────────────────────
 export default function NocPage() {
-  const [loaded,    setLoaded]    = useState(false)
-  const [config,    setConfig]    = useState<ServerConfig | null>(null)
-  const [packets,   setPackets]   = useState<PacketRow[]>([])
-  const [inspector, setInspector] = useState<PacketRow | null>(null)
-  const [stats,     setStats]     = useState({ total: 0, lost: 0, tampered: 0, protocol: 'http' })
-  const [deviceId,  setDeviceId]  = useState('')
-  const [aiEnabled, setAiEnabled] = useState(true)
-  const [saving,    setSaving]    = useState<string | null>(null)
+  const [config,    setConfigState] = useState<ServerConfig | null>(null)
+  const [packets,   setPackets]     = useState<PacketRow[]>([])
+  const [inspector, setInspector]   = useState<PacketRow | null>(null)
+  const [deviceId,  setDeviceId]    = useState('')
+  const [aiEnabled, setAiEnabled]   = useState(true)
+  const [saving,    setSaving]      = useState<string | null>(null)
+  const [filter,    setFilter]      = useState<'all' | 'ok' | 'rejected'>('all')
 
-  // Load initial config + packets
   useEffect(() => {
-    fetchConfig().then((c) => setConfig(c as ServerConfig)).catch(() => {})
-    fetchPackets(50).then((rows) => setPackets(rows as PacketRow[])).catch(() => {})
+    fetchConfig().then((c) => setConfigState(c as ServerConfig)).catch(() => {})
+    fetchPackets(80).then((rows) => setPackets(rows as PacketRow[])).catch(() => {})
   }, [])
 
-  // WebSocket: push new packets to the top
   const handleWs = useCallback((ev: WsEvent) => {
     if (ev.event === 'telemetry') {
       const t = ev as unknown as TelemetryRow
@@ -295,8 +286,7 @@ export default function NocPage() {
         auth_status: 'ok',
         encrypted:   false,
         raw_payload: JSON.stringify(t),
-      }, ...prev.slice(0, 99)])
-      setStats((s) => ({ ...s, total: s.total + 1, protocol: t.protocol }))
+      }, ...prev.slice(0, 119)])
     }
     if (ev.event === 'ai_recommendation') {
       setPackets((prev) =>
@@ -307,14 +297,12 @@ export default function NocPage() {
 
   const { connected } = useWebSocket(handleWs)
 
-  // ─── Control helpers ─────────────────────────────────────────────────
   const save = async (key: string, fn: () => Promise<unknown>) => {
     setSaving(key)
     try {
       await fn()
-      // Re-fetch config
       const c = await fetchConfig() as ServerConfig
-      setConfig(c)
+      setConfigState(c)
       toast.success(`${key} updated`)
     } catch (e: unknown) {
       toast.error(e instanceof Error ? e.message : 'Error')
@@ -323,11 +311,11 @@ export default function NocPage() {
     }
   }
 
-  const handleProtocol = (p: 'http' | 'mqtt') => save('protocol', () => setProtocol(p))
-  const handleEncryption = (v: boolean) => save('encryption', () => setEncryption(v))
-  const handleAuth = (v: boolean) => save('auth', () => setAuth(v))
-  const handleReplay = (v: boolean) => save('replay', () => setReplay(v))
-  const handleChaos = (loss: number, latency: number, tamper: boolean) =>
+  const handleProtocol   = (p: 'http' | 'mqtt')            => save('protocol',   () => setProtocol(p))
+  const handleEncryption = (v: boolean)                     => save('encryption', () => setEncryption(v))
+  const handleAuth       = (v: boolean)                     => save('auth',       () => setAuth(v))
+  const handleReplay     = (v: boolean)                     => save('replay',     () => setReplay(v))
+  const handleChaos      = (loss: number, latency: number, tamper: boolean) =>
     save('chaos', () => setChaos({ loss_pct: loss, latency_ms: latency, tamper }))
   const handleDisconnect = () => {
     if (!deviceId.trim()) { toast.error('Enter device ID'); return }
@@ -342,235 +330,376 @@ export default function NocPage() {
     save('ai', () => setAiService(v))
   }
 
-  const chaos = config?.chaos
+  const chaos   = config?.chaos
   const loading = (key: string) => saving === key
 
-  if (!loaded) {
-    return <WireframeCarLoader onComplete={() => setLoaded(true)} message="Initializing NOC..." />
-  }
+  const filteredPackets = packets.filter((p) => {
+    if (filter === 'ok')       return p.status === 'ok' && p.auth_status !== 'fail' && p.auth_status !== 'tamper_detected'
+    if (filter === 'rejected') return p.status !== 'ok' || p.auth_status === 'fail' || p.auth_status === 'tamper_detected'
+    return true
+  })
+
+  const totalOk       = packets.filter(p => p.status === 'ok').length
+  const totalRejected = packets.filter(p => p.status !== 'ok').length
 
   return (
     <>
       <CustomCursor />
       <Navbar wsConnected={connected} />
+      <div className="scan-line" />
+      <div className="hud-grid-bg" style={{ position: 'fixed', inset: 0, zIndex: 0, pointerEvents: 'none' }} />
 
-      <main style={{ paddingTop: 60, minHeight: '100vh' }}>
-        <div style={{ maxWidth: 1500, margin: '0 auto', padding: '24px 20px' }}>
+      <main style={{ paddingTop: 60, minHeight: '100vh', position: 'relative', zIndex: 1 }}>
+        <div style={{ maxWidth: 1520, margin: '0 auto', padding: '20px 18px' }}>
 
-          {/* Header */}
-          <motion.div
-            initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}
-            style={{ marginBottom: 24, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}
-          >
+          {/* ── Header ── */}
+          <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}
+            style={{ marginBottom: 18, display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
             <div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
                 <div className="live-dot" />
                 <span className="label">Network Operations Center</span>
               </div>
-              <h1 className="font-display" style={{ fontSize: 22, letterSpacing: '0.15em', color: 'var(--cyan)' }}>
+              <h1 className="font-display" style={{ fontSize: 20, letterSpacing: '0.2em', color: 'var(--cyan)',
+                textShadow: '0 0 30px rgba(0,212,255,0.3)' }}>
                 CVIS NOC
               </h1>
             </div>
-            <div style={{ display: 'flex', gap: 20, alignItems: 'center' }}>
+
+            {/* Stats strip */}
+            <div style={{ marginLeft: 'auto', display: 'flex', gap: 6 }}>
               {[
-                { label: 'Protocol', value: config?.active_protocol?.toUpperCase() ?? '---', color: config?.active_protocol === 'mqtt' ? 'var(--amber)' : 'var(--cyan)' },
-                { label: 'Auth',     value: config?.auth_enabled ? 'ON' : 'OFF',            color: config?.auth_enabled ? 'var(--green)' : 'var(--red)' },
-                { label: 'Encrypt', value: config?.encryption_enabled ? 'AES' : 'Plain',   color: config?.encryption_enabled ? 'var(--green)' : 'var(--text-muted)' },
-                { label: 'Packets', value: packets.length,                                  color: 'var(--text-primary)' },
+                { label: 'PROTOCOL', value: config?.active_protocol?.toUpperCase() ?? '---',
+                  color: config?.active_protocol === 'mqtt' ? '#ffb347' : '#00d4ff' },
+                { label: 'AUTH',     value: config?.auth_enabled ? 'ON' : 'OFF',
+                  color: config?.auth_enabled ? '#2ed573' : '#ff4757' },
+                { label: 'ENCRYPT',  value: config?.encryption_enabled ? 'AES' : 'PLAIN',
+                  color: config?.encryption_enabled ? '#2ed573' : 'var(--text-muted)' },
+                { label: 'PACKETS',  value: String(packets.length), color: 'var(--text-primary)' },
+                { label: 'ACCEPTED', value: String(totalOk), color: '#2ed573' },
+                { label: 'REJECTED', value: String(totalRejected),
+                  color: totalRejected > 0 ? '#ff4757' : 'var(--text-muted)' },
               ].map((s) => (
-                <div key={s.label} style={{ textAlign: 'center' }}>
+                <div key={s.label} style={{
+                  padding: '6px 12px',
+                  background: 'rgba(0,212,255,0.03)',
+                  border: '1px solid rgba(0,212,255,0.08)',
+                  borderRadius: 4,
+                  textAlign: 'center',
+                  minWidth: 60,
+                }}>
                   <div className="label">{s.label}</div>
-                  <div className="font-mono" style={{ fontSize: 14, color: s.color, marginTop: 2 }}>{s.value}</div>
+                  <div className="font-mono" style={{ fontSize: 13, color: s.color, marginTop: 3 }}>{s.value}</div>
                 </div>
               ))}
             </div>
           </motion.div>
 
-          {/* Main grid: flow + controls | table */}
-          <div style={{ display: 'grid', gridTemplateColumns: '340px 1fr', gap: 16, alignItems: 'start' }}>
+          {/* ── Main layout ── */}
+          <div style={{ display: 'grid', gridTemplateColumns: '300px 1fr', gap: 14, alignItems: 'start' }}>
 
-            {/* Left: Packet flow + Controls */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+            {/* ── Left panel: Flow + Controls ── */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
 
-              {/* Packet flow SVG */}
-              <motion.div
-                className="glass-card"
-                initial={{ opacity: 0 }} animate={{ opacity: 1 }}
-                style={{ padding: '20px', overflow: 'hidden' }}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
-                  <Wifi size={13} color="var(--cyan)" />
+              {/* Packet flow */}
+              <motion.div initial={{ opacity: 0, x: -12 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.05 }}
+                className="hud-panel" style={{ padding: '16px 16px 10px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+                  <Activity size={11} color="var(--cyan)" />
                   <span className="label">Live Packet Flow</span>
-                  <span style={{
-                    marginLeft: 'auto', fontSize: 10,
-                    color: connected ? 'var(--green)' : 'var(--red)',
-                  }}>
+                  <span style={{ marginLeft: 'auto', fontSize: 9, fontFamily: 'Space Mono',
+                    color: connected ? '#2ed573' : '#ff4757' }}>
                     {connected ? '● LIVE' : '◌ OFFLINE'}
                   </span>
                 </div>
-                <PacketFlow protocol={(config?.active_protocol as 'http' | 'mqtt') ?? 'http'} />
+                <PacketFlow protocol={(config?.active_protocol as 'http' | 'mqtt') ?? 'http'} connected={connected} />
               </motion.div>
 
-              {/* Control panel */}
-              <motion.div
-                className="glass-card"
-                initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.15 }}
-                style={{ padding: '20px' }}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-                  <Shield size={13} color="var(--cyan)" />
+              {/* Controls */}
+              <motion.div initial={{ opacity: 0, x: -12 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.1 }}
+                className="hud-panel" style={{ padding: '16px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 14, paddingBottom: 10,
+                  borderBottom: '1px solid rgba(0,212,255,0.07)' }}>
+                  <Shield size={11} color="var(--cyan)" />
                   <span className="label">NOC Controls</span>
                 </div>
 
-                {/* Protocol */}
-                <ControlRow icon={Wifi} label="Protocol" sublabel="HTTP REST ⇄ MQTT pub-sub">
-                  <div style={{ display: 'flex', gap: 4 }}>
+                {/* ─ Protocol ─ */}
+                <div style={{ marginBottom: 14 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
+                    <Wifi size={10} color="var(--text-muted)" />
+                    <span style={{ fontSize: 10, color: 'var(--text-secondary)', fontWeight: 500 }}>Protocol</span>
+                    <span style={{ fontSize: 9, color: 'var(--text-muted)', marginLeft: 2 }}>HTTP ⇄ MQTT</span>
+                  </div>
+                  <div style={{ display: 'flex', gap: 6 }}>
                     {(['http', 'mqtt'] as const).map((p) => (
                       <button key={p} onClick={() => handleProtocol(p)}
                         disabled={loading('protocol') || config?.active_protocol === p}
                         style={{
-                          padding: '4px 10px', borderRadius: 6, fontSize: 10, cursor: 'pointer',
-                          background: config?.active_protocol === p ? 'var(--cyan-dim)' : 'transparent',
-                          border: `1px solid ${config?.active_protocol === p ? 'var(--cyan)' : 'var(--border)'}`,
-                          color: config?.active_protocol === p ? 'var(--cyan)' : 'var(--text-muted)',
-                          fontFamily: 'Space Mono',
+                          flex: 1, padding: '7px', borderRadius: 3, fontSize: 10, cursor: 'pointer',
+                          fontFamily: 'Space Mono', letterSpacing: '0.08em',
+                          background: config?.active_protocol === p
+                            ? (p === 'mqtt' ? 'rgba(255,179,71,0.12)' : 'rgba(0,212,255,0.12)')
+                            : 'transparent',
+                          border: `1px solid ${config?.active_protocol === p
+                            ? (p === 'mqtt' ? 'rgba(255,179,71,0.4)' : 'rgba(0,212,255,0.4)')
+                            : 'rgba(255,255,255,0.07)'}`,
+                          color: config?.active_protocol === p
+                            ? (p === 'mqtt' ? '#ffb347' : '#00d4ff')
+                            : 'var(--text-muted)',
                           opacity: loading('protocol') ? 0.5 : 1,
-                        }}
-                      >{p.toUpperCase()}</button>
+                          transition: 'all 150ms',
+                        }}>
+                        {p.toUpperCase()}
+                      </button>
                     ))}
                   </div>
-                </ControlRow>
+                </div>
 
-                {/* Encryption */}
-                <ControlRow icon={Lock} label="AES-256-GCM Encryption" sublabel="AEAD payload encryption">
-                  <Toggle on={config?.encryption_enabled ?? false} onChange={handleEncryption} disabled={loading('encryption')} />
-                </ControlRow>
-
-                {/* Auth */}
-                <ControlRow icon={Shield} label="Auth Enforcement" sublabel="API key + HMAC verification">
-                  <Toggle on={config?.auth_enabled ?? true} onChange={handleAuth} disabled={loading('auth')} />
-                </ControlRow>
-
-                {/* Replay */}
-                <ControlRow icon={RefreshCw} label="Replay Protection" sublabel="Timestamp-window deduplication">
-                  <Toggle on={config?.replay_protection_enabled ?? false} onChange={handleReplay} disabled={loading('replay')} />
-                </ControlRow>
-
-                {/* Packet loss */}
-                <ControlRow icon={WifiOff} label="Packet Loss" sublabel={`${chaos?.loss_pct ?? 0}% drop rate`}>
-                  <div style={{ display: 'flex', gap: 4 }}>
-                    {[0, 5, 10, 25].map((v) => (
-                      <button key={v} onClick={() => handleChaos(v, chaos?.latency_ms ?? 0, chaos?.tamper ?? false)}
-                        disabled={loading('chaos') || chaos?.loss_pct === v}
-                        style={{
-                          padding: '3px 7px', borderRadius: 4, fontSize: 9, cursor: 'pointer',
-                          background: chaos?.loss_pct === v ? 'var(--amber-dim)' : 'transparent',
-                          border: `1px solid ${chaos?.loss_pct === v ? 'var(--amber)' : 'var(--border)'}`,
-                          color: chaos?.loss_pct === v ? 'var(--amber)' : 'var(--text-muted)',
-                          fontFamily: 'Space Mono',
-                        }}
-                      >{v}%</button>
-                    ))}
+                {/* ─ Security toggles ─ */}
+                {[
+                  {
+                    icon: Lock, label: 'AES-256-GCM Encryption', key: 'encryption',
+                    on: config?.encryption_enabled ?? false,
+                    onChange: handleEncryption, color: '#00d4ff',
+                  },
+                  {
+                    icon: Shield, label: 'Auth Enforcement', key: 'auth',
+                    on: config?.auth_enabled ?? true,
+                    onChange: handleAuth, color: '#2ed573',
+                  },
+                  {
+                    icon: RefreshCw, label: 'Replay Protection', key: 'replay',
+                    on: config?.replay_protection_enabled ?? false,
+                    onChange: handleReplay, color: '#2ed573',
+                  },
+                  {
+                    icon: BrainCircuit, label: 'AI Service', key: 'ai',
+                    on: aiEnabled,
+                    onChange: handleAiToggle, color: '#00d4ff',
+                  },
+                ].map((ctrl) => (
+                  <div key={ctrl.label} style={{
+                    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                    padding: '10px 0', borderBottom: '1px solid rgba(0,212,255,0.04)',
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+                      <ctrl.icon size={10} color="var(--text-muted)" />
+                      <span style={{ fontSize: 10, color: 'var(--text-secondary)' }}>{ctrl.label}</span>
+                    </div>
+                    <Toggle on={ctrl.on} onChange={ctrl.onChange}
+                      disabled={loading(ctrl.key)} accentColor={ctrl.color} />
                   </div>
-                </ControlRow>
+                ))}
 
-                {/* Latency */}
-                <ControlRow icon={RefreshCw} label="Artificial Latency" sublabel={`${chaos?.latency_ms ?? 0}ms delay`}>
-                  <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-                    {[0, 100, 300, 1000].map((v) => (
-                      <button key={v} onClick={() => handleChaos(chaos?.loss_pct ?? 0, v, chaos?.tamper ?? false)}
-                        disabled={loading('chaos') || chaos?.latency_ms === v}
-                        style={{
-                          padding: '3px 7px', borderRadius: 4, fontSize: 9, cursor: 'pointer',
-                          background: chaos?.latency_ms === v ? 'var(--amber-dim)' : 'transparent',
-                          border: `1px solid ${chaos?.latency_ms === v ? 'var(--amber)' : 'var(--border)'}`,
-                          color: chaos?.latency_ms === v ? 'var(--amber)' : 'var(--text-muted)',
-                          fontFamily: 'Space Mono',
-                        }}
-                      >{v}ms</button>
-                    ))}
+                {/* ─ Chaos: Packet loss ─ */}
+                <div style={{ marginTop: 12 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 7 }}>
+                    <WifiOff size={10} color="var(--text-muted)" />
+                    <span style={{ fontSize: 10, color: 'var(--text-secondary)' }}>Packet Loss</span>
+                    <span className="font-mono" style={{ marginLeft: 'auto', fontSize: 10,
+                      color: (chaos?.loss_pct ?? 0) > 0 ? '#ffb347' : 'var(--text-muted)' }}>
+                      {chaos?.loss_pct ?? 0}%
+                    </span>
                   </div>
-                </ControlRow>
+                  <ChipSelector
+                    options={[0, 5, 10, 25]}
+                    value={chaos?.loss_pct ?? 0}
+                    onChange={(v) => handleChaos(Number(v), chaos?.latency_ms ?? 0, chaos?.tamper ?? false)}
+                    disabled={loading('chaos')}
+                    color="#ffb347"
+                  />
+                </div>
 
-                {/* Tamper injector */}
-                <ControlRow icon={AlertTriangle} label="Tamper Injector" sublabel="Mutates payload → HMAC reject">
+                {/* ─ Latency ─ */}
+                <div style={{ marginTop: 12 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 7 }}>
+                    <RefreshCw size={10} color="var(--text-muted)" />
+                    <span style={{ fontSize: 10, color: 'var(--text-secondary)' }}>Artificial Latency</span>
+                    <span className="font-mono" style={{ marginLeft: 'auto', fontSize: 10,
+                      color: (chaos?.latency_ms ?? 0) > 0 ? '#ffb347' : 'var(--text-muted)' }}>
+                      {chaos?.latency_ms ?? 0}ms
+                    </span>
+                  </div>
+                  <ChipSelector
+                    options={[0, 100, 300, 1000]}
+                    value={chaos?.latency_ms ?? 0}
+                    onChange={(v) => handleChaos(chaos?.loss_pct ?? 0, Number(v), chaos?.tamper ?? false)}
+                    disabled={loading('chaos')}
+                    color="#ffb347"
+                  />
+                </div>
+
+                {/* ─ Tamper ─ */}
+                <div style={{
+                  marginTop: 12, display: 'flex', alignItems: 'center',
+                  justifyContent: 'space-between', padding: '10px 0',
+                  borderTop: '1px solid rgba(0,212,255,0.05)',
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+                    <AlertTriangle size={10} color="var(--text-muted)" />
+                    <div>
+                      <div style={{ fontSize: 10, color: 'var(--text-secondary)' }}>Tamper Injector</div>
+                      <div style={{ fontSize: 9, color: 'var(--text-muted)', fontFamily: 'Space Mono', marginTop: 1 }}>
+                        Mutates payload → HMAC reject
+                      </div>
+                    </div>
+                  </div>
                   <Toggle
                     on={chaos?.tamper ?? false}
                     onChange={(v) => handleChaos(chaos?.loss_pct ?? 0, chaos?.latency_ms ?? 0, v)}
                     disabled={loading('chaos')}
+                    accentColor="#ff4757"
                   />
-                </ControlRow>
+                </div>
 
-                {/* AI service */}
-                <ControlRow icon={BrainCircuit} label="AI Service" sublabel="Telemetry recommendations">
-                  <Toggle on={aiEnabled} onChange={handleAiToggle} disabled={loading('ai')} />
-                </ControlRow>
-
-                {/* Disconnect / reconnect */}
-                <div style={{ paddingTop: 14 }}>
+                {/* ─ Vehicle control ─ */}
+                <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid rgba(0,212,255,0.05)' }}>
                   <div className="label" style={{ marginBottom: 8 }}>Vehicle Control</div>
                   <input
                     value={deviceId} onChange={(e) => setDeviceId(e.target.value)}
                     placeholder="device_id"
                     style={{
-                      width: '100%', background: 'var(--glass)', border: '1px solid var(--border)',
-                      borderRadius: 6, padding: '6px 10px', color: 'var(--text-primary)', fontSize: 11,
+                      width: '100%',
+                      background: 'rgba(0,212,255,0.04)', border: '1px solid rgba(0,212,255,0.1)',
+                      borderRadius: 3, padding: '7px 10px', color: 'var(--text-primary)', fontSize: 11,
                       outline: 'none', marginBottom: 8, fontFamily: 'Space Mono',
                     }}
                   />
                   <div style={{ display: 'flex', gap: 6 }}>
                     <button onClick={handleDisconnect} disabled={loading('disconnect')} style={{
-                      flex: 1, padding: '7px', borderRadius: 6, fontSize: 11, cursor: 'pointer',
-                      background: 'var(--red-dim)', border: '1px solid var(--red)', color: 'var(--red)',
+                      flex: 1, padding: '7px', borderRadius: 3, fontSize: 10, cursor: 'pointer',
+                      fontFamily: 'Space Mono',
+                      background: 'rgba(255,71,87,0.08)', border: '1px solid rgba(255,71,87,0.25)',
+                      color: '#ff4757',
                       opacity: loading('disconnect') ? 0.5 : 1,
-                    }}>Disconnect</button>
+                    }}>DISCONNECT</button>
                     <button onClick={handleReconnect} disabled={loading('reconnect')} style={{
-                      flex: 1, padding: '7px', borderRadius: 6, fontSize: 11, cursor: 'pointer',
-                      background: 'var(--green-dim)', border: '1px solid var(--green)', color: 'var(--green)',
+                      flex: 1, padding: '7px', borderRadius: 3, fontSize: 10, cursor: 'pointer',
+                      fontFamily: 'Space Mono',
+                      background: 'rgba(46,213,115,0.08)', border: '1px solid rgba(46,213,115,0.25)',
+                      color: '#2ed573',
                       opacity: loading('reconnect') ? 0.5 : 1,
-                    }}>Reconnect</button>
+                    }}>RECONNECT</button>
                   </div>
                 </div>
               </motion.div>
             </div>
 
-            {/* Right: Packet table */}
-            <motion.div
-              className="glass-card"
-              initial={{ opacity: 0, x: 12 }} animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: 0.1 }}
-              style={{ overflow: 'hidden' }}
-            >
-              <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: 8 }}>
-                <Wifi size={13} color="var(--cyan)" />
-                <span className="label">Packet Log</span>
-                <span style={{ marginLeft: 'auto', fontSize: 10, color: 'var(--text-muted)' }}>{packets.length} packets</span>
-                <span style={{ fontSize: 10, color: 'var(--text-muted)' }}>Click to inspect</span>
+            {/* ── Right panel: Packet table ── */}
+            <motion.div initial={{ opacity: 0, x: 12 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.1 }}
+              className="hud-panel" style={{ overflow: 'hidden' }}>
+
+              {/* Table header */}
+              <div style={{
+                padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 8,
+                borderBottom: '1px solid rgba(0,212,255,0.08)',
+                background: 'rgba(0,212,255,0.02)',
+              }}>
+                <Activity size={11} color="var(--cyan)" />
+                <span className="label">Packet Capture</span>
+                <span style={{ fontSize: 9, color: 'var(--text-muted)', fontFamily: 'Space Mono', marginLeft: 2 }}>
+                  {filteredPackets.length} / {packets.length}
+                </span>
+                <span style={{ marginLeft: 4, fontSize: 9, color: 'var(--text-muted)' }}>· click to inspect</span>
+
+                {/* Filter chips */}
+                <div style={{ marginLeft: 'auto', display: 'flex', gap: 5 }}>
+                  {([
+                    { key: 'all',      label: 'ALL' },
+                    { key: 'ok',       label: 'ACCEPTED' },
+                    { key: 'rejected', label: 'REJECTED' },
+                  ] as const).map((f) => (
+                    <button key={f.key} onClick={() => setFilter(f.key)}
+                      style={{
+                        padding: '3px 8px', borderRadius: 3, fontSize: 9, cursor: 'pointer',
+                        fontFamily: 'Space Mono', letterSpacing: '0.05em',
+                        background: filter === f.key ? 'rgba(0,212,255,0.1)' : 'transparent',
+                        border: `1px solid ${filter === f.key ? 'rgba(0,212,255,0.3)' : 'rgba(255,255,255,0.06)'}`,
+                        color: filter === f.key ? '#00d4ff' : 'var(--text-muted)',
+                        transition: 'all 120ms',
+                      }}>
+                      {f.label}
+                    </button>
+                  ))}
+                </div>
               </div>
+
+              {/* Table */}
               <div style={{ overflowX: 'auto', maxHeight: 'calc(100vh - 200px)', overflowY: 'auto' }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                <table className="noc-table">
                   <thead>
-                    <tr style={{ borderBottom: '1px solid var(--border)' }}>
-                      {['#', 'Time', 'Proto', 'Device', 'Size', 'Auth', 'Enc', 'Status', ''].map((h) => (
-                        <th key={h} style={{ padding: '8px 10px', textAlign: 'left', fontSize: 9, color: 'var(--text-muted)', fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase', whiteSpace: 'nowrap' }}>
-                          {h}
-                        </th>
+                    <tr>
+                      {['#', 'Time', 'Proto', 'Device', 'Size', 'Auth', 'Encrypted', 'Status', ''].map((h) => (
+                        <th key={h}>{h}</th>
                       ))}
                     </tr>
                   </thead>
                   <tbody>
-                    {packets.length === 0 ? (
+                    {filteredPackets.length === 0 ? (
                       <tr>
-                        <td colSpan={9} style={{ padding: '32px', textAlign: 'center', color: 'var(--text-muted)', fontSize: 12 }}>
-                          Waiting for packets...
+                        <td colSpan={9} style={{ padding: '48px 24px', textAlign: 'center',
+                          color: 'var(--text-muted)', fontSize: 12, fontFamily: 'Space Mono',
+                          letterSpacing: '0.1em' }}>
+                          AWAITING PACKETS...
                         </td>
                       </tr>
-                    ) : (
-                      packets.map((p) => (
-                        <PacketTableRow key={p.packet_id} packet={p} onClick={() => setInspector(p)} />
-                      ))
-                    )}
+                    ) : filteredPackets.map((p) => {
+                      const statusOk   = p.status === 'ok'
+                      const authOk     = p.auth_status === 'ok' || p.auth_status === 'no_auth'
+                      const protoColor = p.protocol === 'mqtt' ? '#ffb347' : '#00d4ff'
+                      return (
+                        <tr key={p.packet_id} onClick={() => setInspector(p)}>
+                          <td style={{ color: 'var(--text-muted)', fontSize: 10 }}>
+                            {p.packet_id}
+                          </td>
+                          <td style={{ color: 'var(--text-muted)', fontSize: 10, whiteSpace: 'nowrap' }}>
+                            {new Date(p.timestamp).toLocaleTimeString()}
+                          </td>
+                          <td>
+                            <span style={{ fontSize: 9, color: protoColor, letterSpacing: '0.06em' }}>
+                              {p.protocol.toUpperCase()}
+                            </span>
+                          </td>
+                          <td style={{ color: 'var(--text-primary)', fontSize: 11 }}>{p.device_id}</td>
+                          <td style={{ color: 'var(--text-muted)', fontSize: 10 }}>{p.size_bytes}B</td>
+                          <td>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                              {authOk
+                                ? <CheckCircle size={10} color="#2ed573" />
+                                : <XCircle size={10} color="#ff4757" />}
+                              <span style={{ fontSize: 9,
+                                color: authOk ? '#2ed573' : '#ff4757', letterSpacing: '0.04em' }}>
+                                {p.auth_status}
+                              </span>
+                            </div>
+                          </td>
+                          <td>
+                            <span style={{ fontSize: 9,
+                              color: p.encrypted ? '#2ed573' : 'var(--text-muted)',
+                              letterSpacing: '0.04em' }}>
+                              {p.encrypted ? 'AES-GCM' : 'PLAIN'}
+                            </span>
+                          </td>
+                          <td>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                              <div style={{
+                                width: 5, height: 5, borderRadius: '50%',
+                                background: statusOk ? '#2ed573' : '#ff4757',
+                                boxShadow: `0 0 4px ${statusOk ? '#2ed573' : '#ff4757'}`,
+                              }} />
+                              <span style={{ fontSize: 9,
+                                color: statusOk ? '#2ed573' : '#ff4757', letterSpacing: '0.04em' }}>
+                                {p.status.toUpperCase()}
+                              </span>
+                            </div>
+                          </td>
+                          <td>
+                            <ChevronRight size={11} color="rgba(0,212,255,0.3)" />
+                          </td>
+                        </tr>
+                      )
+                    })}
                   </tbody>
                 </table>
               </div>
@@ -579,7 +708,6 @@ export default function NocPage() {
         </div>
       </main>
 
-      {/* Packet inspector modal */}
       <AnimatePresence>
         {inspector && <PacketInspector packet={inspector} onClose={() => setInspector(null)} />}
       </AnimatePresence>

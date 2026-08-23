@@ -106,56 +106,66 @@ async def get_stats() -> dict:
 async def get_auth_logs(
     limit: int = Query(50, ge=1, le=500),
     event_type: str | None = Query(None, description="Filter: auth_ok|auth_fail|tamper_detected|registered|no_auth"),
+    device_id: str | None = Query(None, description="Filter by device ID"),
 ) -> list[dict]:
     """Return auth log entries, newest first."""
     db = await get_db()
+    conditions = []
+    params: list = []
     if event_type:
-        async with db.execute(
-            "SELECT id AS log_id, timestamp, device_id, event_type, ip_address AS source_ip, details FROM auth_logs WHERE event_type = ? ORDER BY id DESC LIMIT ?",
-            (event_type, limit),
-        ) as cur:
-            rows = await cur.fetchall()
-    else:
-        async with db.execute(
-            "SELECT id AS log_id, timestamp, device_id, event_type, ip_address AS source_ip, details FROM auth_logs ORDER BY id DESC LIMIT ?",
-            (limit,),
-        ) as cur:
-            rows = await cur.fetchall()
+        conditions.append("event_type = ?")
+        params.append(event_type)
+    if device_id:
+        conditions.append("device_id = ?")
+        params.append(device_id)
+    where = f"WHERE {' AND '.join(conditions)}" if conditions else ""
+    params.append(limit)
+    async with db.execute(
+        f"SELECT id AS log_id, timestamp, device_id, event_type, ip_address AS source_ip, details FROM auth_logs {where} ORDER BY id DESC LIMIT ?",
+        params,
+    ) as cur:
+        rows = await cur.fetchall()
     return [dict(r) for r in rows]
 
 
 @router.get("/packet-stats", summary="Packet statistics over time")
-async def get_packet_stats(hours: int = Query(24, ge=1, le=168)) -> dict:
+async def get_packet_stats(
+    hours: int = Query(24, ge=1, le=168),
+    device_id: str | None = Query(None, description="Filter by device ID"),
+) -> dict:
     """Return packet counts grouped by hour for the last N hours."""
     db = await get_db()
+    device_filter = "AND device_id = ?" if device_id else ""
+    base_params = [f"-{hours} hours"]
+    if device_id:
+        base_params.insert(0, device_id) if device_filter else None
+        base_params = [f"-{hours} hours", device_id] if device_id else [f"-{hours} hours"]
 
-    # Packets per hour
     async with db.execute(
-        """
+        f"""
         SELECT
             strftime('%Y-%m-%dT%H:00:00', received_at) as hour,
             protocol,
             COUNT(*) as count,
             SUM(size_bytes) as total_bytes
         FROM packets
-        WHERE received_at >= datetime('now', ?)
+        WHERE received_at >= datetime('now', ?) {device_filter}
         GROUP BY hour, protocol
         ORDER BY hour
         """,
-        (f"-{hours} hours",),
+        [f"-{hours} hours"] + ([device_id] if device_id else []),
     ) as cur:
         rows = await cur.fetchall()
 
-    # Mode distribution
     async with db.execute(
-        """
+        f"""
         SELECT mode, COUNT(*) as count
         FROM telemetry
-        WHERE received_at >= datetime('now', ?)
+        WHERE received_at >= datetime('now', ?) {device_filter}
         GROUP BY mode
         ORDER BY count DESC
         """,
-        (f"-{hours} hours",),
+        [f"-{hours} hours"] + ([device_id] if device_id else []),
     ) as cur:
         mode_rows = await cur.fetchall()
 
