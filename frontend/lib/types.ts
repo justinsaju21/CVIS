@@ -128,6 +128,20 @@ export interface AiStatus {
   available_models: string[]
 }
 
+export interface FleetVehicle {
+  device_id:    string
+  name:         string
+  description:  string
+  color:        string
+  personality:  string
+  active:       boolean
+  last_mode?:   string | null
+  last_battery?:number | null
+  last_temp?:   number | null
+  last_seen?:   string | null
+  ai_enabled:   boolean
+}
+
 // WebSocket event types
 export type WsEvent =
   | { event: 'telemetry';          packet_id: number; received_at: string } & TelemetryPayload
@@ -136,3 +150,4 @@ export type WsEvent =
   | { event: 'device_disconnected';device_id: string; reason: string }
   | { event: 'device_reconnected'; device_id: string }
   | { event: 'ai_service_status';  enabled: boolean }
+  | { event: 'vehicle_ai_status';  device_id: string; enabled: boolean }

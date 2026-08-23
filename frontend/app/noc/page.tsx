@@ -12,11 +12,12 @@ import Navbar from '@/components/layout/Navbar'
 import CustomCursor from '@/components/layout/CustomCursor'
 import { useWebSocket } from '@/hooks/useWebSocket'
 import {
-  fetchConfig, fetchPackets,
+  fetchConfig, fetchPackets, fetchVehicles,
   setProtocol, setEncryption, setAuth, setReplay, setChaos,
   disconnectDevice, reconnectDevice, setAiService,
 } from '@/lib/api'
-import type { ServerConfig, PacketRow, WsEvent, TelemetryRow } from '@/lib/types'
+import type { ServerConfig, PacketRow, WsEvent, TelemetryRow, FleetVehicle } from '@/lib/types'
+import { VehicleSelector } from '@/components/ui/VehicleSelector'
 
 // ─── Packet flow topology ──────────────────────────────────────────────────
 function PacketFlow({ protocol, connected }: { protocol: 'http' | 'mqtt'; connected: boolean }) {
@@ -262,15 +263,21 @@ export default function NocPage() {
   const [config,    setConfigState] = useState<ServerConfig | null>(null)
   const [packets,   setPackets]     = useState<PacketRow[]>([])
   const [inspector, setInspector]   = useState<PacketRow | null>(null)
-  const [deviceId,  setDeviceId]    = useState('')
+  const [deviceId,  setDeviceId]    = useState('') // for manual disconnect/reconnect
   const [aiEnabled, setAiEnabled]   = useState(true)
   const [saving,    setSaving]      = useState<string | null>(null)
   const [filter,    setFilter]      = useState<'all' | 'ok' | 'rejected'>('all')
+  
+  // Fleet state
+  const [vehicles,   setVehicles]   = useState<FleetVehicle[]>([])
+  const [selectedVehicleId, setSelectedVehicleId] = useState<string | null>(null)
+  const [selectorOpen, setSelectorOpen] = useState(false)
 
   useEffect(() => {
     fetchConfig().then((c) => setConfigState(c as ServerConfig)).catch(() => {})
-    fetchPackets(80).then((rows) => setPackets(rows as PacketRow[])).catch(() => {})
-  }, [])
+    fetchPackets(80, selectedVehicleId || undefined).then((rows) => setPackets(rows as PacketRow[])).catch(() => {})
+    fetchVehicles().then((fleet) => setVehicles(fleet as FleetVehicle[])).catch(() => {})
+  }, [selectedVehicleId])
 
   const handleWs = useCallback((ev: WsEvent) => {
     if (ev.event === 'telemetry') {
@@ -367,31 +374,41 @@ export default function NocPage() {
             </div>
 
             {/* Stats strip */}
-            <div style={{ marginLeft: 'auto', display: 'flex', gap: 6 }}>
-              {[
-                { label: 'PROTOCOL', value: config?.active_protocol?.toUpperCase() ?? '---',
-                  color: config?.active_protocol === 'mqtt' ? '#ffb347' : '#00d4ff' },
-                { label: 'AUTH',     value: config?.auth_enabled ? 'ON' : 'OFF',
-                  color: config?.auth_enabled ? '#2ed573' : '#ff4757' },
-                { label: 'ENCRYPT',  value: config?.encryption_enabled ? 'AES' : 'PLAIN',
-                  color: config?.encryption_enabled ? '#2ed573' : 'var(--text-muted)' },
-                { label: 'PACKETS',  value: String(packets.length), color: 'var(--text-primary)' },
-                { label: 'ACCEPTED', value: String(totalOk), color: '#2ed573' },
-                { label: 'REJECTED', value: String(totalRejected),
-                  color: totalRejected > 0 ? '#ff4757' : 'var(--text-muted)' },
-              ].map((s) => (
-                <div key={s.label} style={{
-                  padding: '6px 12px',
-                  background: 'rgba(0,212,255,0.03)',
-                  border: '1px solid rgba(0,212,255,0.08)',
-                  borderRadius: 4,
-                  textAlign: 'center',
-                  minWidth: 60,
-                }}>
-                  <div className="label">{s.label}</div>
-                  <div className="font-mono" style={{ fontSize: 13, color: s.color, marginTop: 3 }}>{s.value}</div>
-                </div>
-              ))}
+            <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 12 }}>
+              <VehicleSelector
+                vehicles={vehicles}
+                selectedId={selectedVehicleId}
+                onChange={setSelectedVehicleId}
+                isOpen={selectorOpen}
+                onToggle={() => setSelectorOpen(!selectorOpen)}
+              />
+              
+              <div style={{ display: 'flex', gap: 6 }}>
+                {[
+                  { label: 'PROTOCOL', value: config?.active_protocol?.toUpperCase() ?? '---',
+                    color: config?.active_protocol === 'mqtt' ? '#ffb347' : '#00d4ff' },
+                  { label: 'AUTH',     value: config?.auth_enabled ? 'ON' : 'OFF',
+                    color: config?.auth_enabled ? '#2ed573' : '#ff4757' },
+                  { label: 'ENCRYPT',  value: config?.encryption_enabled ? 'AES' : 'PLAIN',
+                    color: config?.encryption_enabled ? '#2ed573' : 'var(--text-muted)' },
+                  { label: 'PACKETS',  value: String(packets.length), color: 'var(--text-primary)' },
+                  { label: 'ACCEPTED', value: String(totalOk), color: '#2ed573' },
+                  { label: 'REJECTED', value: String(totalRejected),
+                    color: totalRejected > 0 ? '#ff4757' : 'var(--text-muted)' },
+                ].map((s) => (
+                  <div key={s.label} style={{
+                    padding: '6px 12px',
+                    background: 'rgba(0,212,255,0.03)',
+                    border: '1px solid rgba(0,212,255,0.08)',
+                    borderRadius: 4,
+                    textAlign: 'center',
+                    minWidth: 60,
+                  }}>
+                    <div className="label">{s.label}</div>
+                    <div className="font-mono" style={{ fontSize: 13, color: s.color, marginTop: 3 }}>{s.value}</div>
+                  </div>
+                ))}
+              </div>
             </div>
           </motion.div>
 

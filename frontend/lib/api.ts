@@ -23,8 +23,10 @@ export const api = {
 }
 
 // ─── Telemetry ───────────────────────────────────────────────────────────
-export const fetchRecent     = (limit = 60) => api.get(`/api/v1/telemetry/recent?limit=${limit}`)
-export const fetchPackets    = (limit = 100) => api.get(`/api/v1/telemetry/packets?limit=${limit}`)
+export const fetchRecent     = (limit = 60, device_id?: string) => 
+  api.get(`/api/v1/telemetry/recent?limit=${limit}${device_id ? `&device_id=${device_id}` : ''}`)
+export const fetchPackets    = (limit = 100, device_id?: string) => 
+  api.get(`/api/v1/telemetry/packets?limit=${limit}${device_id ? `&device_id=${device_id}` : ''}`)
 
 // ─── Config ──────────────────────────────────────────────────────────────
 export const fetchConfig     = ()            => api.get('/api/v1/config/all')
@@ -42,6 +44,9 @@ export const reconnectDevice  = (device_id: string) =>
   api.post('/api/v1/control/reconnect', { device_id, reason: 'NOC reconnect' })
 export const setAiService     = (e: boolean) =>
   api.post('/api/v1/control/ai-service', { enabled: e })
+export const setVehicleAiService = (device_id: string, e: boolean) =>
+  api.post('/api/v1/control/ai-service/vehicle', { device_id, enabled: e })
+export const fetchVehicles    = () => api.get('/api/v1/control/vehicles')
 
 // ─── AI ──────────────────────────────────────────────────────────────────
 export const fetchAiStatus        = ()                       => api.get('/api/v1/ai/status')
@@ -52,9 +57,11 @@ export const sendChat             = (device_id: string, message: string) =>
 
 // ─── Admin ───────────────────────────────────────────────────────────────
 export const fetchAdminStats   = ()            => api.get('/api/v1/admin/stats')
-export const fetchAuthLogs     = (limit = 50)  => api.get(`/api/v1/admin/auth-logs?limit=${limit}`)
+export const fetchAuthLogs     = (limit = 50, device_id?: string)  => 
+  api.get(`/api/v1/admin/auth-logs?limit=${limit}${device_id ? `&device_id=${device_id}` : ''}`)
 export const fetchAdminDevices = ()            => api.get('/api/v1/admin/devices')
-export const fetchPacketStats  = (hours = 24)  => api.get(`/api/v1/admin/packet-stats?hours=${hours}`)
+export const fetchPacketStats  = (hours = 24, device_id?: string)  => 
+  api.get(`/api/v1/admin/packet-stats?hours=${hours}${device_id ? `&device_id=${device_id}` : ''}`)
 export const fetchErrorLog     = (limit = 50)  => api.get(`/api/v1/admin/error-log?limit=${limit}`)
 
 // ─── Devices ─────────────────────────────────────────────────────────────

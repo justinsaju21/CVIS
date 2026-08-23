@@ -14,8 +14,9 @@ import {
 import Navbar from '@/components/layout/Navbar'
 import CustomCursor from '@/components/layout/CustomCursor'
 import { useWebSocket } from '@/hooks/useWebSocket'
-import { fetchAdminStats, fetchAuthLogs, fetchAdminDevices, fetchPacketStats } from '@/lib/api'
-import type { AdminStats, AuthLog, DeviceInfo, WsEvent } from '@/lib/types'
+import { fetchAdminStats, fetchAuthLogs, fetchAdminDevices, fetchPacketStats, fetchVehicles, setVehicleAiService } from '@/lib/api'
+import type { AdminStats, AuthLog, DeviceInfo, WsEvent, FleetVehicle } from '@/lib/types'
+import { VehicleSelector } from '@/components/ui/VehicleSelector'
 
 // ─── Stat card ────────────────────────────────────────────────────────────────
 function StatCard({ icon: Icon, label, value, unit, color = 'var(--cyan)', sublabel, accent = false }:
@@ -104,29 +105,44 @@ export default function AdminPage() {
   const [authLogs,   setAuthLogs]   = useState<AuthLog[]>([])
   const [devices,    setDevices]    = useState<DeviceInfo[]>([])
   const [pkStats,    setPkStats]    = useState<{ hour: string; count: number }[]>([])
+  const [vehicles,   setVehicles]   = useState<FleetVehicle[]>([])
+  const [selectedVehicleId, setSelectedVehicleId] = useState<string | null>(null)
+  const [selectorOpen, setSelectorOpen] = useState(false)
   const [refreshing, setRefreshing] = useState(false)
   const [tick,       setTick]       = useState(0)
 
   const load = useCallback(async () => {
     setRefreshing(true)
     try {
-      const [s, logs, devs, pks] = await Promise.all([
+      const [s, logs, devs, pks, fleet] = await Promise.all([
         fetchAdminStats(),
-        fetchAuthLogs(30),
+        fetchAuthLogs(30, selectedVehicleId || undefined),
         fetchAdminDevices(),
-        fetchPacketStats(12),
+        fetchPacketStats(12, selectedVehicleId || undefined),
+        fetchVehicles(),
       ])
       setStats(s as AdminStats)
       setAuthLogs(logs as AuthLog[])
       setDevices(devs as DeviceInfo[])
+      setVehicles(fleet as FleetVehicle[])
       const raw = (pks as { hour_bucket: string; count: number }[])
-      setPkStats(raw.map((r) => ({
-        hour:  new Date(r.hour_bucket).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        count: r.count,
-      })).reverse())
-    } catch {}
+      if (Array.isArray(raw)) {
+        setPkStats(raw.map((r) => ({
+          hour:  new Date(r.hour_bucket).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          count: r.count,
+        })).reverse())
+      } else {
+        const _pks = pks as any
+        setPkStats(_pks.packets_per_hour?.map((r: any) => ({
+          hour:  new Date(r.hour).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          count: r.count,
+        })) || [])
+      }
+    } catch (err) {
+      console.error(err)
+    }
     setRefreshing(false)
-  }, [])
+  }, [selectedVehicleId])
 
   useEffect(() => { load() }, [load, tick])
   useEffect(() => {
@@ -171,6 +187,15 @@ export default function AdminPage() {
               </h1>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              {/* Vehicle Selector */}
+              <VehicleSelector
+                vehicles={vehicles}
+                selectedId={selectedVehicleId}
+                onChange={setSelectedVehicleId}
+                isOpen={selectorOpen}
+                onToggle={() => setSelectorOpen(!selectorOpen)}
+              />
+              
               {/* Server heartbeat */}
               <div style={{ display: 'flex', alignItems: 'center', gap: 5,
                 padding: '6px 12px', border: '1px solid rgba(0,212,255,0.1)', borderRadius: 4,
@@ -344,8 +369,32 @@ export default function AdminPage() {
                         </div>
                       )}
                     </div>
+                    
+                    {/* Per-vehicle AI toggle */}
+                    {(() => {
+                      const fv = vehicles.find(v => v.device_id === d.device_id)
+                      const isAiOn = fv ? fv.ai_enabled : true
+                      return (
+                        <button
+                          onClick={async () => {
+                            await setVehicleAiService(d.device_id, !isAiOn)
+                            load()
+                          }}
+                          style={{
+                            padding: '4px 8px', borderRadius: 4,
+                            background: isAiOn ? 'rgba(46,213,115,0.1)' : 'rgba(255,71,87,0.1)',
+                            border: `1px solid ${isAiOn ? 'rgba(46,213,115,0.3)' : 'rgba(255,71,87,0.3)'}`,
+                            color: isAiOn ? '#2ed573' : '#ff4757',
+                            fontSize: 8, fontFamily: 'Space Mono', cursor: 'pointer', flexShrink: 0
+                          }}
+                        >
+                          AI {isAiOn ? 'ON' : 'OFF'}
+                        </button>
+                      )
+                    })()}
+
                     <span style={{ fontSize: 9, fontFamily: 'Space Mono',
-                      color: d.active ? '#2ed573' : 'var(--text-muted)', flexShrink: 0 }}>
+                      color: d.active ? '#2ed573' : 'var(--text-muted)', flexShrink: 0, marginLeft: 4 }}>
                       {d.active ? 'ACTIVE' : 'OFFLINE'}
                     </span>
                   </div>

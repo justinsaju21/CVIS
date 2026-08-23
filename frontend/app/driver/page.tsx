@@ -13,8 +13,8 @@ import {
 import WireframeCarLoader from '@/components/layout/WireframeCarLoader'
 import CustomCursor from '@/components/layout/CustomCursor'
 import { useWebSocket } from '@/hooks/useWebSocket'
-import { fetchRecent, fetchRecommendation, sendChat } from '@/lib/api'
-import type { TelemetryRow, WsEvent } from '@/lib/types'
+import { fetchRecent, fetchRecommendation, sendChat, fetchVehicles } from '@/lib/api'
+import type { TelemetryRow, WsEvent, FleetVehicle } from '@/lib/types'
 
 // ─── Mode config ─────────────────────────────────────────────────────────────
 const MODE_CONFIG: Record<string, { color: string; badge: string; glow: string; accent: string }> = {
@@ -207,6 +207,9 @@ interface AlertItem { id: number; msg: string; type: 'warn' | 'fault' | 'info'; 
 
 export default function DriverPage() {
   const [loaded, setLoaded] = useState(false)
+  const [vehicles, setVehicles] = useState<FleetVehicle[]>([])
+  const [selectedVehicleId, setSelectedVehicleId] = useState<string | null>(null)
+  
   const [latest, setLatest] = useState<TelemetryRow | null>(null)
   const [history, setHistory] = useState<{ id: string; time: string; batt: number; speed: number; temp: number }[]>([])
   const [aiRec, setAiRec] = useState('')
@@ -229,7 +232,12 @@ export default function DriverPage() {
   })), [])
 
   useEffect(() => {
-    fetchRecent(60).then((rows: unknown) => {
+    fetchVehicles().then((fleet) => setVehicles(fleet as FleetVehicle[])).catch(() => {})
+  }, [])
+
+  useEffect(() => {
+    if (!selectedVehicleId) return
+    fetchRecent(60, selectedVehicleId).then((rows: unknown) => {
       const data = (rows as TelemetryRow[]).slice(-40).reverse()
       setHistory(data.map((r, i) => ({
         id: String(i),
@@ -238,12 +246,14 @@ export default function DriverPage() {
       })))
       if (data.length > 0) { setLatest(data[0]); setMaxSpeed(Math.max(...data.map(r => r.speed_kmh))) }
     }).catch(() => {})
-  }, [])
+  }, [selectedVehicleId])
 
   const handleWs = useCallback((ev: WsEvent) => {
+    if (!selectedVehicleId) return
     if (ev.event === 'telemetry' || ev.event === 'telemetry_backfill') {
       const rows = ev.event === 'telemetry_backfill' ? (ev as { items: TelemetryRow[] }).items : [ev as unknown as TelemetryRow]
       rows.forEach((r) => {
+        if (r.device_id !== selectedVehicleId) return
         setLatest(r)
         setHistory(prev => [...prev.slice(-59), {
           id: r.received_at + Math.random(),
@@ -264,8 +274,13 @@ export default function DriverPage() {
         }
       })
     }
-    if (ev.event === 'ai_recommendation') typewriterEffect(ev.recommendation)
-  }, [])
+    if (ev.event === 'ai_recommendation' && ev.device_id === selectedVehicleId) {
+      typewriterEffect(ev.recommendation)
+    }
+    if (ev.event === 'vehicle_ai_status' && ev.device_id === selectedVehicleId) {
+      setIsPro(ev.enabled)
+    }
+  }, [selectedVehicleId])
 
   const { connected } = useWebSocket(handleWs)
 
@@ -310,7 +325,56 @@ export default function DriverPage() {
   const SB: React.CSSProperties = { fontSize: 8, color: 'rgba(255,255,255,0.22)', fontFamily: 'Inter' }
   const V: React.CSSProperties = { fontFamily: 'Space Mono', fontWeight: 700, letterSpacing: '-0.02em', lineHeight: 1 }
 
-  if (!loaded) return <WireframeCarLoader onComplete={() => setLoaded(true)} message="Loading Drive Console..." />
+  if (!loaded) return <WireframeCarLoader onComplete={() => setLoaded(true)} message="Loading Fleet Registry..." />
+
+  if (!selectedVehicleId) {
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', background: '#020406', position: 'relative' }}>
+        <CustomCursor />
+        <div className="scan-line" />
+        <div className="hud-grid-bg" style={{ position: 'fixed', inset: 0, zIndex: 0, pointerEvents: 'none' }} />
+        
+        <div style={{ position: 'relative', zIndex: 1, display: 'flex', flexDirection: 'column', gap: 24, maxWidth: 800, width: '100%', padding: '0 20px' }}>
+          <div style={{ textAlign: 'center', marginBottom: 20 }}>
+            <h1 className="font-display" style={{ fontSize: 32, letterSpacing: '0.2em', color: 'var(--cyan)', textShadow: '0 0 30px rgba(0,212,255,0.3)' }}>CVIS FLEET REGISTRY</h1>
+            <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)', fontFamily: 'Space Mono', letterSpacing: '0.1em', marginTop: 8 }}>SELECT A VEHICLE TO INITIALIZE DRIVE CONSOLE</div>
+          </div>
+          
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 16 }}>
+            {vehicles.map(v => (
+              <motion.button
+                key={v.device_id}
+                onClick={() => { setSelectedVehicleId(v.device_id); setIsPro(v.ai_enabled); }}
+                whileHover={{ scale: 1.02, y: -4 }}
+                whileTap={{ scale: 0.98 }}
+                style={{
+                  padding: 24, background: 'rgba(0,212,255,0.03)', border: '1px solid rgba(0,212,255,0.15)',
+                  borderRadius: 8, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12,
+                  boxShadow: '0 8px 32px rgba(0,0,0,0.5)', cursor: 'pointer', position: 'relative', overflow: 'hidden'
+                }}
+              >
+                <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 4, background: v.color, boxShadow: `0 0 12px ${v.color}` }} />
+                
+                <div style={{ width: 48, height: 48, borderRadius: '50%', background: `${v.color}22`, border: `1px solid ${v.color}55`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <Navigation size={24} color={v.color} style={{ filter: `drop-shadow(0 0 8px ${v.color})` }} />
+                </div>
+                
+                <div style={{ textAlign: 'center' }}>
+                  <div style={{ fontSize: 18, fontWeight: 700, color: 'white', fontFamily: 'Orbitron', letterSpacing: '0.1em' }}>{v.name}</div>
+                  <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', fontFamily: 'Space Mono', marginTop: 4 }}>{v.device_id}</div>
+                </div>
+                
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8, padding: '6px 12px', background: 'rgba(0,0,0,0.4)', borderRadius: 20 }}>
+                  <div style={{ width: 6, height: 6, borderRadius: '50%', background: v.active ? '#2ed573' : 'rgba(255,255,255,0.2)', boxShadow: v.active ? '0 0 8px #2ed573' : 'none' }} />
+                  <span style={{ fontSize: 9, fontFamily: 'Space Mono', color: v.active ? '#2ed573' : 'rgba(255,255,255,0.4)', letterSpacing: '0.1em' }}>{v.active ? 'ONLINE' : 'OFFLINE'}</span>
+                </div>
+              </motion.button>
+            ))}
+          </div>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <>
@@ -328,13 +392,27 @@ export default function DriverPage() {
           {/* HEADER */}
           <motion.div initial={{ opacity: 0, y: -12 }} animate={{ opacity: 1, y: 0 }}
             style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
-            <div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                <div className="live-dot" />
-                <span style={{ fontFamily: 'Orbitron', fontSize: 19, fontWeight: 700, color: 'white', letterSpacing: '0.1em' }}>LUXURY DRIVE CONSOLE</span>
-              </div>
-              <div style={{ fontSize: 8.5, color: 'rgba(255,255,255,0.28)', fontFamily: 'Space Mono', letterSpacing: '0.1em', marginTop: 2 }}>
-                Advanced real-time performance &amp; vehicle interface
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              <button
+                onClick={() => { setSelectedVehicleId(null); setLatest(null); setHistory([]); setMaxSpeed(0); setTotalDist(0); setAlerts([]); }}
+                style={{
+                  width: 32, height: 32, borderRadius: '50%', background: 'rgba(0,212,255,0.05)',
+                  border: '1px solid rgba(0,212,255,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  cursor: 'pointer', color: 'var(--cyan)', flexShrink: 0
+                }}
+              >
+                <ChevronRight size={16} style={{ transform: 'rotate(180deg)' }} />
+              </button>
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <div className="live-dot" />
+                  <span style={{ fontFamily: 'Orbitron', fontSize: 19, fontWeight: 700, color: 'white', letterSpacing: '0.1em' }}>
+                    LUXURY DRIVE CONSOLE <span style={{ color: 'var(--cyan)' }}>// {selectedVehicleId}</span>
+                  </span>
+                </div>
+                <div style={{ fontSize: 8.5, color: 'rgba(255,255,255,0.28)', fontFamily: 'Space Mono', letterSpacing: '0.1em', marginTop: 2 }}>
+                  Advanced real-time performance &amp; vehicle interface
+                </div>
               </div>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 7, flexWrap: 'wrap' }}>
