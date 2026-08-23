@@ -191,6 +191,7 @@ async def set_replay(body: ReplayConfig) -> dict:
 @router.get("/all", summary="Get all runtime configuration in one call")
 async def get_all_config() -> dict:
     """Snapshot of all current backend config — useful for NOC on connect."""
+    from routers.control import is_ai_enabled
     protocol   = await get_config("active_protocol") or "http"
     encryption = (await get_config("encryption_enabled") or "false") == "true"
     return {
@@ -198,9 +199,11 @@ async def get_all_config() -> dict:
         "encryption_enabled":        encryption,
         "auth_enabled":              auth_module.is_auth_enabled(),
         "replay_protection_enabled": is_replay_protection_enabled(),
+        "ai_service_enabled":        is_ai_enabled(),
         "chaos": {
             "loss_pct":   chaos_config.loss_pct,
             "latency_ms": chaos_config.latency_ms,
             "tamper":     chaos_config.tamper_enabled,
         },
     }
+

@@ -32,17 +32,18 @@ export interface TelemetryRow extends TelemetryPayload {
 }
 
 export interface PacketRow {
-  packet_id:       number
-  timestamp:       string
-  direction:       string
-  protocol:        'http' | 'mqtt'
-  device_id:       string
-  size_bytes:      number
-  status:          string
-  auth_status:     string
-  encrypted:       boolean
-  raw_payload:     string
-  ai_response?:    string
+  packet_id:          number
+  timestamp:          string
+  direction:          string
+  protocol:           'http' | 'mqtt'
+  device_id:          string
+  size_bytes:         number
+  status:             string
+  auth_status:        string
+  encrypted:          boolean | number
+  encryption_method?: string
+  raw_payload:        string
+  ai_response?:       string
 }
 
 export interface DeviceInfo {
@@ -83,6 +84,7 @@ export interface ServerConfig {
   encryption_enabled:        boolean
   auth_enabled:              boolean
   replay_protection_enabled: boolean
+  ai_service_enabled?:       boolean
   chaos:                     ChaosConfig
 }
 

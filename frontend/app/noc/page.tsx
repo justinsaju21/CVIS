@@ -17,7 +17,7 @@ import {
   disconnectDevice, reconnectDevice, setAiService,
 } from '@/lib/api'
 import type { ServerConfig, PacketRow, WsEvent, TelemetryRow, FleetVehicle } from '@/lib/types'
-import { VehicleSelector } from '@/components/ui/VehicleSelector'
+
 
 // ─── Packet flow topology ──────────────────────────────────────────────────
 function PacketFlow({ protocol, connected }: { protocol: 'http' | 'mqtt'; connected: boolean }) {
@@ -274,31 +274,44 @@ export default function NocPage() {
   const [selectorOpen, setSelectorOpen] = useState(false)
 
   useEffect(() => {
-    fetchConfig().then((c) => setConfigState(c as ServerConfig)).catch(() => {})
+    fetchConfig().then((c) => {
+      const cfg = c as ServerConfig
+      setConfigState(cfg)
+      if (typeof cfg.ai_service_enabled === 'boolean') {
+        setAiEnabled(cfg.ai_service_enabled)
+      }
+    }).catch(() => {})
     fetchPackets(80, selectedVehicleId || undefined).then((rows) => setPackets(rows as PacketRow[])).catch(() => {})
     fetchVehicles().then((fleet) => setVehicles(fleet as FleetVehicle[])).catch(() => {})
   }, [selectedVehicleId])
 
   const handleWs = useCallback((ev: WsEvent) => {
     if (ev.event === 'telemetry') {
-      const t = ev as unknown as TelemetryRow
+      const t = ev as unknown as TelemetryRow & { encrypted?: number; encryption_method?: string; auth_status?: string }
       setPackets((prev) => [{
-        packet_id:   t.packet_id,
-        timestamp:   t.received_at,
-        direction:   'inbound',
-        protocol:    t.protocol,
-        device_id:   t.device_id,
-        size_bytes:  0,
-        status:      'ok',
-        auth_status: 'ok',
-        encrypted:   false,
-        raw_payload: JSON.stringify(t),
+        packet_id:         t.packet_id,
+        timestamp:         t.received_at,
+        direction:         'inbound',
+        protocol:          t.protocol,
+        device_id:         t.device_id,
+        size_bytes:        0,
+        status:            t.status || 'ok',
+        auth_status:       t.auth_status || 'ok',
+        encrypted:         t.encrypted ?? 0,
+        encryption_method: t.encryption_method ?? 'PLAIN',
+        raw_payload:       JSON.stringify(t),
       }, ...prev.slice(0, 119)])
     }
     if (ev.event === 'ai_recommendation') {
       setPackets((prev) =>
         prev.map((p) => p.packet_id === ev.packet_id ? { ...p, ai_response: ev.recommendation } : p)
       )
+    }
+    if (ev.event === 'ai_service_status') {
+      const statusEv = ev as unknown as { event: string; enabled: boolean }
+      if (typeof statusEv.enabled === 'boolean') {
+        setAiEnabled(statusEv.enabled)
+      }
     }
   }, [])
 
@@ -310,6 +323,9 @@ export default function NocPage() {
       await fn()
       const c = await fetchConfig() as ServerConfig
       setConfigState(c)
+      if (typeof c.ai_service_enabled === 'boolean') {
+        setAiEnabled(c.ai_service_enabled)
+      }
       toast.success(`${key} updated`)
     } catch (e: unknown) {
       toast.error(e instanceof Error ? e.message : 'Error')
@@ -341,13 +357,16 @@ export default function NocPage() {
   const loading = (key: string) => saving === key
 
   const filteredPackets = packets.filter((p) => {
+    // Vehicle filter — only show packets for the selected vehicle
+    if (deviceId && p.device_id !== deviceId) return false
     if (filter === 'ok')       return p.status === 'ok' && p.auth_status !== 'fail' && p.auth_status !== 'tamper_detected'
     if (filter === 'rejected') return p.status !== 'ok' || p.auth_status === 'fail' || p.auth_status === 'tamper_detected'
     return true
   })
 
-  const totalOk       = packets.filter(p => p.status === 'ok').length
-  const totalRejected = packets.filter(p => p.status !== 'ok').length
+  const scopedPackets  = deviceId ? packets.filter(p => p.device_id === deviceId) : packets
+  const totalOk        = scopedPackets.filter(p => p.status === 'ok').length
+  const totalRejected  = scopedPackets.filter(p => p.status !== 'ok').length
 
   return (
     <>
@@ -375,25 +394,21 @@ export default function NocPage() {
 
             {/* Stats strip */}
             <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 12 }}>
-              <VehicleSelector
-                vehicles={vehicles}
-                selectedId={selectedVehicleId}
-                onChange={setSelectedVehicleId}
-                isOpen={selectorOpen}
-                onToggle={() => setSelectorOpen(!selectorOpen)}
-              />
+
               
               <div style={{ display: 'flex', gap: 6 }}>
                 {[
-                  { label: 'PROTOCOL', value: config?.active_protocol?.toUpperCase() ?? '---',
+                  { label: 'PROTOCOL',   value: config?.active_protocol?.toUpperCase() ?? '---',
                     color: config?.active_protocol === 'mqtt' ? '#ffb347' : '#00d4ff' },
-                  { label: 'AUTH',     value: config?.auth_enabled ? 'ON' : 'OFF',
+                  { label: 'AUTH',       value: config?.auth_enabled ? 'ON' : 'OFF',
                     color: config?.auth_enabled ? '#2ed573' : '#ff4757' },
-                  { label: 'ENCRYPT',  value: config?.encryption_enabled ? 'AES' : 'PLAIN',
+                  { label: 'ENCRYPT',    value: config?.encryption_enabled ? 'AES' : 'PLAIN',
                     color: config?.encryption_enabled ? '#2ed573' : 'var(--text-muted)' },
-                  { label: 'PACKETS',  value: String(packets.length), color: 'var(--text-primary)' },
-                  { label: 'ACCEPTED', value: String(totalOk), color: '#2ed573' },
-                  { label: 'REJECTED', value: String(totalRejected),
+                  { label: 'AI SERVICE', value: aiEnabled ? 'ON' : 'OFF',
+                    color: aiEnabled ? '#2ed573' : '#ff4757' },
+                  { label: 'PACKETS',    value: String(packets.length), color: 'var(--text-primary)' },
+                  { label: 'ACCEPTED',   value: String(totalOk), color: '#2ed573' },
+                  { label: 'REJECTED',   value: String(totalRejected),
                     color: totalRejected > 0 ? '#ff4757' : 'var(--text-muted)' },
                 ].map((s) => (
                   <div key={s.label} style={{
@@ -573,30 +588,86 @@ export default function NocPage() {
                 {/* ─ Vehicle control ─ */}
                 <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid rgba(0,212,255,0.05)' }}>
                   <div className="label" style={{ marginBottom: 8 }}>Vehicle Control</div>
-                  <input
-                    value={deviceId} onChange={(e) => setDeviceId(e.target.value)}
-                    placeholder="device_id"
-                    style={{
-                      width: '100%',
-                      background: 'rgba(0,212,255,0.04)', border: '1px solid rgba(0,212,255,0.1)',
-                      borderRadius: 3, padding: '7px 10px', color: 'var(--text-primary)', fontSize: 11,
-                      outline: 'none', marginBottom: 8, fontFamily: 'Space Mono',
-                    }}
-                  />
+
+                  {/* Vehicle dropdown */}
+                  <div style={{ position: 'relative', marginBottom: 8 }}>
+                    <select
+                      value={deviceId}
+                      onChange={(e) => setDeviceId(e.target.value)}
+                      style={{
+                        width: '100%',
+                        background: 'rgba(0,212,255,0.04)',
+                        border: '1px solid rgba(0,212,255,0.15)',
+                        borderRadius: 3,
+                        padding: '7px 28px 7px 10px',
+                        color: deviceId ? 'var(--text-primary)' : 'var(--text-muted)',
+                        fontSize: 11,
+                        fontFamily: 'Space Mono',
+                        outline: 'none',
+                        cursor: 'pointer',
+                        appearance: 'none',
+                        WebkitAppearance: 'none',
+                      }}
+                    >
+                      <option value="" style={{ background: '#090d14', color: 'var(--text-muted)' }}>— select vehicle —</option>
+                      {vehicles.map((v) => (
+                        <option
+                          key={v.device_id}
+                          value={v.device_id}
+                          style={{ background: '#090d14', color: '#e2e8f0' }}
+                        >
+                          {v.name ?? v.device_id} ({v.device_id})
+                        </option>
+                      ))}
+                    </select>
+                    {/* Custom dropdown arrow */}
+                    <div style={{
+                      position: 'absolute', right: 9, top: '50%', transform: 'translateY(-50%)',
+                      pointerEvents: 'none', color: 'rgba(0,212,255,0.5)', fontSize: 9,
+                    }}>▼</div>
+                  </div>
+
+                  {/* Selected vehicle badge */}
+                  {deviceId && (() => {
+                    const v = vehicles.find(x => x.device_id === deviceId)
+                    return v ? (
+                      <div style={{
+                        display: 'flex', alignItems: 'center', gap: 6,
+                        padding: '5px 9px', marginBottom: 8,
+                        background: 'rgba(0,212,255,0.06)',
+                        border: '1px solid rgba(0,212,255,0.15)',
+                        borderRadius: 3,
+                      }}>
+                        <div style={{
+                          width: 6, height: 6, borderRadius: '50%',
+                          background: v.active ? '#2ed573' : '#ff4757',
+                          boxShadow: `0 0 6px ${v.active ? '#2ed573' : '#ff4757'}`,
+                          flexShrink: 0,
+                        }} />
+                        <span style={{ fontSize: 10, color: 'var(--text-secondary)', fontFamily: 'Space Mono', flex: 1 }}>
+                          {v.name ?? v.device_id}
+                        </span>
+                        <span style={{ fontSize: 9, color: v.active ? '#2ed573' : '#ff4757' }}>
+                          {v.active ? 'ONLINE' : 'OFFLINE'}
+                        </span>
+                      </div>
+                    ) : null
+                  })()}
+
                   <div style={{ display: 'flex', gap: 6 }}>
-                    <button onClick={handleDisconnect} disabled={loading('disconnect')} style={{
+                    <button onClick={handleDisconnect} disabled={loading('disconnect') || !deviceId} style={{
                       flex: 1, padding: '7px', borderRadius: 3, fontSize: 10, cursor: 'pointer',
                       fontFamily: 'Space Mono',
                       background: 'rgba(255,71,87,0.08)', border: '1px solid rgba(255,71,87,0.25)',
                       color: '#ff4757',
-                      opacity: loading('disconnect') ? 0.5 : 1,
+                      opacity: (loading('disconnect') || !deviceId) ? 0.4 : 1,
                     }}>DISCONNECT</button>
-                    <button onClick={handleReconnect} disabled={loading('reconnect')} style={{
+                    <button onClick={handleReconnect} disabled={loading('reconnect') || !deviceId} style={{
                       flex: 1, padding: '7px', borderRadius: 3, fontSize: 10, cursor: 'pointer',
                       fontFamily: 'Space Mono',
                       background: 'rgba(46,213,115,0.08)', border: '1px solid rgba(46,213,115,0.25)',
                       color: '#2ed573',
-                      opacity: loading('reconnect') ? 0.5 : 1,
+                      opacity: (loading('reconnect') || !deviceId) ? 0.4 : 1,
                     }}>RECONNECT</button>
                   </div>
                 </div>
@@ -620,12 +691,43 @@ export default function NocPage() {
                 </span>
                 <span style={{ marginLeft: 4, fontSize: 9, color: 'var(--text-muted)' }}>· click to inspect</span>
 
+                {/* Active vehicle filter badge */}
+                {deviceId && (() => {
+                  const v = vehicles.find(x => x.device_id === deviceId)
+                  return (
+                    <div style={{
+                      display: 'flex', alignItems: 'center', gap: 5,
+                      padding: '2px 8px 2px 6px',
+                      background: 'rgba(0,212,255,0.08)',
+                      border: '1px solid rgba(0,212,255,0.25)',
+                      borderRadius: 3, marginLeft: 6,
+                    }}>
+                      <div style={{
+                        width: 5, height: 5, borderRadius: '50%',
+                        background: '#00d4ff', flexShrink: 0,
+                      }} />
+                      <span style={{ fontSize: 9, color: '#00d4ff', fontFamily: 'Space Mono' }}>
+                        {v?.name ?? deviceId}
+                      </span>
+                      <button
+                        onClick={() => setDeviceId('')}
+                        style={{
+                          background: 'none', border: 'none', cursor: 'pointer',
+                          color: 'rgba(0,212,255,0.5)', fontSize: 10, padding: '0 0 0 2px',
+                          lineHeight: 1,
+                        }}
+                        title="Clear vehicle filter"
+                      >✕</button>
+                    </div>
+                  )
+                })()}
+
                 {/* Filter chips */}
                 <div style={{ marginLeft: 'auto', display: 'flex', gap: 5 }}>
                   {([
-                    { key: 'all',      label: 'ALL' },
-                    { key: 'ok',       label: 'ACCEPTED' },
-                    { key: 'rejected', label: 'REJECTED' },
+                    { key: 'all',      label: `ALL (${scopedPackets.length})` },
+                    { key: 'ok',       label: `ACCEPTED (${totalOk})` },
+                    { key: 'rejected', label: `REJECTED (${totalRejected})` },
                   ] as const).map((f) => (
                     <button key={f.key} onClick={() => setFilter(f.key)}
                       style={{
@@ -692,11 +794,18 @@ export default function NocPage() {
                             </div>
                           </td>
                           <td>
-                            <span style={{ fontSize: 9,
-                              color: p.encrypted ? '#2ed573' : 'var(--text-muted)',
-                              letterSpacing: '0.04em' }}>
-                              {p.encrypted ? 'AES-GCM' : 'PLAIN'}
-                            </span>
+                            {(() => {
+                              const method = p.encryption_method ?? (p.encrypted ? 'AES-GCM' : 'PLAIN')
+                              const isAes  = method === 'AES-GCM'
+                              const isHmac = method === 'HMAC-SHA256'
+                              const color  = isAes ? '#2ed573' : isHmac ? '#00d4ff' : 'var(--text-muted)'
+                              return (
+                                <span style={{ fontSize: 9, color, letterSpacing: '0.04em',
+                                  fontFamily: 'Space Mono' }}>
+                                  {method}
+                                </span>
+                              )
+                            })()}
                           </td>
                           <td>
                             <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>

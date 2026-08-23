@@ -149,7 +149,8 @@ async def get_packets(limit: int = 50, device_id: Optional[str] = None) -> list[
         async with db.execute(
             """
             SELECT id as packet_id, received_at as timestamp, device_id, protocol, direction,
-                   size_bytes, status, raw_json as raw_payload, 'ok' as auth_status, 0 as encrypted
+                   size_bytes, status, raw_json as raw_payload, auth_status,
+                   encrypted, encryption_method
             FROM packets
             WHERE device_id = ?
             ORDER BY id DESC
@@ -162,7 +163,8 @@ async def get_packets(limit: int = 50, device_id: Optional[str] = None) -> list[
         async with db.execute(
             """
             SELECT id as packet_id, received_at as timestamp, device_id, protocol, direction,
-                   size_bytes, status, raw_json as raw_payload, 'ok' as auth_status, 0 as encrypted
+                   size_bytes, status, raw_json as raw_payload, auth_status,
+                   encrypted, encryption_method
             FROM packets
             ORDER BY id DESC
             LIMIT ?
@@ -170,4 +172,4 @@ async def get_packets(limit: int = 50, device_id: Optional[str] = None) -> list[
             (limit,),
         ) as cur:
             rows = await cur.fetchall()
-    return [dict(r) for r in rows]
+    return [dict(row) for row in rows]

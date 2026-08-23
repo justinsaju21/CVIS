@@ -71,16 +71,18 @@ async def _create_schema() -> None:
             applied_at  TEXT NOT NULL DEFAULT (datetime('now'))
         );
 
-        -- ── Raw packet log ─────────────────────────────────────────
+        -- ── Raw packet log ───────────────────────────────────────────────────
         CREATE TABLE IF NOT EXISTS packets (
-            id          INTEGER PRIMARY KEY AUTOINCREMENT,
-            received_at TEXT    NOT NULL,
-            device_id   TEXT    NOT NULL,
-            protocol    TEXT    NOT NULL DEFAULT 'http',
-            direction   TEXT    NOT NULL DEFAULT 'inbound',
-            size_bytes  INTEGER,
-            status      TEXT    NOT NULL,
-            raw_json    TEXT    NOT NULL
+            id                INTEGER PRIMARY KEY AUTOINCREMENT,
+            received_at       TEXT    NOT NULL,
+            device_id         TEXT    NOT NULL,
+            protocol          TEXT    NOT NULL DEFAULT 'http',
+            direction         TEXT    NOT NULL DEFAULT 'inbound',
+            size_bytes        INTEGER,
+            status            TEXT    NOT NULL,
+            raw_json          TEXT    NOT NULL,
+            encrypted         INTEGER NOT NULL DEFAULT 0,
+            encryption_method TEXT    NOT NULL DEFAULT 'PLAIN'
         );
 
         CREATE INDEX IF NOT EXISTS idx_packets_device_id   ON packets(device_id);
@@ -161,10 +163,24 @@ async def _create_schema() -> None:
             (key, value),
         )
 
+    # Migrate existing DB: add columns if missing (schema 2.1)
+    assert _db is not None
+    for col_def in [
+        "ALTER TABLE packets ADD COLUMN encrypted INTEGER NOT NULL DEFAULT 0",
+        "ALTER TABLE packets ADD COLUMN encryption_method TEXT NOT NULL DEFAULT 'PLAIN'",
+        "ALTER TABLE packets ADD COLUMN auth_status TEXT NOT NULL DEFAULT 'ok'",
+    ]:
+        try:
+            await _db.execute(col_def)
+            await _db.commit()
+            logger.info(f"DB migrated: {col_def}")
+        except Exception:
+            pass  # column already exists
+
     # Record schema version
     await _db.execute(
         "INSERT OR IGNORE INTO schema_version (version) VALUES (?)",
-        ("2.0",)
+        ("2.1",)
     )
     await _db.commit()
 

@@ -29,6 +29,12 @@ import urllib.request
 import urllib.error
 
 try:
+    import paho.mqtt.client as mqtt_client
+    MQTT_OK = True
+except ImportError:
+    MQTT_OK = False
+
+try:
     from cryptography.hazmat.primitives.ciphers.aead import AESGCM
     CRYPTO_OK = True
 except ImportError:
@@ -92,17 +98,19 @@ def fetch_fleet(base_url: str) -> list[dict]:
 
 class VehicleSimulator:
     def __init__(self, base_url: str, device_id: str, name: str,
-                 interval: float, cycle_secs: float, start_mode: int):
-        self.base_url     = base_url.rstrip("/")
-        self.device_id    = device_id
-        self.name         = name
-        self.interval     = interval
-        self.cycle_secs   = cycle_secs
-        self.api_key      = ""
+                 interval: float, cycle_secs: float, start_mode: int,
+                 force_tamper: bool = False):
+        self.base_url      = base_url.rstrip("/")
+        self.device_id     = device_id
+        self.name          = name
+        self.interval      = interval
+        self.cycle_secs    = cycle_secs
+        self.force_tamper  = force_tamper
+        self.api_key       = ""
         self.device_secret = ""
-        self.mode_index   = start_mode % len(MODES)
-        self.last_cycle   = time.time()
-        self.start_time   = time.time()
+        self.mode_index    = start_mode % len(MODES)
+        self.last_cycle    = time.time()
+        self.start_time    = time.time()
 
     def register(self) -> bool:
         # Deactivate first so we always get fresh credentials
@@ -155,7 +163,7 @@ class VehicleSimulator:
             "charging_rate_w": charge,
         }
 
-    def send_http(self, packet: dict, encryption_enabled: bool) -> tuple[int, str]:
+    def send_http(self, packet: dict, encryption_enabled: bool, tamper: bool = False) -> tuple[int, str]:
         headers = {"Content-Type": "application/json"}
         if self.api_key:
             headers["X-API-Key"] = self.api_key
@@ -164,14 +172,26 @@ class VehicleSimulator:
             plaintext = json.dumps(packet)
             sig = sign_hmac(self.device_secret, plaintext)
             envelope = aes_gcm_encrypt(self.device_secret, plaintext)
+            if tamper:
+                # Mutate ciphertext to cause AES-GCM tag mismatch
+                ct = envelope["ct"]
+                mutated_ct = ("00" if ct[:2] != "00" else "ff") + ct[2:]
+                envelope["ct"] = mutated_ct
             headers["X-HMAC-Signature"] = sig
             headers["X-Encrypted"] = "true"
             body = json.dumps(envelope).encode()
         else:
             payload_str = json.dumps(packet)
+            sig = sign_hmac(self.device_secret, payload_str) if self.device_secret else ""
             if self.device_secret:
-                headers["X-HMAC-Signature"] = sign_hmac(self.device_secret, payload_str)
-            body = payload_str.encode()
+                headers["X-HMAC-Signature"] = sig
+            if tamper:
+                # Mutate payload post-signature to trigger HMAC mismatch
+                tampered_pkt = dict(packet)
+                tampered_pkt["speed_kmh"] = round(tampered_pkt.get("speed_kmh", 50.0) + 123.4, 1)
+                body = json.dumps(tampered_pkt).encode()
+            else:
+                body = payload_str.encode()
 
         req = urllib.request.Request(
             f"{self.base_url}/api/v1/telemetry",
@@ -182,6 +202,58 @@ class VehicleSimulator:
                 return resp.status, resp.read().decode()
         except urllib.error.HTTPError as e:
             return e.code, e.read().decode()
+        except Exception as e:
+            return 500, str(e)
+
+    def send_mqtt(self, packet: dict, encryption_enabled: bool, tamper: bool = False) -> tuple[int, str]:
+        """Publish a telemetry packet via MQTT to the local broker."""
+        if not MQTT_OK:
+            return 500, "paho-mqtt not installed"
+
+        BROKER_HOST = "localhost"
+        BROKER_PORT = 1883
+        topic = f"cvis/telemetry/{self.device_id}"
+
+        if encryption_enabled and CRYPTO_OK and self.device_secret:
+            plaintext = json.dumps(packet)
+            sig = sign_hmac(self.device_secret, plaintext)
+            envelope = aes_gcm_encrypt(self.device_secret, plaintext)
+            if tamper:
+                ct = envelope["ct"]
+                envelope["ct"] = ("00" if ct[:2] != "00" else "ff") + ct[2:]
+            payload = json.dumps({
+                "_meta": {"api_key": self.api_key, "hmac": sig},
+                "encrypted": True,
+                **envelope,
+            })
+        else:
+            payload_str = json.dumps(packet)
+            sig = sign_hmac(self.device_secret, payload_str) if self.device_secret else ""
+            if tamper:
+                tampered_pkt = dict(packet)
+                tampered_pkt["speed_kmh"] = round(tampered_pkt.get("speed_kmh", 50.0) + 123.4, 1)
+                payload = json.dumps({
+                    "_meta": {"api_key": self.api_key, "hmac": sig},
+                    **tampered_pkt,
+                })
+            else:
+                payload = json.dumps({
+                    "_meta": {"api_key": self.api_key, "hmac": sig},
+                    **packet,
+                })
+
+        try:
+            client = mqtt_client.Client(
+                mqtt_client.CallbackAPIVersion.VERSION2,
+                client_id=f"{self.device_id}-pub",
+            )
+            client.connect(BROKER_HOST, BROKER_PORT, keepalive=10)
+            client.loop_start()          # background thread to handle ACKs
+            result = client.publish(topic, payload, qos=1)
+            result.wait_for_publish(timeout=5)  # wait for broker ACK
+            client.loop_stop()
+            client.disconnect()
+            return 200, "mqtt ok"
         except Exception as e:
             return 500, str(e)
 
@@ -198,13 +270,21 @@ class VehicleSimulator:
 
             cfg        = self.get_backend_config()
             encryption = cfg.get("encryption_enabled", False)
+            protocol   = cfg.get("active_protocol", "http")
+            tamper     = self.force_tamper or cfg.get("chaos", {}).get("tamper", False)
             pkt        = self.generate_packet()
-            code, _    = self.send_http(pkt, encryption)
-            count += 1
 
+            if protocol == "mqtt" and MQTT_OK:
+                code, _ = self.send_mqtt(pkt, encryption, tamper=tamper)
+            else:
+                code, _ = self.send_http(pkt, encryption, tamper=tamper)
+
+            count += 1
             enc_str    = "[ENC]" if encryption else "[PLN]"
+            tamper_str = "[TAMPER]" if tamper else "        "
+            proto_str  = protocol.upper()
             status_str = "OK" if code == 200 else f"ERR{code}"
-            print(f"[{self.name}] #{count:04d} {enc_str} {pkt['mode']:<22} "
+            print(f"[{self.name}] #{count:04d} {enc_str} {tamper_str} [{proto_str}] {pkt['mode']:<20} "
                   f"Spd:{pkt['speed_kmh']:5.1f} Bat:{pkt['battery_pct']:4.1f}% -> {status_str}")
 
             if max_packets > 0 and count >= max_packets:
@@ -219,6 +299,7 @@ if __name__ == "__main__":
     parser.add_argument("--interval", type=float, default=2.0,  help="Seconds between packets per vehicle")
     parser.add_argument("--count",    type=int,   default=0,    help="Max packets per vehicle (0=infinite)")
     parser.add_argument("--single",   default=None,             help="Run only this device_id (e.g. ESP32-ALPHA)")
+    parser.add_argument("--tamper",   action="store_true",      help="Force inject payload tampering for testing rejection")
     args = parser.parse_args()
 
     # ── Single source of truth: fetch fleet from backend ──────────────────
@@ -241,12 +322,13 @@ if __name__ == "__main__":
     print(f"[FLEET] Registering {len(fleet)} vehicle(s)...")
     for v in fleet:
         sim = VehicleSimulator(
-            base_url   = args.url,
-            device_id  = v["device_id"],
-            name       = v.get("name", v["device_id"]),
-            interval   = args.interval,
-            cycle_secs = v.get("cycle_secs", 12),
-            start_mode = v.get("start_mode", 0),
+            base_url     = args.url,
+            device_id    = v["device_id"],
+            name         = v.get("name", v["device_id"]),
+            interval     = args.interval,
+            cycle_secs   = v.get("cycle_secs", 12),
+            start_mode   = v.get("start_mode", 0),
+            force_tamper = args.tamper,
         )
         if not sim.register():
             print(f"[FLEET] Skipping {v['device_id']} — registration failed")

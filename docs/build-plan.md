@@ -63,7 +63,7 @@
 
 ## Phase 6 — Hardening + Testing (Week 6–7)
 - [x] End-to-end test: all 8 modes × both protocols × all chaos settings (test_phase6.py: 45/45 passed)
-- [ ] MQTT reconnect logic (Mosquitto not yet running — pending broker install)
+- [x] MQTT reconnect logic (Verified with local Mosquitto broker)
 - [ ] ESP32 WiFi drop/reconnect logic (pending hardware)
 - [x] Replay protection (nonce/timestamp window) — implemented and tested
 - [x] PROGRESS.md updated ← gate for Phase 7

@@ -67,6 +67,53 @@ async def ingest_telemetry_data(
     db = await get_db()
     received_at = datetime.now(timezone.utc).isoformat()
 
+    async def _record_rejected(dev_id: Optional[str], auth_st: str, reason: str, enc_m: str = "PLAIN"):
+        try:
+            resolved_dev_id = dev_id
+            if not resolved_dev_id:
+                try:
+                    import json
+                    parsed_raw = json.loads(raw_json)
+                    resolved_dev_id = parsed_raw.get("device_id") or parsed_raw.get("_meta", {}).get("device_id")
+                except Exception:
+                    pass
+            resolved_dev_id = resolved_dev_id or "UNKNOWN"
+
+            sz = len(raw_json.encode("utf-8"))
+            c = await db.execute(
+                """
+                INSERT INTO packets
+                    (received_at, device_id, protocol, direction, size_bytes, status, raw_json,
+                     encrypted, encryption_method, auth_status)
+                VALUES (?, ?, ?, 'inbound', ?, 'rejected', ?, ?, ?, ?)
+                """,
+                (received_at, resolved_dev_id, protocol, sz, raw_json,
+                 1 if encrypted else 0, enc_m, auth_st),
+            )
+            pkt_id = c.lastrowid
+            await db.commit()
+            await manager.broadcast({
+                "event": "telemetry",
+                "packet_id": pkt_id,
+                "received_at": received_at,
+                "protocol": protocol,
+                "device_id": resolved_dev_id,
+                "status": "rejected",
+                "auth_status": auth_st,
+                "encrypted": 1 if encrypted else 0,
+                "encryption_method": enc_m,
+                "mode": "Fault",
+                "speed_kmh": 0,
+                "battery_pct": 0,
+                "battery_temp_c": 0,
+                "motor_temp_c": 0,
+                "range_km": 0,
+                "fault_code": 999,
+                "charging_rate_w": 0,
+            })
+        except Exception as ex:
+            logger.error(f"[INGEST] Failed to log rejected packet: {ex}")
+
     # ── 1. Auth: verify API key ──────────────────────────────────────────
     device_id: Optional[str] = None
     device_secret: Optional[str] = None
@@ -74,6 +121,7 @@ async def ingest_telemetry_data(
     if auth_enabled:
         if not api_key:
             await _log_auth(None, "auth_fail", source_ip, "Missing API key")
+            await _record_rejected(None, "fail", "Missing API key")
             raise ValueError("AUTH_FAIL: Missing API key")
 
         key_hash = hash_api_key(api_key)
@@ -85,6 +133,7 @@ async def ingest_telemetry_data(
 
         if not row:
             await _log_auth(None, "auth_fail", source_ip, "Invalid API key")
+            await _record_rejected(None, "fail", "Invalid API key")
             raise ValueError("AUTH_FAIL: Invalid API key")
 
         device_id = row["device_id"]
@@ -95,6 +144,7 @@ async def ingest_telemetry_data(
     plaintext_json = raw_json
     if encrypted:
         if not (iv and ct and tag and device_secret):
+            await _record_rejected(device_id, "fail", "Missing AES-GCM fields", "AES-GCM")
             raise ValueError("DECRYPT_FAIL: Missing AES-GCM fields or device secret")
         try:
             plaintext_json = aes_gcm_decrypt(device_secret, iv, ct, tag)
@@ -102,6 +152,7 @@ async def ingest_telemetry_data(
         except InvalidTag:
             await _log_auth(device_id, "tamper_detected", source_ip,
                             "AES-GCM tag mismatch — payload tampered or wrong key")
+            await _record_rejected(device_id, "tamper_detected", "AES-GCM tag mismatch", "AES-GCM")
             raise ValueError("TAMPER: AES-GCM authentication tag invalid")
 
     # ── 3. HMAC verification (on plaintext) ──────────────────────────────
@@ -110,17 +161,20 @@ async def ingest_telemetry_data(
             await _log_auth(device_id, "tamper_detected", source_ip,
                             "HMAC-SHA256 mismatch — payload may have been tampered")
             logger.warning(f"[INGEST] HMAC FAIL device={device_id} — TAMPER DETECTED")
+            await _record_rejected(device_id, "tamper_detected", "HMAC verification failed", "HMAC-SHA256")
             raise ValueError("TAMPER: HMAC signature verification failed")
         logger.debug(f"[INGEST] HMAC OK for device={device_id}")
     elif auth_enabled and not hmac_signature:
         await _log_auth(device_id, "auth_fail", source_ip,
                         "Missing HMAC signature")
+        await _record_rejected(device_id, "fail", "Missing HMAC signature")
         raise ValueError("AUTH_FAIL: Missing HMAC signature")
 
     # ── 4. Parse + validate payload ──────────────────────────────────────
     try:
         payload = TelemetryPayload.model_validate_json(plaintext_json)
     except Exception as e:
+        await _record_rejected(device_id, "fail", f"Parse fail: {e}")
         raise ValueError(f"PARSE_FAIL: {e}")
 
     # ── 5. Replay protection ───────────────────────────────────────
@@ -128,18 +182,29 @@ async def ingest_telemetry_data(
     if replay_err:
         await _log_auth(payload.device_id, "tamper_detected", source_ip,
                         replay_err)
+        await _record_rejected(payload.device_id, "tamper_detected", replay_err)
         raise ValueError(replay_err)  # already prefixed with "REPLAY: ..."
 
     size_bytes = len(raw_json.encode("utf-8"))
 
-    # ── 6. Persist raw packet ────────────────────────────────────────────
+    # Determine the encryption method label for logging/display
+    if encrypted:
+        enc_method = "AES-GCM"
+    elif hmac_signature and device_secret:
+        enc_method = "HMAC-SHA256"
+    else:
+        enc_method = "PLAIN"
+
+    # ── 6. Persist raw packet ───────────────────────────────────────────
     cursor = await db.execute(
         """
         INSERT INTO packets
-            (received_at, device_id, protocol, direction, size_bytes, status, raw_json)
-        VALUES (?, ?, ?, 'inbound', ?, 'ok', ?)
+            (received_at, device_id, protocol, direction, size_bytes, status, raw_json,
+             encrypted, encryption_method, auth_status)
+        VALUES (?, ?, ?, 'inbound', ?, 'ok', ?, ?, ?, 'ok')
         """,
-        (received_at, payload.device_id, protocol, size_bytes, plaintext_json),
+        (received_at, payload.device_id, protocol, size_bytes, plaintext_json,
+         1 if encrypted else 0, enc_method),
     )
     packet_id: int = cursor.lastrowid  # type: ignore
 
@@ -173,6 +238,8 @@ async def ingest_telemetry_data(
         "packet_id": packet_id,
         "received_at": received_at,
         "protocol": protocol,
+        "encrypted": 1 if encrypted else 0,
+        "encryption_method": enc_method,
         **payload.model_dump(),
     }
     await manager.broadcast(broadcast_payload)
