@@ -74,7 +74,13 @@ volatile uint8_t  currentMode      = MODE_HEALTHY;
 volatile bool     modeChanged      = false;
 uint32_t          lastSendMs       = 0;
 uint32_t          lastConfigPollMs = 0;
-uint32_t          chargingBattPct  = 45;
+uint32_t          lastPhysicsMs    = 0;
+
+// Physics state
+float state_speed      = 60.0f;
+float state_batt_pct   = 80.0f;
+float state_batt_temp  = 30.0f;
+float state_motor_temp = 45.0f;
 
 // ─── Network clients ───────────────────────────────────────
 WiFiClient   wifiClient;
@@ -109,42 +115,99 @@ TelemetryPacket buildTelemetry(uint8_t mode) {
   p.fault_code     = 0;
   p.charging_rate_w = 0.0f;
 
+  uint32_t now = millis();
+  float dt = 0.1f;
+  if (lastPhysicsMs > 0) {
+    dt = (now - lastPhysicsMs) / 1000.0f;
+  }
+  if (dt > 10.0f) dt = 0.1f;
+  lastPhysicsMs = now;
+
+  float target_speed = 0;
+  float target_batt = 0;
+  float target_batt_t = 0;
+  float target_motor_t = 0;
+  float charge = 0;
+  float accel_rate = 8.0f;
+  float eff = 1.0f;
+  float range_factor = 3.0f;
+
   switch (mode) {
     case MODE_HEALTHY:
-      p.speed_kmh = vary(60,10); p.battery_pct = vary(80,5);
-      p.battery_temp_c = vary(30,2); p.motor_temp_c = vary(45,5); p.range_km = vary(250,20); break;
+      target_speed = 60; target_batt = 80; target_batt_t = 30; target_motor_t = 45; 
+      break;
     case MODE_ECO:
-      p.speed_kmh = vary(40,5); p.battery_pct = vary(75,5);
-      p.battery_temp_c = vary(28,2); p.motor_temp_c = vary(38,3); p.range_km = vary(290,15); break;
+      target_speed = 40; target_batt = 75; target_batt_t = 28; target_motor_t = 38; 
+      accel_rate = 5.0f; eff = 0.6f; range_factor = 3.8f;
+      break;
     case MODE_SPORT:
-      p.speed_kmh = vary(110,15); p.battery_pct = vary(65,5);
-      p.battery_temp_c = vary(35,3); p.motor_temp_c = vary(75,8); p.range_km = vary(180,20); break;
+      target_speed = 110; target_batt = 65; target_batt_t = 35; target_motor_t = 75; 
+      accel_rate = 12.0f; eff = 2.5f; range_factor = 1.8f;
+      break;
     case MODE_HEAVY_TRAFFIC:
-      p.speed_kmh = vary(15,5); p.battery_pct = vary(70,5);
-      p.battery_temp_c = vary(31,2); p.motor_temp_c = vary(42,4); p.range_km = vary(220,15); break;
+      target_speed = 15; target_batt = 70; target_batt_t = 31; target_motor_t = 42; 
+      eff = 1.5f; range_factor = 2.2f;
+      break;
     case MODE_LOW_BATTERY:
-      p.speed_kmh = vary(50,10); p.battery_pct = vary(12,3);
-      p.battery_temp_c = vary(32,2); p.motor_temp_c = vary(48,5); p.range_km = vary(35,10); break;
+      target_speed = 50; target_batt = 12; target_batt_t = 32; target_motor_t = 48; 
+      break;
     case MODE_BATTERY_OVERHEAT:
-      p.speed_kmh = vary(30,5); p.battery_pct = vary(55,5);
-      p.battery_temp_c = vary(58,4); p.motor_temp_c = vary(65,5);
-      p.range_km = vary(140,15); p.fault_code = 0x02; break;
+      target_speed = 30; target_batt = 55; target_batt_t = 58; target_motor_t = 65; 
+      p.fault_code = 0x02;
+      break;
     case MODE_CHARGING:
-      p.speed_kmh = 0; chargingBattPct = min(chargingBattPct + 1, (uint32_t)95);
-      p.battery_pct = (float)chargingBattPct;
-      p.battery_temp_c = vary(38,3); p.motor_temp_c = vary(32,2);
-      p.range_km = (float)chargingBattPct * 3.5f;
-      p.charging_rate_w = vary(7400,500); break;
+      target_speed = 0; target_batt = 100; target_batt_t = 38; target_motor_t = 32; 
+      charge = 7400;
+      break;
     case MODE_MOTOR_FAULT:
-      p.speed_kmh = 0; p.battery_pct = vary(60,5);
-      p.battery_temp_c = vary(33,2); p.motor_temp_c = vary(95,8);
-      p.range_km = 0; p.fault_code = 0x04; break;
+      target_speed = 0; target_batt = 60; target_batt_t = 33; target_motor_t = 95; 
+      p.fault_code = 0x04; accel_rate = 20.0f;
+      break;
   }
-  p.battery_pct    = constrain(p.battery_pct,    0.0f, 100.0f);
-  p.speed_kmh      = constrain(p.speed_kmh,      0.0f, 200.0f);
-  p.battery_temp_c = constrain(p.battery_temp_c, 15.0f, 80.0f);
-  p.motor_temp_c   = constrain(p.motor_temp_c,   20.0f, 120.0f);
-  p.range_km       = constrain(p.range_km,       0.0f, 500.0f);
+
+  if (state_batt_pct <= 0.0f && mode != MODE_CHARGING) {
+      target_speed = 0.0f;
+      accel_rate = 5.0f;
+  }
+
+  // Speed physics
+  float speed_diff = target_speed - state_speed;
+  if (abs(speed_diff) < accel_rate * dt) {
+      state_speed = target_speed;
+  } else {
+      state_speed += (accel_rate * dt) * (speed_diff > 0 ? 1 : -1);
+  }
+
+  // Battery physics
+  float base_drain = 0.02f;
+  float power_usage = base_drain + (state_speed / 100.0f) * (state_speed / 100.0f) * 0.15f * eff;
+  
+  if (mode == MODE_CHARGING) {
+      state_batt_pct += 1.0f * dt;
+      p.charging_rate_w = vary(charge, 500);
+  } else {
+      state_batt_pct -= power_usage * dt;
+  }
+
+  if (mode == MODE_LOW_BATTERY || mode == MODE_BATTERY_OVERHEAT) {
+      float batt_diff = target_batt - state_batt_pct;
+      if (abs(batt_diff) > 1.0f) {
+          state_batt_pct += (5.0f * dt) * (batt_diff > 0 ? 1 : -1);
+      }
+  }
+
+  state_batt_pct = constrain(state_batt_pct, 0.0f, 100.0f);
+
+  // Thermal physics
+  state_batt_temp += (target_batt_t - state_batt_temp) * 0.2f * dt;
+  state_motor_temp += (target_motor_t - state_motor_temp) * 0.2f * dt;
+
+  p.speed_kmh      = max(0.0f, vary(state_speed, 1.5f));
+  p.battery_pct    = state_batt_pct;
+  p.battery_temp_c = max(0.0f, vary(state_batt_temp, 0.5f));
+  p.motor_temp_c   = max(0.0f, vary(state_motor_temp, 1.5f));
+  p.range_km       = max(0.0f, vary(state_batt_pct * range_factor, 2.0f));
+
   return p;
 }
 

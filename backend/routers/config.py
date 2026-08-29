@@ -205,5 +205,16 @@ async def get_all_config() -> dict:
             "latency_ms": chaos_config.latency_ms,
             "tamper":     chaos_config.tamper_enabled,
         },
+        "force_mode": await get_config("force_mode"),
     }
+
+class ModeConfig(BaseModel):
+    mode: str | None = Field(None, description="Force a specific drive mode (or None to auto-cycle)")
+
+@router.post("/mode", summary="Force a specific vehicle mode")
+async def set_force_mode(body: ModeConfig) -> dict:
+    value = body.mode if body.mode else ""
+    await set_config("force_mode", value)
+    return {"force_mode": body.mode, "status": "ok"}
+
 

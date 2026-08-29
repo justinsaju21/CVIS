@@ -39,7 +39,8 @@ This document analyses the security properties of the CVIS communication layer, 
 ### 1.4 Replay Protection
 
 - **What:** Timestamp-window deduplication. The same `(device_id, timestamp_ms)` pair is rejected if seen more than once.
-- **Window:** In-memory bounded set, entries evicted after 2× the window (default 60 seconds). Restarts clear the set (acceptable for demo; production would use Redis).
+- **Why:** Prevents an attacker from capturing a valid payload on the wire and resending it later to manipulate backend state.
+- **How:** The backend maintains an in-memory `OrderedDict` of seen pairs within a 30-second rolling window (evicted at 60s). `timestamp_ms` is an opaque boot-relative monotonic `millis()` token.
 - **Failure mode:** Duplicate pair → `REPLAY:` ValueError → 401 + `tamper_detected` logged.
 - **Enabled by:** NOC or admin via `POST /api/v1/config/replay {"enabled": true}`. Off by default until the communication layer is stable.
 - **Code:** [`backend/replay_protection.py`](../backend/replay_protection.py)
@@ -58,7 +59,7 @@ This document analyses the security properties of the CVIS communication layer, 
 |---|---|---|
 | **Spoofed packet (wrong device)** | API key verification → 401 | Brute-force: 2^256 search space — infeasible |
 | **Packet tampering (in transit)** | HMAC-SHA256 → 401 + log | None while HMAC key is secret |
-| **Replay attack** | Timestamp-window deduplication → 401 | ESP32 millis() wraps at ~49 days; window covers this |
+| **Replay attack** | Timestamp-window deduplication → 401 | ESP32 millis() wraps at ~49 days; 30-second rolling window prevents recent replays |
 | **Eavesdropping / sniffing** | AES-256-GCM (when enabled) | Disabled by default; enable for production |
 | **Forged HMAC** | Constant-time verify prevents timing oracle | None |
 | **Credential theft** | API key hashed in DB, device_secret never re-transmitted | Lost key requires re-registration |
@@ -100,7 +101,7 @@ This approach is entirely legitimate for a CCNS demonstration and is explicitly 
 
 2. **MQTT broker has no auth** — Mosquitto is running without ACLs or TLS. Production would require TLS-MQTT and per-client certificates.
 
-3. **Replay window uses millis() not UTC** — Since ESP32 millis() resets to 0 on boot, a reset followed by re-sending would use the same timestamp_ms values. Mitigated by: (a) replay set clears on server restart, (b) device must re-authenticate after boot, (c) timestamps are only ~49-day unique.
+3. **Replay window uses boot-relative millis()** — Since ESP32 millis() resets to 0 on boot, a reset followed by re-sending would use the same timestamp_ms values. Mitigated by: (a) replay set clears on server restart, (b) device must re-authenticate after boot, (c) a collision only occurs if the device reboots and sends the identical timestamp within the exact 60-second eviction window of its last packet.
 
 4. **No backend admin auth** — Admin and NOC endpoints are not behind a login gate in the prototype. The first-priority TODO before live demo.
 

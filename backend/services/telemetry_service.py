@@ -110,6 +110,8 @@ async def ingest_telemetry_data(
                 "range_km": 0,
                 "fault_code": 999,
                 "charging_rate_w": 0,
+                "raw_payload": raw_json,
+                "size_bytes": sz,
             })
         except Exception as ex:
             logger.error(f"[INGEST] Failed to log rejected packet: {ex}")
@@ -203,7 +205,7 @@ async def ingest_telemetry_data(
              encrypted, encryption_method, auth_status)
         VALUES (?, ?, ?, 'inbound', ?, 'ok', ?, ?, ?, 'ok')
         """,
-        (received_at, payload.device_id, protocol, size_bytes, plaintext_json,
+        (received_at, payload.device_id, protocol, size_bytes, raw_json,
          1 if encrypted else 0, enc_method),
     )
     packet_id: int = cursor.lastrowid  # type: ignore
@@ -240,6 +242,8 @@ async def ingest_telemetry_data(
         "protocol": protocol,
         "encrypted": 1 if encrypted else 0,
         "encryption_method": enc_method,
+        "raw_payload": raw_json,
+        "size_bytes": size_bytes,
         **payload.model_dump(),
     }
     await manager.broadcast(broadcast_payload)

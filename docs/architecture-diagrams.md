@@ -7,7 +7,7 @@
 ```mermaid
 graph TB
     subgraph ESP32["ESP32 Vehicle Node (Simulated)"]
-        FW["firmware.ino — 8-mode telemetry generator"]
+        FW["firmware.ino — Stateful Physics Engine (Inertia, Drain, Range)"]
         CRYPTO_FW["crypto_utils.h — mbedTLS HMAC-SHA256 + AES-256-GCM"]
         BTN["Push Button GPIO — Mode Cycle ISR"]
         BTN --> FW
@@ -102,7 +102,8 @@ sequenceDiagram
     participant WS as WebSocket
     participant UI as Frontend
 
-    ESP->>ESP: Generate telemetry (8-mode sim)
+    ESP->>ESP: Calculate dt & step physics state
+    ESP->>ESP: Generate telemetry packet
     ESP->>ESP: HMAC-sign payload
     ESP->>ESP: AES-GCM encrypt (if enabled)
     ESP->>CM: POST /api/v1/telemetry

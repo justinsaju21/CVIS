@@ -150,6 +150,12 @@ Toggle replay protection.
 {"enabled": true}
 ```
 
+### `POST /api/v1/config/mode`
+Force a specific driving mode in the backend simulator (used by the dashboard).
+```json
+{"mode": "Sport"} // or null to resume automatic cycling
+```
+
 ---
 
 ## AI

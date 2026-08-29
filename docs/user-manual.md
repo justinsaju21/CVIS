@@ -74,17 +74,18 @@ The Driver view shows a real-time health dashboard for the connected vehicle.
 
 | Widget | Description |
 |---|---|
-| **Mode Badge** | Current vehicle mode (Healthy / Eco / Sport / etc.) |
-| **Battery Arc** | Animated circular gauge showing battery %. Red < 20%, amber < 40%. |
-| **Speed** | Current speed in km/h |
-| **Range** | Estimated remaining range in km |
-| **Motor Temp** | Motor temperature — amber > 70°C, red > 85°C |
-| **Charging Rate** | Current charge rate in kW |
-| **Battery History** | 60-point rolling area chart of battery % |
-| **Speed + Motor Temp** | Dual-series history chart |
-| **AI Recommendation** | Live AI-generated advice from Ollama, typewriter-animated |
-| **Alert Feed** | Critical mode alerts with colour-coded severity |
-| **Chat with CVIS** | Free-text chat grounded in current telemetry |
+| **Mode Badge / Card** | Click this card to open the **Mode Selector**. You can manually force the vehicle into Healthy, Eco, Sport, or Heavy Traffic. |
+| **Speed Dial** | Current speed in km/h. Smoothly spools up/down based on physical inertia when modes change. |
+| **Battery Level** | Real-time battery %. Drains continuously based on aerodynamic drag (speed) and mode efficiency. |
+| **Est. Range** | Dynamically calculates based on actual live battery % multiplied by the active mode's efficiency curve. |
+| **Tire Pressure** | 4-wheel live tire pressure monitoring, highlighting over/under inflation. |
+| **Live Route Map** | Real GPS mapping integration. |
+| **Drive Score (Pro)** | Real-time AI grading out of 10 based on speed habits, braking, and efficiency. |
+| **Key Suggestions** | Actionable driving tips based on live telemetry. |
+| **AI Advisory / Chat** | Free-text chat grounded in current telemetry. |
+
+### Physics Simulation
+This dashboard is driven by a stateful physics engine running on the backend (or physical ESP32). When you switch modes on the dashboard, values do not teleport randomly. Speed will accelerate smoothly via an inertia curve, battery will drain mathematically based on speed load, and the range estimate will dynamically shift to match your new power efficiency!
 
 ### AI Chat Tips
 - "What is wrong with the vehicle right now?"

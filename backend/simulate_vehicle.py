@@ -111,6 +111,14 @@ class VehicleSimulator:
         self.mode_index    = start_mode % len(MODES)
         self.last_cycle    = time.time()
         self.start_time    = time.time()
+        self.last_update   = time.time()
+        
+        # Initial physics state based on starting mode
+        m_name, m_spd, m_bat, m_bt, m_mt, m_rng, m_f, m_c = MODES[self.mode_index]
+        self.state_speed      = m_spd
+        self.state_batt_pct   = m_bat
+        self.state_batt_temp  = m_bt
+        self.state_motor_temp = m_mt
 
     def register(self) -> bool:
         # Deactivate first so we always get fresh credentials
@@ -148,17 +156,78 @@ class VehicleSimulator:
             return {"active_protocol": "http", "encryption_enabled": False}
 
     def generate_packet(self) -> dict:
-        mode_name, speed, batt, batt_t, motor_t, rng, fault, charge = MODES[self.mode_index]
+        mode_name, target_speed, target_batt, target_batt_t, target_motor_t, _rng, fault, charge = MODES[self.mode_index]
+        
+        now = time.time()
+        dt = now - self.last_update
+        if dt > 10: dt = 0.1 # prevent huge jumps if paused
+        self.last_update = now
+
+        # 1. Speed Physics
+        # Accelerate or decelerate smoothly toward target speed
+        accel_rate = 12.0 if mode_name == "Sport" else (5.0 if mode_name == "Eco" else 8.0)
+        
+        # Physics overrides for critical states
+        if mode_name == "Motor Fault": 
+            target_speed = 0.0 # Force stop on fault
+            accel_rate = 20.0  # Hard brake
+            
+        if self.state_batt_pct <= 0.0 and mode_name != "Charging":
+            target_speed = 0.0 # Out of battery, lose power
+            accel_rate = 5.0   # Coast to a stop
+            
+        speed_diff = target_speed - self.state_speed
+        if abs(speed_diff) < accel_rate * dt:
+            self.state_speed = target_speed
+        else:
+            self.state_speed += (accel_rate * dt) * (1 if speed_diff > 0 else -1)
+            
+        # 2. Battery Physics
+        # Base drain + speed-based power consumption
+        base_drain = 0.02 # 2% per 100s idle
+        eff = 1.0
+        if mode_name == "Eco": eff = 0.6
+        if mode_name == "Sport": eff = 2.5
+        if mode_name == "Heavy Traffic": eff = 1.5
+        
+        power_usage = base_drain + (self.state_speed / 100.0)**2 * 0.15 * eff
+        
+        if mode_name == "Charging":
+            self.state_batt_pct += 1.0 * dt # Charge rapidly for demo
+        else:
+            self.state_batt_pct -= power_usage * dt
+            
+        # If the mode is a forced situation, we drift the battery towards the situation's target
+        if mode_name in ["Low Battery", "Battery Overheating"]:
+            batt_diff = target_batt - self.state_batt_pct
+            if abs(batt_diff) > 1.0:
+                self.state_batt_pct += (5.0 * dt) * (1 if batt_diff > 0 else -1)
+                
+        self.state_batt_pct = max(0.0, min(100.0, self.state_batt_pct))
+        
+        # 3. Thermal Physics
+        # Temps rise under load and drop when idle
+        self.state_batt_temp += (target_batt_t - self.state_batt_temp) * 0.2 * dt
+        self.state_motor_temp += (target_motor_t - self.state_motor_temp) * 0.2 * dt
+        
+        # 4. Range Calculation
+        # Eco gives more range per percent, Sport gives less
+        range_factor = 3.0
+        if mode_name == "Eco": range_factor = 3.8
+        if mode_name == "Sport": range_factor = 1.8
+        if mode_name == "Heavy Traffic": range_factor = 2.2
+        estimated_range = self.state_batt_pct * range_factor
+
         return {
             "device_id":      self.device_id,
             "schema_version": "1.0",
             "timestamp_ms":   int((time.time() - self.start_time) * 1000),
             "mode":           mode_name,
-            "speed_kmh":      max(0.0, vary(speed, 3.0)),
-            "battery_pct":    max(0.0, min(100.0, vary(batt, 1.0))),
-            "battery_temp_c": max(0.0, vary(batt_t, 0.8)),
-            "motor_temp_c":   max(0.0, vary(motor_t, 1.5)),
-            "range_km":       max(0.0, vary(rng, 5.0)),
+            "speed_kmh":      max(0.0, vary(self.state_speed, 1.5)),
+            "battery_pct":    self.state_batt_pct,  # No variance for smooth UI dropping
+            "battery_temp_c": max(0.0, vary(self.state_batt_temp, 0.5)),
+            "motor_temp_c":   max(0.0, vary(self.state_motor_temp, 1.5)),
+            "range_km":       max(0.0, vary(estimated_range, 2.0)),
             "fault_code":     fault,
             "charging_rate_w": charge,
         }
@@ -269,6 +338,14 @@ class VehicleSimulator:
                 print(f"[{self.name}] Mode -> {MODES[self.mode_index][0]}")
 
             cfg        = self.get_backend_config()
+            force_mode = cfg.get("force_mode")
+            if force_mode:
+                # Find index of force_mode
+                for i, m in enumerate(MODES):
+                    if m[0] == force_mode:
+                        self.mode_index = i
+                        break
+
             encryption = cfg.get("encryption_enabled", False)
             protocol   = cfg.get("active_protocol", "http")
             tamper     = self.force_tamper or cfg.get("chaos", {}).get("tamper", False)

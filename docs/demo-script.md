@@ -40,7 +40,16 @@ python test_phase6.py
 - History graphs start drawing
 - AI recommendation types in (if Ollama is running)
 
-**Say:** *"The ESP32 firmware simulates 8 vehicle modes. Each mode produces logically coherent telemetry — for example, Sport mode means higher speed, higher motor temperature, and faster battery drain. The AI receives all eight telemetry fields simultaneously and reasons over them."*
+**Say:** *"The ESP32 firmware (or backend simulator) runs a stateful physics engine. When I switch the vehicle into Sport mode from this dashboard..."*
+
+**Action:** Click the Mode badge and select **Sport**.
+
+**Show:** 
+- The target speed changes immediately
+- The actual speed dial spools up smoothly due to physics inertia math (`dt` calculation)
+- The battery drain rate accelerates, and the estimated range drops instantly based on Sport mode's lower efficiency factor.
+
+**Say:** *"Notice how the speed accelerates smoothly, and the range drops. This is a mathematically sound, closed-loop physics engine, not just random telemetry. The AI receives all these inter-dependent telemetry fields simultaneously and reasons over them."*
 
 **Switch to `/noc`** — show packets arriving in real-time, each row populating.
 

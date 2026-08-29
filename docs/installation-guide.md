@@ -78,6 +78,25 @@ http://localhost:8000/docs
 
 ---
 
+## 3. Frontend Setup
+
+```bash
+cd frontend
+
+# Install dependencies
+npm install
+
+# Start development server
+npm run dev
+```
+
+The unified Next.js dashboard will be available at:
+```
+http://localhost:3000
+```
+
+---
+
 ## 3. Register a Device
 
 ```bash

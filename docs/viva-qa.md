@@ -19,6 +19,10 @@ The ESP32 adjusts its transmission frequency based on vehicle mode. Fault and ov
 
 Every telemetry payload includes a `schema_version` field (currently `"1.0"`). If we add new telemetry fields in a future firmware version, we increment this field. The backend can inspect this field and apply the appropriate parsing logic for each version, maintaining backward compatibility.
 
+**Q4: How does the simulated telemetry generation work? Is it just random numbers?**
+
+No, the simulated telemetry uses a **Continuous Stateful Physics Engine**. Both the ESP32 and the Python simulator track variables like speed, battery percentage, and temperature in their own memory. They calculate delta time (`dt`) between loop cycles and apply mathematical formulas for physical inertia and aerodynamic power drain. So when the vehicle switches to "Sport" mode, the speed spools up smoothly, the battery drains much faster, and the estimated range drops dynamically based on the live battery level. This guarantees the AI layer receives mathematically coherent, realistic data to reason over.
+
 ---
 
 ## Unit 2 — Network Models & Protocols
@@ -72,7 +76,7 @@ A timing oracle attack exploits the fact that a naive string comparison (`==`) r
 
 **Q13: How does replay protection work in your system?**
 
-Each telemetry payload includes a `timestamp_ms` field set to the current Unix time in milliseconds. The backend maintains a set of seen `(device_id, timestamp_ms)` tuples within a 300-second window. If a packet arrives with a timestamp more than 300 seconds old, or with a `(device_id, timestamp_ms)` pair already seen, it is rejected with 401. This prevents an attacker from capturing a valid packet and re-submitting it later.
+Each telemetry payload includes a `timestamp_ms` field set to a boot-relative monotonic `millis()` token. The backend maintains a set of seen `(device_id, timestamp_ms)` tuples within a 30-second rolling window. If a packet arrives with a `(device_id, timestamp_ms)` pair already seen within the window, it is rejected with 401. Cache eviction occurs at approximately 60 seconds. This prevents an attacker from capturing a valid packet and re-submitting it later.
 
 **Q14: What happens when you click "Disconnect Vehicle" in the NOC?**
 

@@ -77,7 +77,7 @@ cd backend && python test_phase1.py
 | 5 | Wrong API key | 401 Unauthorized |
 | 6 | Valid key, forged HMAC | 401 + tamper_detected in auth_logs |
 | 7 | Truncated HMAC | 401 |
-| 8 | Expired timestamp (> 300s) | 401 (replay protection) |
+| 8 | Duplicate timestamp within window (< 30s) | 401 (replay protection) |
 | 9 | AES-GCM encrypted + valid HMAC | 200 OK, decrypted correctly |
 | 10 | AES-GCM: wrong IV | 422 |
 | 11 | AES-GCM: truncated ciphertext | 422 |

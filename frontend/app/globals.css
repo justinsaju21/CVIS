@@ -1,38 +1,39 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Space+Mono:wght@400;700&family=Orbitron:wght@400;500;600;700;900&display=swap');
 @import "tailwindcss";
+@import "leaflet/dist/leaflet.css";
 
 :root {
   /* Core palette */
-  --bg-primary:    #000000;
-  --bg-secondary:  #040608;
-  --bg-tertiary:   #0a0d10;
-  --bg-card:       #0d1117;
+  --bg-primary:    #e2e8f0;
+  --bg-secondary:  #ffffff;
+  --bg-tertiary:   #cbd5e1;
+  --bg-card:       #ffffff;
 
   /* Borders */
-  --border:        rgba(0,212,255,0.08);
-  --border-hover:  rgba(0,212,255,0.18);
-  --border-active: rgba(0,212,255,0.35);
+  --border:        rgba(0,0,0,0.1);
+  --border-hover:  rgba(0,0,0,0.2);
+  --border-active: rgba(0,0,0,0.35);
 
   /* Text */
-  --text-primary:  #ffffff;
-  --text-secondary: rgba(255, 255, 255, 0.65);
-  --text-muted:    rgba(255, 255, 255, 0.4);
+  --text-primary:  #0f172a;
+  --text-secondary: rgba(0, 0, 0, 0.65);
+  --text-muted:    rgba(0, 0, 0, 0.4);
 
   /* Accents */
-  --cyan:          #00d4ff;
-  --cyan-dim:      rgba(0,212,255,0.1);
-  --cyan-glow:     0 0 20px rgba(0,212,255,0.4), 0 0 60px rgba(0,212,255,0.15);
-  --amber:         #ffb347;
-  --amber-dim:     rgba(255,179,71,0.12);
-  --red:           #ff4757;
-  --red-dim:       rgba(255,71,87,0.12);
-  --green:         #2ed573;
-  --green-dim:     rgba(46,213,115,0.12);
+  --cyan:          #0284c7;
+  --cyan-dim:      rgba(2,132,199,0.1);
+  --cyan-glow:     0 0 20px rgba(2,132,199,0.4), 0 0 60px rgba(2,132,199,0.15);
+  --amber:         #d97706;
+  --amber-dim:     rgba(217,119,6,0.12);
+  --red:           #dc2626;
+  --red-dim:       rgba(220,38,38,0.12);
+  --green:         #16a34a;
+  --green-dim:     rgba(22,163,74,0.12);
 
   /* Glass */
-  --glass:         rgba(0,212,255,0.02);
-  --glass-border:  rgba(0,212,255,0.08);
-  --glass-hover:   rgba(0,212,255,0.05);
+  --glass:         rgba(255,255,255,0.7);
+  --glass-border:  rgba(0,0,0,0.1);
+  --glass-hover:   rgba(255,255,255,0.9);
 }
 
 /* ─── Reset ──────────────────────────────────────────────────────────────── */
@@ -59,10 +60,11 @@ body {
 
 /* ─── Typography ─────────────────────────────────────────────────────────── */
 .font-display {
-  font-family: 'Orbitron', sans-serif;
+  font-family: 'Inter', sans-serif;
+  font-weight: 700;
 }
 .font-mono {
-  font-family: 'Space Mono', monospace;
+  font-family: 'Inter', sans-serif;
 }
 
 /* ─── Glass card ─────────────────────────────────────────────────────────── */
@@ -81,37 +83,20 @@ body {
 
 /* ─── HUD panel (for driver view) ───────────────────────────────────────── */
 .hud-panel {
-  background: rgba(0,10,16,0.85);
-  border: 1px solid rgba(0,212,255,0.15);
-  backdrop-filter: blur(24px);
-  -webkit-backdrop-filter: blur(24px);
-  border-radius: 4px;
+  background: #ffffff;
+  border: 1px solid rgba(0,0,0,0.06);
+  border-radius: 8px;
   position: relative;
   overflow: hidden;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.02);
 }
 
-/* Corner brackets on HUD panels */
+/* Corner brackets on HUD panels - removed for cleaner light theme */
 .hud-panel::before,
 .hud-panel::after {
-  content: '';
-  position: absolute;
-  width: 10px;
-  height: 10px;
-  border-color: var(--cyan);
-  border-style: solid;
+  display: none;
 }
-.hud-panel::before {
-  top: 4px;
-  left: 4px;
-  border-width: 1px 0 0 1px;
-  opacity: 0.6;
-}
-.hud-panel::after {
-  bottom: 4px;
-  right: 4px;
-  border-width: 0 1px 1px 0;
-  opacity: 0.6;
-}
+
 
 /* ─── HUD value display ──────────────────────────────────────────────────── */
 .hud-value {
@@ -131,12 +116,11 @@ body {
 
 /* ─── Labels ─────────────────────────────────────────────────────────────── */
 .label {
-  font-family: 'Space Mono', monospace;
-  font-size: 9px;
-  font-weight: 700;
+  font-size: 12px;
+  font-weight: 600;
   text-transform: uppercase;
-  letter-spacing: 0.18em;
-  color: rgba(255,255,255,0.32);
+  letter-spacing: 0.05em;
+  color: rgba(0,0,0,0.5);
 }
 
 /* ─── Glow utilities ─────────────────────────────────────────────────────── */

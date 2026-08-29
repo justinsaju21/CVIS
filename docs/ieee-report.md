@@ -43,7 +43,11 @@ The communication layer supports two protocol adapters behind a common ingest in
 
 The active protocol is switchable at runtime via `POST /api/v1/config/protocol` — no server restart required.
 
-### C. Ingest Pipeline
+### C. Stateful Physics Simulation
+
+To provide realistic telemetry for the AI reasoning layer, both the physical ESP32 and the Python simulator implement a continuous stateful physics engine. Rather than generating randomized values, the engine tracks variables (speed, battery percentage, temperatures) across loop cycles and calculates delta time (`dt`). Mode changes update a target speed and efficiency profile. Physical inertia, continuous aerodynamic battery drain, and thermal drift are mathematically applied per cycle. The estimated range is dynamically calculated by multiplying the real-time battery percentage by the active mode's efficiency factor. This strict interconnection ensures that when the vehicle's state changes, all dependent telemetry fields react realistically over time.
+
+### D. Ingest Pipeline
 
 Every packet, regardless of transport, passes through the same ingest pipeline:
 
@@ -81,13 +85,15 @@ When encryption is enabled, the firmware encrypts the payload using AES-256-GCM 
 { "encrypted": true, "iv": "<base64>", "ct": "<base64>", "tag": "<base64>" }
 ```
 
-HMAC is computed over the plaintext before encryption. The backend verifies HMAC first (over the expected plaintext reconstruction), then decrypts. This is an Encrypt-then-MAC ordering applied to an AEAD scheme.
+### D. Encrypt-then-MAC vs MAC-then-Encrypt
 
-### D. Replay Protection
+HMAC is computed over the plaintext before encryption. The backend verifies HMAC first (over the expected plaintext reconstruction), then decrypts. This is technically a MAC-then-Encrypt ordering applied within an AEAD envelope. Since AES-GCM's own authentication tag already provides authenticated encryption and prevents ciphertext tampering, the additional HMAC provides an extra layer of application-level integrity over the plaintext but is not cryptographically strictly required.
 
-Each payload includes `timestamp_ms` (Unix milliseconds). The backend maintains a bounded set of seen `(device_id, timestamp_ms)` pairs for a 300-second window. Packets older than 300 seconds or with duplicate timestamps are rejected with 401.
+### E. Replay Protection
 
-### E. Chaos Middleware — Security Demonstrations
+Each payload includes `timestamp_ms` (a boot-relative monotonic `millis()` token on the ESP32, not wall-clock time). The backend maintains a bounded set of seen `(device_id, timestamp_ms)` pairs for a 30-second rolling window. Packets within the 30-second window with duplicate timestamps are rejected with 401. Cache eviction occurs at approximately 60 seconds.
+
+### F. Chaos Middleware — Security Demonstrations
 
 A raw ASGI middleware intercepts requests before FastAPI body parsing and can:
 

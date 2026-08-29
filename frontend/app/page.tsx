@@ -12,7 +12,7 @@ import type { FleetVehicle } from '@/lib/types'
 
 export default function HomePage() {
   const router = useRouter()
-  const [loaded, setLoaded] = useState(false)
+  const [selectedVehicle, setSelectedVehicle] = useState<string | null>(null)
   const [vehicles, setVehicles] = useState<FleetVehicle[]>([])
 
   useEffect(() => {
@@ -21,7 +21,7 @@ export default function HomePage() {
       .catch(() => {})
   }, [])
 
-  if (!loaded) return <WireframeCarLoader onComplete={() => setLoaded(true)} message="Loading Fleet Registry..." />
+  if (selectedVehicle) return <WireframeCarLoader onComplete={() => router.push(`/driver/${selectedVehicle}`)} message="Initializing Console..." />
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', background: '#020406', position: 'relative' }}>
@@ -46,7 +46,7 @@ export default function HomePage() {
             return (
               <motion.button
                 key={v.device_id}
-                onClick={() => router.push(`/driver/${slug}`)}
+                onClick={() => setSelectedVehicle(slug)}
                 whileHover={{ scale: 1.02, y: -4 }}
                 whileTap={{ scale: 0.98 }}
                 style={{

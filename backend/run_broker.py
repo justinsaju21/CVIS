@@ -15,8 +15,7 @@ config = {
     'sys_interval': 10,
     'auth': {
         'allow-anonymous': True,
-    },
-    'plugins': ['auth_anonymous'],
+    }
 }
 
 async def start_broker():
