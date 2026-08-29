@@ -21,7 +21,7 @@ from fastapi import APIRouter, Body
 from pydantic import BaseModel, Field
 
 import auth as auth_module
-from db import get_config, set_config
+from db import get_db, get_config, set_config
 from middleware.chaos import chaos_config
 from replay_protection import is_replay_protection_enabled, set_replay_protection_enabled
 
@@ -194,12 +194,14 @@ async def get_all_config() -> dict:
     from routers.control import is_ai_enabled
     protocol   = await get_config("active_protocol") or "http"
     encryption = (await get_config("encryption_enabled") or "false") == "true"
+    mobile_app = (await get_config("mobile_app_enabled") or "true") == "true"
     return {
         "active_protocol":           protocol,
         "encryption_enabled":        encryption,
         "auth_enabled":              auth_module.is_auth_enabled(),
         "replay_protection_enabled": is_replay_protection_enabled(),
         "ai_service_enabled":        is_ai_enabled(),
+        "mobile_app_enabled":        mobile_app,
         "chaos": {
             "loss_pct":   chaos_config.loss_pct,
             "latency_ms": chaos_config.latency_ms,
@@ -218,3 +220,51 @@ async def set_force_mode(body: ModeConfig) -> dict:
     return {"force_mode": body.mode, "status": "ok"}
 
 
+# ─── Mobile App Access Control ─────────────────────────────────────────────
+
+class GlobalMobileAppConfig(BaseModel):
+    enabled: bool = Field(..., description="True = global mobile app access granted")
+
+@router.get("/mobile-access", summary="Get mobile app access state for a vehicle")
+async def get_mobile_access(vehicle_id: str) -> dict:
+    """
+    Return the mobile app access state and tier for the given vehicle.
+    Access is granted only if the global mobile_app_enabled is true AND vehicle is premium.
+    """
+    from fastapi import HTTPException
+    db = await get_db()
+    async with db.execute(
+        "SELECT tier FROM devices WHERE device_id = ?",
+        (vehicle_id,),
+    ) as cur:
+        row = await cur.fetchone()
+    if not row:
+        raise HTTPException(404, f"Device '{vehicle_id}' not found")
+        
+    mobile_app_global = (await get_config("mobile_app_enabled") or "true") == "true"
+    
+    return {
+        "vehicle_id": vehicle_id,
+        "tier":       row["tier"],
+        "enabled":    mobile_app_global and (row["tier"] == "premium"),
+    }
+
+@router.post("/mobile-app", summary="Globally enable or disable mobile app access")
+async def set_global_mobile_app(body: GlobalMobileAppConfig) -> dict:
+    """
+    NOC-controlled gate: globally enable or disable the mobile app URL.
+    Even if globally enabled, only premium-tier vehicles can access it (enforced by GET endpoint).
+    """
+    await set_config("mobile_app_enabled", "true" if body.enabled else "false")
+    
+    logger.info(
+        f"[CONFIG] Global Mobile access "
+        f"{'ENABLED' if body.enabled else 'DISABLED'}"
+    )
+    # Broadcast to WebSocket so NOC panel updates live
+    from ws_manager import manager
+    await manager.broadcast({
+        "event":      "global_mobile_app_changed",
+        "enabled":    body.enabled,
+    })
+    return {"enabled": body.enabled, "status": "ok"}

@@ -46,6 +46,8 @@ export const setAiService     = (e: boolean) =>
   api.post('/api/v1/control/ai-service', { enabled: e })
 export const setVehicleAiService = (device_id: string, e: boolean) =>
   api.post('/api/v1/control/ai-service/vehicle', { device_id, enabled: e })
+export const setGlobalMobileApp = (e: boolean) =>
+  api.post('/api/v1/config/mobile-app', { enabled: e })
 export const fetchVehicles    = () => api.get('/api/v1/control/vehicles')
 
 // ─── AI ──────────────────────────────────────────────────────────────────
@@ -68,3 +70,7 @@ export const fetchErrorLog     = (limit = 50)  => api.get(`/api/v1/admin/error-l
 export const fetchDevices      = ()            => api.get('/api/v1/devices')
 export const registerDevice    = (device_id: string) =>
   api.post('/api/v1/devices/register', { device_id })
+
+// ─── Mobile App Access ────────────────────────────────────────────────────
+export const fetchMobileAccess = (vehicle_id: string) =>
+  api.get(`/api/v1/config/mobile-access?vehicle_id=${vehicle_id}`)

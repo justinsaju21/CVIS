@@ -243,7 +243,7 @@ async def get_vehicles() -> list[dict]:
     for v in FLEET:
         async with db.execute(
             """
-            SELECT d.active,
+            SELECT d.active, d.tier, d.mobile_access_enabled,
                    t.mode AS last_mode, t.battery_pct AS last_battery,
                    t.motor_temp_c AS last_temp, t.received_at AS last_seen
             FROM devices d
@@ -259,19 +259,23 @@ async def get_vehicles() -> list[dict]:
             row = await cur.fetchone()
         entry = {**v}
         if row:
-            entry["active"]       = bool(row["active"])
-            entry["last_mode"]    = row["last_mode"]
-            entry["last_battery"] = row["last_battery"]
-            entry["last_temp"]    = row["last_temp"]
-            entry["last_seen"]    = row["last_seen"]
-            entry["ai_enabled"]   = is_ai_enabled(v["device_id"])
+            entry["active"]                = bool(row["active"])
+            entry["tier"]                  = row["tier"] or "free"
+            entry["mobile_access_enabled"] = bool(row["mobile_access_enabled"])
+            entry["last_mode"]             = row["last_mode"]
+            entry["last_battery"]          = row["last_battery"]
+            entry["last_temp"]             = row["last_temp"]
+            entry["last_seen"]             = row["last_seen"]
+            entry["ai_enabled"]            = is_ai_enabled(v["device_id"])
         else:
-            entry["active"]       = False
-            entry["last_mode"]    = None
-            entry["last_battery"] = None
-            entry["last_temp"]    = None
-            entry["last_seen"]    = None
-            entry["ai_enabled"]   = is_ai_enabled(v["device_id"])
+            entry["active"]                = False
+            entry["tier"]                  = "free"
+            entry["mobile_access_enabled"] = False
+            entry["last_mode"]             = None
+            entry["last_battery"]          = None
+            entry["last_temp"]             = None
+            entry["last_seen"]             = None
+            entry["ai_enabled"]            = is_ai_enabled(v["device_id"])
         result.append(entry)
     return result
 

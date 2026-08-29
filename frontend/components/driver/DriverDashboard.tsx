@@ -225,7 +225,27 @@ function StatCard({
   )
 }
 
-// ─── Card Modal (centered overlay) ───────────────────────────────────────────
+// ─── Formatted AI Text Component ───────────────────────────────────────────
+function FormattedAiText({ text }: { text: string }) {
+  if (!text) return null
+  const parts = text.split(/(\*\*.*?\*\*)/g)
+  return (
+    <>
+      {parts.map((part, i) => {
+        if (part.startsWith('**') && part.endsWith('**')) {
+          return (
+            <strong key={i} style={{ color: '#0f172a', fontWeight: 700 }}>
+              {part.slice(2, -2)}
+            </strong>
+          )
+        }
+        return <span key={i} style={{ color: '#334155' }}>{part}</span>
+      })}
+    </>
+  )
+}
+
+// ─── Card Modal (fixed top-centered overlay) ─────────────────────────────────
 function CardModal({ title, icon, accent = '#0ea5e9', onClose, children }: {
   title: string; icon: React.ReactNode; accent?: string
   onClose: () => void; children: React.ReactNode
@@ -235,23 +255,24 @@ function CardModal({ title, icon, accent = '#0ea5e9', onClose, children }: {
       initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
       style={{
         position: 'fixed', inset: 0, zIndex: 500,
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        background: 'rgba(255,255,255,0.85)', backdropFilter: 'blur(8px)', padding: 24,
+        display: 'flex', alignItems: 'flex-start', justifyContent: 'center',
+        paddingTop: 'max(80px, 10vh)', paddingLeft: 24, paddingRight: 24, paddingBottom: 24,
+        background: 'rgba(15,23,42,0.45)', backdropFilter: 'blur(8px)',
       }}
       onClick={onClose}
     >
       <motion.div
-        initial={{ scale: 0.92, y: 24, opacity: 0 }}
+        initial={{ scale: 0.95, y: 16, opacity: 0 }}
         animate={{ scale: 1, y: 0, opacity: 1 }}
-        exit={{ scale: 0.92, y: 24, opacity: 0 }}
-        transition={{ type: 'spring', stiffness: 380, damping: 30 }}
+        exit={{ scale: 0.95, y: 16, opacity: 0 }}
+        transition={{ duration: 0.2, ease: 'easeOut' }}
         onClick={e => e.stopPropagation()}
         style={{
-          width: '100%', maxWidth: 480,
-          background: '#f1f5f9',
-          border: `1px solid rgba(0,0,0,0.1)`,
+          width: '100%', maxWidth: 500,
+          background: '#ffffff',
+          border: `1px solid rgba(0,0,0,0.12)`,
           borderRadius: 12,
-          boxShadow: `0 24px 60px rgba(0,0,0,0.15), 0 0 20px rgba(0,0,0,0.05)`,
+          boxShadow: `0 24px 60px rgba(0,0,0,0.2), 0 0 20px rgba(0,0,0,0.05)`,
           overflow: 'hidden',
         }}
       >
@@ -265,12 +286,12 @@ function CardModal({ title, icon, accent = '#0ea5e9', onClose, children }: {
           </span>
           <button onClick={onClose} style={{
             marginLeft: 'auto', background: 'none', border: 'none',
-            color: 'rgba(0,0,0,0.4)', cursor: 'pointer', lineHeight: 1,
+            color: 'rgba(0,0,0,0.5)', cursor: 'pointer', lineHeight: 1,
           }}>
             <X size={16} />
           </button>
         </div>
-        <div style={{ padding: '20px', maxHeight: '70vh', overflowY: 'auto' }}>
+        <div style={{ padding: '20px', maxHeight: '75vh', overflowY: 'auto' }}>
           {children}
         </div>
       </motion.div>
@@ -302,6 +323,8 @@ export default function DriverDashboard({ vehicleId, vehicleName, vehicleColor, 
   const alertId = useRef(0)
   const chatBottom = useRef<HTMLDivElement>(null)
   const recognitionRef = useRef<any>(null)
+  const typewriterTimer = useRef<NodeJS.Timeout | null>(null)
+  const lastRecRef = useRef<string>('')
 
   const efficiencyData = useMemo(() => Array.from({ length: 13 }, (_, i) => ({
     time: `${(i * 2).toString().padStart(2, '00')}:00`,
@@ -318,13 +341,38 @@ export default function DriverDashboard({ vehicleId, vehicleName, vehicleColor, 
     fetchConfig().then((cfg: any) => {
       setIsPro(cfg.ai_service_enabled === true)
     }).catch(() => {})
+
+    return () => {
+      if (typewriterTimer.current) clearInterval(typewriterTimer.current)
+    }
   }, [vehicleId])
 
-  const typewriterEffect = (text: string) => {
-    setAiTyping(true); setAiRec('')
+  const typewriterEffect = useCallback((text: string) => {
+    if (typewriterTimer.current) clearInterval(typewriterTimer.current)
+    if (!text) {
+      setAiRec('')
+      setAiTyping(false)
+      lastRecRef.current = ''
+      return
+    }
+    if (lastRecRef.current === text) {
+      setAiRec(text)
+      setAiTyping(false)
+      return
+    }
+    lastRecRef.current = text
+    setAiTyping(true)
     let i = 0
-    const iv = setInterval(() => { setAiRec(text.slice(0, i + 1)); i++; if (i >= text.length) { clearInterval(iv); setAiTyping(false) } }, 18)
-  }
+    const step = 3
+    typewriterTimer.current = setInterval(() => {
+      i += step
+      setAiRec(text.slice(0, i))
+      if (i >= text.length) {
+        if (typewriterTimer.current) clearInterval(typewriterTimer.current)
+        setAiTyping(false)
+      }
+    }, 24)
+  }, [])
 
   const handleWs = useCallback((ev: WsEvent) => {
     if (ev.event === 'telemetry' || ev.event === 'telemetry_backfill') {
@@ -340,19 +388,18 @@ export default function DriverDashboard({ vehicleId, vehicleName, vehicleColor, 
           const msgs: Record<string, string> = { 'Motor Fault': `Motor fault \u2014 0x${r.fault_code.toString(16).toUpperCase()}`, 'Battery Overheating': `Batt temp critical: ${r.battery_temp_c.toFixed(0)}\u00b0C`, 'Low Battery': `Low battery: ${r.battery_pct.toFixed(0)}% \u2014 ${r.range_km.toFixed(0)}km range` }
           
           setAlerts(prev => {
-            // Avoid duplicate alerts for the same mode in a row
             if (prev.length > 0 && prev[0].msg.startsWith(msgs[r.mode].split(':')[0])) return prev;
             return [{ id, msg: msgs[r.mode] ?? r.mode, type: r.mode === 'Motor Fault' || r.mode === 'Battery Overheating' ? 'fault' : 'warn', time: new Date().toLocaleTimeString() }, ...prev.slice(0, 7)]
           })
         } else {
-          setAlerts([]) // Clear alerts if vehicle returns to normal mode
+          setAlerts([])
         }
       })
     }
-    if (ev.event === 'ai_recommendation' && ev.device_id === vehicleId) typewriterEffect(ev.recommendation)
+    if (ev.event === 'ai_recommendation' && ev.device_id === vehicleId && ev.recommendation) typewriterEffect(ev.recommendation)
     if (ev.event === 'vehicle_ai_status' && ev.device_id === vehicleId) setIsPro(ev.enabled)
     if (ev.event === 'ai_service_status') setIsPro(ev.enabled as boolean)
-  }, [vehicleId])
+  }, [vehicleId, typewriterEffect])
 
   const { connected } = useWebSocket(handleWs)
 
@@ -557,7 +604,7 @@ export default function DriverDashboard({ vehicleId, vehicleName, vehicleColor, 
                   <div style={{ height: 8, borderRadius: 4, background: 'rgba(0,0,0,0.11)', overflow: 'hidden' }}>
                     <motion.div style={{ height: '100%', borderRadius: 4, background: latest && latest.battery_pct < 20 ? '#ef4444' : 'linear-gradient(90deg,#10b981,#0ea5e9)' }} animate={{ width: `${latest?.battery_pct ?? 0}%` }} transition={{ duration: 0.8 }} />
                   </div>
-                  {[{ label: 'Voltage', val: (latest?.battery_pct ?? 80) > 50 ? '402V' : '387V', col: 'white' }, { label: 'Battery Temp', val: `${Math.round(latest?.battery_temp_c ?? 28)}°C`, col: latest && latest.battery_temp_c > 50 ? '#ef4444' : '#10b981' }, { label: 'Charge Rate', val: mode === 'Charging' ? `${((latest?.charging_rate_w ?? 11000) / 1000).toFixed(1)} kW` : '— Not Charging', col: mode === 'Charging' ? '#0ea5e9' : 'rgba(0,0,0,0.60)' }, { label: 'State', val: mode === 'Charging' ? 'Charging' : mode === 'Low Battery' ? 'Critical' : 'Discharging', col: mode === 'Charging' ? '#10b981' : mode === 'Low Battery' ? '#ef4444' : 'rgba(0,0,0,1.00)' }].map(r => (
+                  {[{ label: 'Voltage', val: (latest?.battery_pct ?? 80) > 50 ? '402V' : '387V', col: '#0f172a' }, { label: 'Battery Temp', val: `${Math.round(latest?.battery_temp_c ?? 28)}°C`, col: latest && latest.battery_temp_c > 50 ? '#ef4444' : '#10b981' }, { label: 'Charge Rate', val: mode === 'Charging' ? `${((latest?.charging_rate_w ?? 11000) / 1000).toFixed(1)} kW` : '— Not Charging', col: mode === 'Charging' ? '#0ea5e9' : 'rgba(0,0,0,0.60)' }, { label: 'State', val: mode === 'Charging' ? 'Charging' : mode === 'Low Battery' ? 'Critical' : 'Discharging', col: mode === 'Charging' ? '#10b981' : mode === 'Low Battery' ? '#ef4444' : '#0f172a' }].map(r => (
                     <div key={r.label} style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 14px', background: 'rgba(0,0,0,0.04)', borderRadius: 6, border: '1px solid rgba(0,0,0,0.09)' }}>
                       <span style={{ fontSize: 12, color: 'rgba(0,0,0,0.60)', fontFamily: 'sans-serif' }}>{r.label}</span>
                       <span style={{ fontSize: 13, fontWeight: 600, color: r.col, fontFamily: 'sans-serif' }}>{r.val}</span>
@@ -574,7 +621,7 @@ export default function DriverDashboard({ vehicleId, vehicleName, vehicleColor, 
                   {[{ label: 'Feels Like', val: `${Math.round(ambientTemp - 2)}°C` }, { label: 'Cabin Temp', val: `${Math.round(ambientTemp + 4)}°C` }, { label: 'Range Impact', val: ambientTemp < 18 ? '+3%' : ambientTemp < 28 ? 'Neutral' : '-2%' }, { label: 'HVAC Load', val: ambientTemp > 28 ? 'High' : ambientTemp > 18 ? 'Moderate' : 'Low' }, { label: 'Dew Point', val: `${Math.round(ambientTemp - 6)}°C` }].map(r => (
                     <div key={r.label} style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 14px', background: 'rgba(0,0,0,0.04)', borderRadius: 6, border: '1px solid rgba(0,0,0,0.09)' }}>
                       <span style={{ fontSize: 12, color: 'rgba(0,0,0,0.60)', fontFamily: 'sans-serif' }}>{r.label}</span>
-                      <span style={{ fontSize: 13, fontWeight: 600, color: 'rgba(255,255,255,0.85)', fontFamily: 'sans-serif' }}>{r.val}</span>
+                      <span style={{ fontSize: 13, fontWeight: 600, color: '#0f172a', fontFamily: 'sans-serif' }}>{r.val}</span>
                     </div>
                   ))}
                 </div>
@@ -624,7 +671,7 @@ export default function DriverDashboard({ vehicleId, vehicleName, vehicleColor, 
                   {[{ label: 'Current Speed', val: `${Math.round(latest?.speed_kmh ?? 0)} km/h` }, { label: 'ETA at Speed', val: latest && latest.speed_kmh > 5 ? `${Math.round((latest.range_km / latest.speed_kmh) * 60)} min` : '—' }, { label: 'Consumption', val: `${mode === 'Eco' ? '14.2' : mode === 'Sport' ? '22.8' : '17.5'} kWh/100km` }, { label: 'Charging ETA', val: mode === 'Charging' ? `${Math.round(((100 - (latest?.battery_pct ?? 0)) / 100) * 60)} min to full` : 'Not Charging' }].map(r => (
                     <div key={r.label} style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 14px', background: 'rgba(0,0,0,0.04)', borderRadius: 6, border: '1px solid rgba(0,0,0,0.09)' }}>
                       <span style={{ fontSize: 12, color: 'rgba(0,0,0,0.60)', fontFamily: 'sans-serif' }}>{r.label}</span>
-                      <span style={{ fontSize: 13, fontWeight: 600, color: 'rgba(255,255,255,0.85)', fontFamily: 'sans-serif' }}>{r.val}</span>
+                      <span style={{ fontSize: 13, fontWeight: 600, color: '#0f172a', fontFamily: 'sans-serif' }}>{r.val}</span>
                     </div>
                   ))}
                 </div>
@@ -755,7 +802,7 @@ export default function DriverDashboard({ vehicleId, vehicleName, vehicleColor, 
                       <div key={i} style={{ display: 'flex', gap: 14, padding: '14px', background: s.priority === 'high' ? 'rgba(239,68,68,0.06)' : 'rgba(14,165,233,0.04)', border: `1px solid ${s.priority === 'high' ? 'rgba(239,68,68,0.22)' : 'rgba(14,165,233,0.12)'}`, borderRadius: 8 }}>
                         <div style={{ fontSize: 24, lineHeight: 1 }}>{s.icon}</div>
                         <div style={{ flex: 1 }}>
-                          <div style={{ fontSize: 13, fontWeight: 700, color: s.priority === 'high' ? '#ef4444' : 'rgba(255,255,255,0.85)', fontFamily: 'sans-serif', marginBottom: 4 }}>{s.title}</div>
+                          <div style={{ fontSize: 13, fontWeight: 700, color: s.priority === 'high' ? '#ef4444' : '#0f172a', fontFamily: 'sans-serif', marginBottom: 4 }}>{s.title}</div>
                           <div style={{ fontSize: 12, color: 'rgba(0,0,0,0.7)', lineHeight: 1.5, fontFamily: 'sans-serif' }}>{s.desc}</div>
                           <div style={{ marginTop: 8, display: 'inline-block', padding: '2px 8px', borderRadius: 10, background: s.priority === 'high' ? 'rgba(239,68,68,0.15)' : 'rgba(14,165,233,0.1)', fontSize: 10, color: s.priority === 'high' ? '#ef4444' : '#0ea5e9', fontFamily: 'sans-serif' }}>{s.priority.toUpperCase()} PRIORITY</div>
                         </div>
@@ -793,14 +840,16 @@ export default function DriverDashboard({ vehicleId, vehicleName, vehicleColor, 
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                       {aiTyping && <div className="typewriter-cursor" />}
-                      <span style={{ fontSize: 12, color: 'rgba(0,0,0,0.60)', fontFamily: 'sans-serif' }}>{aiTyping ? 'Generating...' : 'Last recommendation'}</span>
+                      <span style={{ fontSize: 12, color: '#64748b', fontFamily: 'sans-serif', fontWeight: 500 }}>
+                        {aiTyping ? 'Generating recommendation...' : 'Live AI Recommendation'}
+                      </span>
                     </div>
-                    <button onClick={() => { requestRecommendation() }} disabled={aiTyping || !latest} style={{ background: 'rgba(14,165,233,0.1)', border: '1px solid rgba(14,165,233,0.3)', borderRadius: 6, padding: '6px 14px', fontSize: 12, color: 'var(--cyan)', cursor: 'pointer', fontFamily: 'sans-serif', opacity: aiTyping ? 0.5 : 1 }}>↻ Refresh</button>
+                    <button onClick={() => { requestRecommendation() }} disabled={aiTyping || !latest} style={{ background: 'rgba(14,165,233,0.12)', border: '1px solid rgba(14,165,233,0.3)', borderRadius: 6, padding: '6px 14px', fontSize: 12, fontWeight: 600, color: '#0284c7', cursor: 'pointer', fontFamily: 'sans-serif', opacity: aiTyping ? 0.5 : 1 }}>↻ Refresh</button>
                   </div>
-                  <div style={{ padding: '16px', background: 'rgba(14,165,233,0.04)', borderRadius: 8, border: '1px solid rgba(14,165,233,0.1)', fontSize: 14, color: 'rgba(255,255,255,0.8)', lineHeight: 1.7, fontFamily: 'sans-serif', minHeight: 80 }}>
-                    {aiRec || <span style={{ color: 'rgba(0,0,0,0.38)' }}>{!connected ? '◌ Waiting for connection...' : 'AI on standby — awaiting telemetry data.'}</span>}
+                  <div style={{ padding: '16px 18px', background: '#f8fafc', borderRadius: 8, border: '1px solid #e2e8f0', fontSize: 13.5, color: '#334155', lineHeight: 1.7, fontFamily: 'sans-serif', minHeight: 140, maxHeight: 300, overflowY: 'auto' }}>
+                    {aiRec ? <FormattedAiText text={aiRec} /> : <span style={{ color: '#94a3b8' }}>{!connected ? '◌ Waiting for connection...' : 'AI on standby — awaiting telemetry data.'}</span>}
                   </div>
-                  <div style={{ fontSize: 12, color: 'rgba(0,0,0,0.38)', fontFamily: 'sans-serif', textAlign: 'center' }}>Based on live telemetry from {vehicleId}</div>
+                  <div style={{ fontSize: 11.5, color: '#64748b', fontFamily: 'sans-serif', textAlign: 'center' }}>Based on live telemetry from {vehicleId}</div>
                 </div>
               </CardModal>
             )}

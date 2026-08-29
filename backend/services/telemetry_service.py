@@ -26,6 +26,10 @@ from ws_manager import manager
 
 logger = logging.getLogger("cvis.telemetry_service")
 
+_last_device_mode: dict[str, str] = {}
+_last_ai_time: dict[str, float] = {}
+_ai_in_flight: set[str] = set()
+
 
 async def _log_auth(device_id: Optional[str], event_type: str,
                     ip_address: str, details: str) -> None:
@@ -251,15 +255,27 @@ async def ingest_telemetry_data(
     # ── 8. Fire-and-forget AI recommendation ─────────────────────────────
     try:
         import asyncio
+        import time
         from routers.control import is_ai_enabled
-        if is_ai_enabled():
+
+        now_ts = time.time()
+        prev_mode = _last_device_mode.get(payload.device_id)
+        last_time = _last_ai_time.get(payload.device_id, 0.0)
+        mode_changed = (prev_mode != payload.mode)
+        time_elapsed = (now_ts - last_time) >= 20.0
+
+        _last_device_mode[payload.device_id] = payload.mode
+
+        if is_ai_enabled(payload.device_id) and (mode_changed or time_elapsed) and (payload.device_id not in _ai_in_flight):
+            _ai_in_flight.add(payload.device_id)
+            _last_ai_time[payload.device_id] = now_ts
             asyncio.create_task(
-                _send_ai_recommendation(payload, packet_id, received_at)
+                _send_ai_recommendation(payload, packet_id, received_at, prev_mode)
             )
         else:
-            logger.debug("[INGEST] AI service stopped — recommendation skipped")
+            logger.debug("[INGEST] AI recommendation skipped (throttled or disabled)")
     except ImportError:
-        pass  # AI module not yet loaded — skip silently
+        pass
 
     return {
         "status": "ok",
@@ -269,28 +285,61 @@ async def ingest_telemetry_data(
     }
 
 
-async def _send_ai_recommendation(payload: TelemetryPayload,
-                                   packet_id: int, received_at: str) -> None:
+async def _send_ai_recommendation(
+    payload: TelemetryPayload,
+    packet_id: int,
+    received_at: str,
+    prev_mode: str | None = None,
+) -> None:
     """
     Background task: generate AI recommendation and broadcast via WebSocket.
     This runs AFTER the HTTP ack is sent, so it never blocks the ESP32.
+
+    Updated (Quick Wins ①–④):
+      - Fetches last 5 history rows for trend delta context (②)
+      - Passes prev_mode for mode-transition detection (④)
+      - Uses (system, user) prompt tuple with /api/chat (①)
+      - Broadcasts severity alongside recommendation (③)
     """
     try:
         from ai.ollama_client import generate_recommendation
         from ai.prompt_builder import build_recommendation_prompt
 
-        prompt = build_recommendation_prompt(payload)
-        recommendation = await generate_recommendation(prompt)
+        # ② Fetch recent history for trend context
+        db = await get_db()
+        async with db.execute(
+            """
+            SELECT mode, speed_kmh, battery_pct, battery_temp_c,
+                   motor_temp_c, fault_code, received_at
+            FROM telemetry
+            WHERE device_id = ?
+            ORDER BY id DESC LIMIT 5
+            """,
+            (payload.device_id,),
+        ) as cur:
+            history_rows = await cur.fetchall()
+        history = [dict(r) for r in history_rows]
 
-        if recommendation:
+        # ① build returns (system, user); ②③④ all applied inside builder
+        system, user = build_recommendation_prompt(payload, history, prev_mode)
+        result = await generate_recommendation(system, user)
+
+        if result:
+            severity, recommendation = result   # ③ unpack severity
             await manager.broadcast({
-                "event": "ai_recommendation",
-                "packet_id": packet_id,
-                "received_at": received_at,
-                "device_id": payload.device_id,
-                "mode": payload.mode,
+                "event":          "ai_recommendation",
+                "packet_id":      packet_id,
+                "received_at":    received_at,
+                "device_id":      payload.device_id,
+                "mode":           payload.mode,
+                "severity":       severity,          # ③ NEW field
                 "recommendation": recommendation,
             })
-            logger.info(f"[AI] Recommendation sent for packet_id={packet_id}")
+            logger.info(
+                f"[AI] Recommendation sent for packet_id={packet_id} "
+                f"severity={severity}"
+            )
     except Exception as e:
         logger.debug(f"[AI] Recommendation skipped: {e}")
+    finally:
+        _ai_in_flight.discard(payload.device_id)

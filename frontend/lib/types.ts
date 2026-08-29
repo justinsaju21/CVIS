@@ -85,6 +85,7 @@ export interface ServerConfig {
   auth_enabled:              boolean
   replay_protection_enabled: boolean
   ai_service_enabled?:       boolean
+  mobile_app_enabled?:       boolean
   chaos:                     ChaosConfig
 }
 
@@ -131,25 +132,28 @@ export interface AiStatus {
 }
 
 export interface FleetVehicle {
-  device_id:    string
-  name:         string
-  description:  string
-  color:        string
-  personality:  string
-  active:       boolean
-  last_mode?:   string | null
-  last_battery?:number | null
-  last_temp?:   number | null
-  last_seen?:   string | null
-  ai_enabled:   boolean
+  device_id:             string
+  name:                  string
+  description:           string
+  color:                 string
+  personality:           string
+  active:                boolean
+  tier:                  'free' | 'premium'
+  mobile_access_enabled: boolean
+  last_mode?:            string | null
+  last_battery?:         number | null
+  last_temp?:            number | null
+  last_seen?:            string | null
+  ai_enabled:            boolean
 }
 
 // WebSocket event types
 export type WsEvent =
-  | { event: 'telemetry';          packet_id: number; received_at: string } & TelemetryPayload
-  | { event: 'telemetry_backfill'; items: TelemetryRow[] }
-  | { event: 'ai_recommendation';  packet_id: number; device_id: string; mode: string; recommendation: string }
-  | { event: 'device_disconnected';device_id: string; reason: string }
-  | { event: 'device_reconnected'; device_id: string }
-  | { event: 'ai_service_status';  enabled: boolean }
-  | { event: 'vehicle_ai_status';  device_id: string; enabled: boolean }
+  | { event: 'telemetry';            packet_id: number; received_at: string } & TelemetryPayload
+  | { event: 'telemetry_backfill';   items: TelemetryRow[] }
+  | { event: 'ai_recommendation';    packet_id: number; device_id: string; mode: string; recommendation: string }
+  | { event: 'device_disconnected';  device_id: string; reason: string }
+  | { event: 'device_reconnected';   device_id: string }
+  | { event: 'ai_service_status';    enabled: boolean }
+  | { event: 'vehicle_ai_status';    device_id: string; enabled: boolean }
+  | { event: 'mobile_access_changed'; vehicle_id: string; enabled: boolean }

@@ -4,7 +4,7 @@ import { useState, useCallback, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   Shield, Lock, Wifi, WifiOff, RefreshCw, BrainCircuit,
-  AlertTriangle, CheckCircle, XCircle, Eye, Activity, ChevronRight
+  AlertTriangle, CheckCircle, XCircle, Eye, Activity, ChevronRight, Smartphone
 } from 'lucide-react'
 import { toast } from 'sonner'
 
@@ -15,6 +15,7 @@ import {
   fetchConfig, fetchPackets, fetchVehicles,
   setProtocol, setEncryption, setAuth, setReplay, setChaos,
   disconnectDevice, reconnectDevice, setAiService,
+  setGlobalMobileApp,
 } from '@/lib/api'
 import type { ServerConfig, PacketRow, WsEvent, TelemetryRow, FleetVehicle } from '@/lib/types'
 
@@ -272,6 +273,7 @@ export default function NocPage() {
   const [vehicles,   setVehicles]   = useState<FleetVehicle[]>([])
   const [selectedVehicleId, setSelectedVehicleId] = useState<string | null>(null)
   const [selectorOpen, setSelectorOpen] = useState(false)
+  const [globalMobileAccess, setGlobalMobileAccess] = useState(true)
 
   useEffect(() => {
     fetchConfig().then((c) => {
@@ -280,9 +282,15 @@ export default function NocPage() {
       if (typeof cfg.ai_service_enabled === 'boolean') {
         setAiEnabled(cfg.ai_service_enabled)
       }
+      if (typeof cfg.mobile_app_enabled === 'boolean') {
+        setGlobalMobileAccess(cfg.mobile_app_enabled)
+      }
     }).catch(() => {})
     fetchPackets(80, selectedVehicleId || undefined).then((rows) => setPackets(rows as PacketRow[])).catch(() => {})
-    fetchVehicles().then((fleet) => setVehicles(fleet as FleetVehicle[])).catch(() => {})
+    fetchVehicles().then((fleet) => {
+      const f = fleet as FleetVehicle[]
+      setVehicles(f)
+    }).catch(() => {})
   }, [selectedVehicleId])
 
   const handleWs = useCallback((ev: WsEvent) => {
@@ -313,11 +321,15 @@ export default function NocPage() {
         setAiEnabled(statusEv.enabled)
       }
     }
+    if (ev.event === 'global_mobile_app_changed') {
+      const mEv = ev as unknown as { event: string; enabled: boolean }
+      setGlobalMobileAccess(mEv.enabled)
+    }
   }, [])
 
   const { connected } = useWebSocket(handleWs)
 
-  const save = async (key: string, fn: () => Promise<unknown>) => {
+  const save = async (key: string, fn: () => Promise<unknown>, successMsg?: string) => {
     setSaving(key)
     try {
       await fn()
@@ -326,7 +338,7 @@ export default function NocPage() {
       if (typeof c.ai_service_enabled === 'boolean') {
         setAiEnabled(c.ai_service_enabled)
       }
-      toast.success(`${key} updated`)
+      toast.success(successMsg || `${key} updated`)
     } catch (e: unknown) {
       toast.error(e instanceof Error ? e.message : 'Error')
     } finally {
@@ -351,6 +363,10 @@ export default function NocPage() {
   const handleAiToggle = (v: boolean) => {
     setAiEnabled(v)
     save('ai', () => setAiService(v))
+  }
+  const handleGlobalMobileAccess = (v: boolean) => {
+    setGlobalMobileAccess(v)
+    save('global_mobile', () => setGlobalMobileApp(v), `Mobile App access ${v ? 'enabled' : 'disabled'}`)
   }
 
   const chaos   = config?.chaos
@@ -513,6 +529,12 @@ export default function NocPage() {
                     desc: 'Enables LLM telemetry analysis',
                     on: aiEnabled,
                     onChange: handleAiToggle, color: '#0ea5e9',
+                  },
+                  {
+                    icon: Smartphone, label: 'Mobile App', key: 'global_mobile',
+                    desc: 'Enables mobile access globally',
+                    on: globalMobileAccess,
+                    onChange: handleGlobalMobileAccess, color: '#ec4899',
                   },
                 ].map((ctrl) => (
                   <div key={ctrl.label} style={{
@@ -678,6 +700,7 @@ export default function NocPage() {
                     }}>RECONNECT</button>
                   </div>
                 </div>
+
               </motion.div>
             </div>
 

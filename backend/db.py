@@ -156,6 +156,7 @@ async def _create_schema() -> None:
         ("chaos_latency_ms",   "0"),
         ("chaos_tamper",       "false"),
         ("replay_protection",  "false"),
+        ("mobile_app_enabled", "true"),
     ]
     for key, value in defaults:
         await _db.execute(
@@ -163,12 +164,15 @@ async def _create_schema() -> None:
             (key, value),
         )
 
-    # Migrate existing DB: add columns if missing (schema 2.1)
+    # Migrate existing DB: add columns if missing (schema 2.1 → 2.2)
     assert _db is not None
     for col_def in [
         "ALTER TABLE packets ADD COLUMN encrypted INTEGER NOT NULL DEFAULT 0",
         "ALTER TABLE packets ADD COLUMN encryption_method TEXT NOT NULL DEFAULT 'PLAIN'",
         "ALTER TABLE packets ADD COLUMN auth_status TEXT NOT NULL DEFAULT 'ok'",
+        # schema 2.2 — mobile access control
+        "ALTER TABLE devices ADD COLUMN tier TEXT NOT NULL DEFAULT 'free'",
+        "ALTER TABLE devices ADD COLUMN mobile_access_enabled INTEGER NOT NULL DEFAULT 0",
     ]:
         try:
             await _db.execute(col_def)
@@ -177,10 +181,24 @@ async def _create_schema() -> None:
         except Exception:
             pass  # column already exists
 
+    # Seed tier/mobile_access for the 4 known ESP32 nodes
+    # Alpha and Beta are Premium; Gamma and Delta are Free (demo split)
+    premium_devices = ["ESP32-ALPHA", "ESP32-BETA"]
+    for device_id in premium_devices:
+        await _db.execute(
+            "UPDATE devices SET tier = 'premium' WHERE device_id = ? AND tier = 'free'",
+            (device_id,),
+        )
+    await _db.commit()
+
     # Record schema version
     await _db.execute(
         "INSERT OR IGNORE INTO schema_version (version) VALUES (?)",
         ("2.1",)
+    )
+    await _db.execute(
+        "INSERT OR IGNORE INTO schema_version (version) VALUES (?)",
+        ("2.2",)
     )
     await _db.commit()
 
