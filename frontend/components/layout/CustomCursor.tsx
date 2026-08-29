@@ -74,6 +74,7 @@ export default function CustomCursor() {
         background: state === 'default' ? '#fff' : 'var(--cyan)',
         pointerEvents: 'none',
         zIndex: 99999,
+        mixBlendMode: 'difference',
         transition: 'background 150ms',
         boxShadow: state !== 'default' ? '0 0 8px rgba(0,212,255,0.8)' : 'none',
       }} />
@@ -86,6 +87,7 @@ export default function CustomCursor() {
         border: `1.5px solid ${ringColor}`,
         pointerEvents: 'none',
         zIndex: 99998,
+        mixBlendMode: 'difference',
         transition: 'border-color 150ms, width 200ms, height 200ms',
         ...(state === 'link' ? { width: 44, height: 44 } : {}),
       }} />

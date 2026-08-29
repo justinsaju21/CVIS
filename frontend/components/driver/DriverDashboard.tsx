@@ -438,12 +438,17 @@ export default function DriverDashboard({ vehicleId, vehicleName, vehicleColor, 
       const recognition = new SpeechRecognition()
       recognitionRef.current = recognition
       recognition.continuous = false
-      recognition.interimResults = false
+      recognition.interimResults = true // Enable it to feel responsive, but handle it correctly
       
+      const initialInput = chatMsg.trim()
+
       recognition.onstart = () => setIsListening(true)
       recognition.onresult = (event: any) => { 
-        const transcript = event.results[0][0].transcript
-        setChatMsg(prev => prev ? `${prev} ${transcript}` : transcript) 
+        let currentTranscript = ''
+        for (let i = 0; i < event.results.length; i++) {
+          currentTranscript += event.results[i][0].transcript
+        }
+        setChatMsg(initialInput ? `${initialInput} ${currentTranscript}` : currentTranscript) 
       }
       recognition.onerror = (e: any) => {
         console.error("Speech recognition error:", e.error || e)
