@@ -100,6 +100,30 @@ class TelemetryPayload(BaseModel):
         le=350000.0,
         description="Active charging power in Watts (0 when not charging).",
     )
+    ambient_temp_c: Optional[float] = Field(
+        default=None,
+        description="Outside ambient temperature in Celsius.",
+    )
+    headwind_kmh: Optional[float] = Field(
+        default=None,
+        description="Estimated headwind speed in km/h.",
+    )
+    road_gradient_pct: Optional[float] = Field(
+        default=None,
+        description="Road elevation gradient as a percentage (e.g. 5.0 for 5% uphill).",
+    )
+    tire_pressure_psi: Optional[float] = Field(
+        default=None,
+        description="Average tire pressure in PSI.",
+    )
+    cabin_climate_w: Optional[float] = Field(
+        default=None,
+        description="Power draw of the cabin climate control (AC/Heater) in Watts.",
+    )
+    max_cell_voltage_delta: Optional[float] = Field(
+        default=None,
+        description="Maximum voltage difference between any two battery cells.",
+    )
 
 
 class TelemetryResponse(BaseModel):

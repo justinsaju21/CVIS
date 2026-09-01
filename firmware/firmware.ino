@@ -70,17 +70,29 @@ char activeProtocol[8] = "http";
 bool encryptionEnabled = false;
 
 // ─── State ─────────────────────────────────────────────────
-volatile uint8_t  currentMode      = MODE_HEALTHY;
-volatile bool     modeChanged      = false;
 uint32_t          lastSendMs       = 0;
 uint32_t          lastConfigPollMs = 0;
 uint32_t          lastPhysicsMs    = 0;
+uint32_t          tickCounter      = 0;
 
 // Physics state
-float state_speed      = 60.0f;
-float state_batt_pct   = 80.0f;
-float state_batt_temp  = 30.0f;
-float state_motor_temp = 45.0f;
+float state_speed        = 60.0f;
+float state_batt_pct     = 95.0f;
+float state_batt_temp    = 30.0f;
+float state_motor_temp   = 45.0f;
+float state_charge_rate  = 0.0f;
+
+// Advanced environment state
+float env_ambient_temp   = 25.0f;
+float env_headwind       = 10.0f;
+float env_road_grad      = 0.0f;
+float env_tire_psi       = 34.0f;
+float env_cabin_w        = 500.0f;
+float env_cell_delta     = 0.01f;
+
+float target_speed       = 60.0f;
+int   current_fault      = 0;
+const char* current_mode = "Healthy";
 
 // ─── Network clients ───────────────────────────────────────
 WiFiClient   wifiClient;
@@ -99,6 +111,12 @@ struct TelemetryPacket {
   float range_km;
   int   fault_code;
   float charging_rate_w;
+  float ambient_temp_c;
+  float headwind_kmh;
+  float road_gradient_pct;
+  float tire_pressure_psi;
+  float cabin_climate_w;
+  float max_cell_voltage_delta;
 };
 
 // ─── Helpers ──────────────────────────────────────────────────
@@ -106,114 +124,111 @@ float vary(float base, float range) {
   return base + ((float)random(-100, 100) / 100.0f) * range;
 }
 
-TelemetryPacket buildTelemetry(uint8_t mode) {
+void tickPhysics(float dt) {
+  tickCounter++;
+  
+  if (tickCounter % 5 == 0) {
+    env_road_grad += ((float)random(-100, 100) / 100.0f);
+    env_road_grad = constrain(env_road_grad, -10.0f, 10.0f);
+    env_headwind += ((float)random(-200, 200) / 100.0f);
+    env_headwind = constrain(env_headwind, 0.0f, 50.0f);
+  }
+  
+  if (tickCounter % 10 == 0 && current_fault == 0) {
+    target_speed += ((float)random(-1500, 1500) / 100.0f);
+    target_speed = constrain(target_speed, 0.0f, 120.0f);
+  }
+
+  // Smooth acceleration
+  if (state_speed < target_speed) state_speed += 2.0f * dt;
+  else if (state_speed > target_speed) state_speed -= 2.0f * dt;
+  state_speed = max(0.0f, state_speed);
+
+  // Load calculation
+  float aero_drag = ((state_speed + env_headwind) * (state_speed + env_headwind)) / 10000.0f;
+  float gravity_drag = env_road_grad * 0.5f;
+  float tire_drag = max(0.0f, (36.0f - env_tire_psi) * 0.1f);
+  float load_factor = (state_speed / 50.0f) + aero_drag + gravity_drag + tire_drag;
+  load_factor = max(0.1f, load_factor);
+  if (state_speed == 0) load_factor = 0.1f;
+
+  float drain_rate = load_factor * 0.1f * dt;
+  drain_rate += (env_cabin_w / 5000.0f) * dt;
+  state_batt_pct -= drain_rate;
+  state_batt_pct = max(0.0f, state_batt_pct);
+
+  float heating = load_factor * 2.0f * dt;
+  float cooling = (state_motor_temp - env_ambient_temp) * 0.05f * dt;
+  state_motor_temp += (heating - cooling);
+
+  float batt_heating = drain_rate * 5.0f;
+  float batt_cooling = (state_batt_temp - env_ambient_temp) * 0.02f * dt;
+  state_batt_temp += (batt_heating - batt_cooling);
+
+  current_fault = 0;
+  current_mode = "Healthy";
+  
+  if (state_speed > 80.0f) current_mode = "Sport";
+  else if (state_speed > 0 && state_speed < 30.0f) current_mode = "Heavy Traffic";
+  else if (state_speed == 0 && state_charge_rate > 0) current_mode = "Charging";
+
+  if (state_batt_pct <= 15.0f) current_mode = "Low Battery";
+  if (state_batt_pct <= 0) {
+    state_speed = 0; target_speed = 0;
+  }
+
+  if (state_motor_temp > 95.0f) {
+    current_fault = 0x04;
+    current_mode = "Motor Fault";
+    target_speed = 0;
+  }
+  if (state_batt_temp > 60.0f) {
+    current_fault = 0x02;
+    current_mode = "Battery Overheating";
+    if (target_speed > 40.0f) target_speed = 40.0f;
+  }
+}
+
+TelemetryPacket buildTelemetry() {
+  uint32_t now = millis();
+  float dt = 0.1f;
+  if (lastPhysicsMs > 0) dt = (now - lastPhysicsMs) / 1000.0f;
+  if (dt > 5.0f) dt = 0.1f;
+  lastPhysicsMs = now;
+
+  tickPhysics(dt);
+
+  float base_range = state_batt_pct * 3.0f;
+  if (env_tire_psi < 32.0f) base_range *= 0.9f;
+  if (env_headwind > 20.0f) base_range *= 0.85f;
+  if (env_cabin_w > 1000.0f) base_range *= 0.95f;
+  float range_val = max(0.0f, base_range);
+
   TelemetryPacket p;
   p.device_id      = DEVICE_ID;
   p.schema_version = "1.0";
-  p.timestamp_ms   = millis();
-  p.mode           = MODE_NAMES[mode];
-  p.fault_code     = 0;
-  p.charging_rate_w = 0.0f;
-
-  uint32_t now = millis();
-  float dt = 0.1f;
-  if (lastPhysicsMs > 0) {
-    dt = (now - lastPhysicsMs) / 1000.0f;
-  }
-  if (dt > 10.0f) dt = 0.1f;
-  lastPhysicsMs = now;
-
-  float target_speed = 0;
-  float target_batt = 0;
-  float target_batt_t = 0;
-  float target_motor_t = 0;
-  float charge = 0;
-  float accel_rate = 8.0f;
-  float eff = 1.0f;
-  float range_factor = 3.0f;
-
-  switch (mode) {
-    case MODE_HEALTHY:
-      target_speed = 60; target_batt = 80; target_batt_t = 30; target_motor_t = 45; 
-      break;
-    case MODE_ECO:
-      target_speed = 40; target_batt = 75; target_batt_t = 28; target_motor_t = 38; 
-      accel_rate = 5.0f; eff = 0.6f; range_factor = 3.8f;
-      break;
-    case MODE_SPORT:
-      target_speed = 110; target_batt = 65; target_batt_t = 35; target_motor_t = 75; 
-      accel_rate = 12.0f; eff = 2.5f; range_factor = 1.8f;
-      break;
-    case MODE_HEAVY_TRAFFIC:
-      target_speed = 15; target_batt = 70; target_batt_t = 31; target_motor_t = 42; 
-      eff = 1.5f; range_factor = 2.2f;
-      break;
-    case MODE_LOW_BATTERY:
-      target_speed = 50; target_batt = 12; target_batt_t = 32; target_motor_t = 48; 
-      break;
-    case MODE_BATTERY_OVERHEAT:
-      target_speed = 30; target_batt = 55; target_batt_t = 58; target_motor_t = 65; 
-      p.fault_code = 0x02;
-      break;
-    case MODE_CHARGING:
-      target_speed = 0; target_batt = 100; target_batt_t = 38; target_motor_t = 32; 
-      charge = 7400;
-      break;
-    case MODE_MOTOR_FAULT:
-      target_speed = 0; target_batt = 60; target_batt_t = 33; target_motor_t = 95; 
-      p.fault_code = 0x04; accel_rate = 20.0f;
-      break;
-  }
-
-  if (state_batt_pct <= 0.0f && mode != MODE_CHARGING) {
-      target_speed = 0.0f;
-      accel_rate = 5.0f;
-  }
-
-  // Speed physics
-  float speed_diff = target_speed - state_speed;
-  if (abs(speed_diff) < accel_rate * dt) {
-      state_speed = target_speed;
-  } else {
-      state_speed += (accel_rate * dt) * (speed_diff > 0 ? 1 : -1);
-  }
-
-  // Battery physics
-  float base_drain = 0.02f;
-  float power_usage = base_drain + (state_speed / 100.0f) * (state_speed / 100.0f) * 0.15f * eff;
-  
-  if (mode == MODE_CHARGING) {
-      state_batt_pct += 1.0f * dt;
-      p.charging_rate_w = vary(charge, 500);
-  } else {
-      state_batt_pct -= power_usage * dt;
-  }
-
-  if (mode == MODE_LOW_BATTERY || mode == MODE_BATTERY_OVERHEAT) {
-      float batt_diff = target_batt - state_batt_pct;
-      if (abs(batt_diff) > 1.0f) {
-          state_batt_pct += (5.0f * dt) * (batt_diff > 0 ? 1 : -1);
-      }
-  }
-
-  state_batt_pct = constrain(state_batt_pct, 0.0f, 100.0f);
-
-  // Thermal physics
-  state_batt_temp += (target_batt_t - state_batt_temp) * 0.2f * dt;
-  state_motor_temp += (target_motor_t - state_motor_temp) * 0.2f * dt;
-
-  p.speed_kmh      = max(0.0f, vary(state_speed, 1.5f));
+  p.timestamp_ms   = now;
+  p.mode           = current_mode;
+  p.speed_kmh      = state_speed;
   p.battery_pct    = state_batt_pct;
-  p.battery_temp_c = max(0.0f, vary(state_batt_temp, 0.5f));
-  p.motor_temp_c   = max(0.0f, vary(state_motor_temp, 1.5f));
-  p.range_km       = max(0.0f, vary(state_batt_pct * range_factor, 2.0f));
+  p.battery_temp_c = state_batt_temp;
+  p.motor_temp_c   = state_motor_temp;
+  p.range_km       = range_val;
+  p.fault_code     = current_fault;
+  p.charging_rate_w = state_charge_rate;
+  p.ambient_temp_c = env_ambient_temp;
+  p.headwind_kmh   = env_headwind;
+  p.road_gradient_pct = env_road_grad;
+  p.tire_pressure_psi = env_tire_psi;
+  p.cabin_climate_w   = env_cabin_w;
+  p.max_cell_voltage_delta = env_cell_delta;
 
   return p;
 }
 
 // ─── Serialize to canonical JSON ─────────────────────────────
 String serializeTelemetry(const TelemetryPacket& p) {
-  StaticJsonDocument<512> doc;
+  StaticJsonDocument<1024> doc;
   doc["device_id"]       = p.device_id;
   doc["schema_version"]  = p.schema_version;
   doc["timestamp_ms"]    = p.timestamp_ms;
@@ -225,6 +240,12 @@ String serializeTelemetry(const TelemetryPacket& p) {
   doc["range_km"]        = round(p.range_km * 10) / 10.0;
   doc["fault_code"]      = p.fault_code;
   doc["charging_rate_w"] = round(p.charging_rate_w);
+  doc["ambient_temp_c"]  = round(p.ambient_temp_c * 10) / 10.0;
+  doc["headwind_kmh"]    = round(p.headwind_kmh * 10) / 10.0;
+  doc["road_gradient_pct"] = round(p.road_gradient_pct * 10) / 10.0;
+  doc["tire_pressure_psi"] = round(p.tire_pressure_psi * 10) / 10.0;
+  doc["cabin_climate_w"]   = round(p.cabin_climate_w * 10) / 10.0;
+  doc["max_cell_voltage_delta"] = round(p.max_cell_voltage_delta * 1000) / 1000.0;
   String out;
   serializeJson(doc, out);
   return out;
@@ -424,15 +445,16 @@ void connectMqtt() {
   }
 }
 
-// ─── Button ISR ───────────────────────────────────────────────
+// ─── Button ISR (Inject Faults) ───────────────────────────────
 volatile uint32_t lastDebounceMs = 0;
 void IRAM_ATTR onButtonPress() {
   uint32_t now = millis();
   if (now - lastDebounceMs > 300) {
     lastDebounceMs = now;
-    currentMode = (currentMode + 1) % MODE_COUNT;
-    modeChanged = true;
-    if (currentMode == MODE_CHARGING) chargingBattPct = 45;
+    // Inject extreme load to trigger faults
+    target_speed = 120.0f;
+    env_tire_psi = 10.0f;
+    env_road_grad = 10.0f;
   }
 }
 
@@ -472,21 +494,9 @@ void setup() {
 
 // ─── loop() ───────────────────────────────────────────────────
 void loop() {
-  // Keep MQTT alive
   if (mqttClient.connected()) mqttClient.loop();
 
-  uint8_t  mode     = currentMode;
-  uint32_t interval = MODE_INTERVALS_MS[mode];
-  uint32_t now      = millis();
-
-  // Mode change: log + send immediately
-  if (modeChanged) {
-    modeChanged = false;
-    Serial.printf("\n[MODE] → %s (interval %ums, proto=%s%s)\n",
-                  MODE_NAMES[mode], interval, activeProtocol,
-                  encryptionEnabled ? "+AES-GCM" : "");
-    lastSendMs = 0;
-  }
+  uint32_t now = millis();
 
   // Periodic config poll
   if (now - lastConfigPollMs >= CONFIG_POLL_INTERVAL_MS) {
@@ -494,10 +504,10 @@ void loop() {
     pollProtocol();
   }
 
-  // Send telemetry
-  if (now - lastSendMs >= interval) {
+  // Send telemetry every 2 seconds
+  if (now - lastSendMs >= 2000) {
     lastSendMs = now;
-    TelemetryPacket pkt = buildTelemetry(mode);
+    TelemetryPacket pkt = buildTelemetry();
 
     Serial.printf("[TX] [%s%s] Mode: %-20s | Batt: %5.1f%% | Speed: %5.1f km/h"
                   " | Motor: %5.1f°C | Fault: 0x%02X\n",

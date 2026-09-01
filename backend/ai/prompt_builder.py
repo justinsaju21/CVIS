@@ -191,6 +191,22 @@ def build_recommendation_prompt(
     # Range annotations block
     range_block = ("\n=== RANGE VIOLATIONS ===\n" + "\n".join(range_notes) + "\n") if range_notes else ""
 
+    # Advanced physics fields
+    adv = []
+    if payload.ambient_temp_c is not None:
+        adv.append(f"Ambient temp:   {payload.ambient_temp_c:.1f}°C")
+    if payload.headwind_kmh is not None:
+        adv.append(f"Headwind:       {payload.headwind_kmh:.1f} km/h")
+    if payload.road_gradient_pct is not None:
+        adv.append(f"Road gradient:  {payload.road_gradient_pct:.1f}%")
+    if payload.tire_pressure_psi is not None:
+        adv.append(f"Tire pressure:  {payload.tire_pressure_psi:.1f} PSI")
+    if payload.cabin_climate_w is not None:
+        adv.append(f"Cabin AC/Heat:  {payload.cabin_climate_w:.0f} W")
+    if payload.max_cell_voltage_delta is not None:
+        adv.append(f"Cell delta:     {payload.max_cell_voltage_delta:.3f} V")
+    adv_str = ("\n=== ADVANCED PHYSICS ===\n" + "\n".join(adv)) if adv else ""
+
     user_msg = f"""Analyse the following real-time telemetry from vehicle '{payload.device_id}' and respond exactly as instructed.
 {transition_line}
 === CURRENT SNAPSHOT ===
@@ -200,7 +216,7 @@ Battery charge: {payload.battery_pct:.1f}%
 Battery temp:   {payload.battery_temp_c:.1f}°C
 Motor temp:     {payload.motor_temp_c:.1f}°C
 Estimated range:{payload.range_km:.1f} km
-Fault code:     0x{payload.fault_code:02X} — {fault_desc}
+Fault code:     0x{payload.fault_code:02X} — {fault_desc}{adv_str}
 ========================
 {range_block}
 === TREND (last {len(history or [])} readings, oldest → newest) ===
@@ -231,6 +247,22 @@ def build_chat_prompt(
     fault_desc  = FAULT_CODES.get(current_payload.fault_code, f"0x{current_payload.fault_code:02X}")
     trend_block = _build_trend_block(current_payload, recent_history)
 
+    # Advanced physics fields
+    adv = []
+    if current_payload.ambient_temp_c is not None:
+        adv.append(f"Ambient temp: {current_payload.ambient_temp_c:.1f}°C")
+    if current_payload.headwind_kmh is not None:
+        adv.append(f"Headwind:     {current_payload.headwind_kmh:.1f} km/h")
+    if current_payload.road_gradient_pct is not None:
+        adv.append(f"Road grade:   {current_payload.road_gradient_pct:.1f}%")
+    if current_payload.tire_pressure_psi is not None:
+        adv.append(f"Tire PSI:     {current_payload.tire_pressure_psi:.1f}")
+    if current_payload.cabin_climate_w is not None:
+        adv.append(f"Cabin load:   {current_payload.cabin_climate_w:.0f}W")
+    if current_payload.max_cell_voltage_delta is not None:
+        adv.append(f"Cell delta:   {current_payload.max_cell_voltage_delta:.3f}V")
+    adv_str = ("\n" + "\n".join(adv)) if adv else ""
+
     user_msg = f"""=== CURRENT VEHICLE STATE ===
 Device:       {current_payload.device_id}
 Mode:         {current_payload.mode}
@@ -239,7 +271,7 @@ Battery:      {current_payload.battery_pct:.1f}% @ {current_payload.battery_temp
 Motor temp:   {current_payload.motor_temp_c:.1f}°C
 Range:        {current_payload.range_km:.1f} km
 Fault:        {fault_desc}
-Charging:     {f'{current_payload.charging_rate_w:.0f}W' if current_payload.charging_rate_w > 0 else 'Not charging'}
+Charging:     {f'{current_payload.charging_rate_w:.0f}W' if current_payload.charging_rate_w > 0 else 'Not charging'}{adv_str}
 
 === RECENT TREND (oldest → newest) ===
 {trend_block}

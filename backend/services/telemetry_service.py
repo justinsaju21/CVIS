@@ -220,14 +220,18 @@ async def ingest_telemetry_data(
         INSERT INTO telemetry
             (packet_id, received_at, device_id, schema_version,
              mode, speed_kmh, battery_pct, battery_temp_c, motor_temp_c,
-             range_km, fault_code, charging_rate_w)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+             range_km, fault_code, charging_rate_w,
+             ambient_temp_c, headwind_kmh, road_gradient_pct, tire_pressure_psi,
+             cabin_climate_w, max_cell_voltage_delta)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         (
             packet_id, received_at, payload.device_id, payload.schema_version,
             payload.mode, payload.speed_kmh, payload.battery_pct,
             payload.battery_temp_c, payload.motor_temp_c,
             payload.range_km, payload.fault_code, payload.charging_rate_w,
+            payload.ambient_temp_c, payload.headwind_kmh, payload.road_gradient_pct,
+            payload.tire_pressure_psi, payload.cabin_climate_w, payload.max_cell_voltage_delta,
         ),
     )
     await db.commit()
@@ -310,7 +314,9 @@ async def _send_ai_recommendation(
         async with db.execute(
             """
             SELECT mode, speed_kmh, battery_pct, battery_temp_c,
-                   motor_temp_c, fault_code, received_at
+                   motor_temp_c, fault_code, received_at, ambient_temp_c,
+                   headwind_kmh, road_gradient_pct, tire_pressure_psi,
+                   cabin_climate_w, max_cell_voltage_delta
             FROM telemetry
             WHERE device_id = ?
             ORDER BY id DESC LIMIT 5

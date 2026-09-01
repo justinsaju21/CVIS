@@ -102,7 +102,13 @@ async def _create_schema() -> None:
             motor_temp_c    REAL,
             range_km        REAL,
             fault_code      INTEGER,
-            charging_rate_w REAL
+            charging_rate_w REAL,
+            ambient_temp_c  REAL,
+            headwind_kmh    REAL,
+            road_gradient_pct REAL,
+            tire_pressure_psi REAL,
+            cabin_climate_w REAL,
+            max_cell_voltage_delta REAL
         );
 
         CREATE INDEX IF NOT EXISTS idx_telemetry_device_id   ON telemetry(device_id);
@@ -173,6 +179,13 @@ async def _create_schema() -> None:
         # schema 2.2 — mobile access control
         "ALTER TABLE devices ADD COLUMN tier TEXT NOT NULL DEFAULT 'free'",
         "ALTER TABLE devices ADD COLUMN mobile_access_enabled INTEGER NOT NULL DEFAULT 0",
+        # schema 2.3 — advanced AI telemetry
+        "ALTER TABLE telemetry ADD COLUMN ambient_temp_c REAL",
+        "ALTER TABLE telemetry ADD COLUMN headwind_kmh REAL",
+        "ALTER TABLE telemetry ADD COLUMN road_gradient_pct REAL",
+        "ALTER TABLE telemetry ADD COLUMN tire_pressure_psi REAL",
+        "ALTER TABLE telemetry ADD COLUMN cabin_climate_w REAL",
+        "ALTER TABLE telemetry ADD COLUMN max_cell_voltage_delta REAL",
     ]:
         try:
             await _db.execute(col_def)
@@ -199,6 +212,10 @@ async def _create_schema() -> None:
     await _db.execute(
         "INSERT OR IGNORE INTO schema_version (version) VALUES (?)",
         ("2.2",)
+    )
+    await _db.execute(
+        "INSERT OR IGNORE INTO schema_version (version) VALUES (?)",
+        ("2.3",)
     )
     await _db.commit()
 

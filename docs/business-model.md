@@ -6,6 +6,18 @@ The core claim of CVIS is: **AI should live centrally in the cloud/data-centre, 
 
 ---
 
+## Why AI is Necessary: The "Driver Intuition" Fallacy
+
+A common question is: *"Why do we need an AI? After driving for a month, a normal driver intuitively knows that driving fast drains the battery."*
+
+While humans learn basic heuristics, human intuition has critical limitations in modern EVs:
+
+1. **Humans are Reactive; AI is Predictive:** A human driver only knows there is a problem when a dashboard light turns on (already in a warning state). The CVIS AI uses Sliding Window Trend Analysis. It can detect that the motor temperature is rising 1.5°C faster than normal, predicting a thermal event 10 minutes *before* any warning light would trigger. 
+2. **Multi-Variate Calculus vs. "Gut Feeling":** If a driver asks, *"I have 38% battery, the ambient temperature is 35°C, and I am about to climb a 5% grade in Heavy Traffic—will I make it 20km?"* Human intuition fails. The AI acts as a Conversational "What-If" Physics Simulator, instantly calculating thermal resistance and discharge curves to give a mathematically backed answer.
+3. **Swarm Intelligence:** A driver only knows their own car. The cloud AI knows that 50 other vehicles 5 miles ahead are experiencing heavy traffic and extreme battery drain, routing the driver before they even see the traffic.
+
+---
+
 ## Why Centralized AI is Economically Superior
 
 ### Cost structure of on-vehicle vs. cloud AI
@@ -36,6 +48,7 @@ Every other factor favours centralised AI, overwhelmingly in fleet operators' fa
 - Full secure communication layer (HMAC-SHA256, API key auth)
 - Telemetry ingestion and storage (7-day rolling history)
 - Driver dashboard (`/driver`) — live telemetry, graphs, AI recommendation once per 5 minutes
+- **Mobile App Integration:** GPS location tracking, remote lock/unlock, and current battery view
 - Up to 2 registered devices
 - WebSocket real-time updates
 - Basic `/admin` stats (no fine-grained logs)
