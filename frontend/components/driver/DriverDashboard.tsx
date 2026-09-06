@@ -9,7 +9,7 @@ import {
 import {
   BrainCircuit, AlertTriangle, MessageSquare, Send, X,
   Zap, ChevronRight, Lock, Star, TrendingUp, Navigation, Gauge,
-  Thermometer, Battery, Map, Wind, Mic, MicOff
+  Thermometer, Battery, Map, Wind, Mic, MicOff, Volume2, VolumeX
 } from 'lucide-react'
 import dynamic from 'next/dynamic'
 
@@ -24,14 +24,14 @@ import { fetchRecent, fetchRecommendation, sendChat, fetchConfig, api } from '@/
 import type { TelemetryRow, WsEvent } from '@/lib/types'
 
 const MODE_CONFIG: Record<string, { color: string; badge: string; glow: string; accent: string }> = {
-  'Healthy':             { color: '#10b981', badge: 'badge-healthy', glow: 'rgba(16,185,129,0.12)',  accent: '#10b981' },
-  'Eco':                 { color: '#10b981', badge: 'badge-healthy', glow: 'rgba(16,185,129,0.10)',  accent: '#10b981' },
-  'Sport':               { color: '#0ea5e9', badge: 'badge-info',    glow: 'rgba(14,165,233,0.15)',   accent: '#0ea5e9' },
-  'Heavy Traffic':       { color: '#f59e0b', badge: 'badge-warning', glow: 'rgba(245,158,11,0.12)',  accent: '#f59e0b' },
-  'Low Battery':         { color: '#f59e0b', badge: 'badge-warning', glow: 'rgba(245,158,11,0.14)',  accent: '#f59e0b' },
-  'Battery Overheating': { color: '#ef4444', badge: 'badge-fault',   glow: 'rgba(239,68,68,0.15)',   accent: '#ef4444' },
-  'Charging':            { color: '#0ea5e9', badge: 'badge-info',    glow: 'rgba(14,165,233,0.10)',   accent: '#0ea5e9' },
-  'Motor Fault':         { color: '#ef4444', badge: 'badge-fault',   glow: 'rgba(239,68,68,0.20)',   accent: '#ef4444' },
+  'Healthy': { color: '#10b981', badge: 'badge-healthy', glow: 'rgba(16,185,129,0.12)', accent: '#10b981' },
+  'Eco': { color: '#10b981', badge: 'badge-healthy', glow: 'rgba(16,185,129,0.10)', accent: '#10b981' },
+  'Sport': { color: '#0ea5e9', badge: 'badge-info', glow: 'rgba(14,165,233,0.15)', accent: '#0ea5e9' },
+  'Heavy Traffic': { color: '#f59e0b', badge: 'badge-warning', glow: 'rgba(245,158,11,0.12)', accent: '#f59e0b' },
+  'Low Battery': { color: '#f59e0b', badge: 'badge-warning', glow: 'rgba(245,158,11,0.14)', accent: '#f59e0b' },
+  'Battery Overheating': { color: '#ef4444', badge: 'badge-fault', glow: 'rgba(239,68,68,0.15)', accent: '#ef4444' },
+  'Charging': { color: '#0ea5e9', badge: 'badge-info', glow: 'rgba(14,165,233,0.10)', accent: '#0ea5e9' },
+  'Motor Fault': { color: '#ef4444', badge: 'badge-fault', glow: 'rgba(239,68,68,0.20)', accent: '#ef4444' },
 }
 const modeOf = (m: string) => MODE_CONFIG[m] ?? MODE_CONFIG['Healthy']
 
@@ -132,7 +132,7 @@ function MiniBars({ pct, color }: { pct: number; color: string }) {
 
 function ModeSegments({ driveMode }: { driveMode: string }) {
   const segs = [{ key: 'ECO', color: '#10b981' }, { key: 'NORMAL', color: '#0ea5e9' }, { key: 'SPORT', color: '#f59e0b' }, { key: 'MAX', color: '#ef4444' }]
-  const active = ['FAULT','ALERT'].includes(driveMode) ? 3 : driveMode === 'ECO' ? 0 : driveMode === 'SPORT' ? 2 : 1
+  const active = ['FAULT', 'ALERT'].includes(driveMode) ? 3 : driveMode === 'ECO' ? 0 : driveMode === 'SPORT' ? 2 : 1
   return (
     <div style={{ display: 'flex', gap: 3 }}>
       {segs.map((s, i) => (<div key={s.key} style={{ width: 26, height: 5, borderRadius: 2, background: i <= active ? s.color : 'rgba(0,0,0,0.12)', boxShadow: i === active ? `0 0 8px ${s.color}88` : 'none', transition: 'all 0.4s' }} />))}
@@ -315,6 +315,7 @@ export default function DriverDashboard({ vehicleId, vehicleName, vehicleColor, 
   const [chatHistory, setChatHistory] = useState<{ role: 'user' | 'ai'; text: string }[]>([])
   const [chatLoading, setChatLoading] = useState(false)
   const [isListening, setIsListening] = useState(false)
+  const [isSpeaking, setIsSpeaking] = useState(false)
   const [alerts, setAlerts] = useState<AlertItem[]>([])
   const [isPro, setIsPro] = useState(false)
   const [maxSpeed, setMaxSpeed] = useState(0)
@@ -325,6 +326,8 @@ export default function DriverDashboard({ vehicleId, vehicleName, vehicleColor, 
   const recognitionRef = useRef<any>(null)
   const typewriterTimer = useRef<NodeJS.Timeout | null>(null)
   const lastRecRef = useRef<string>('')
+  const voiceTriggered = useRef(false)
+  const femaleVoiceRef = useRef<SpeechSynthesisVoice | null>(null)
 
   const efficiencyData = useMemo(() => Array.from({ length: 13 }, (_, i) => ({
     time: `${(i * 2).toString().padStart(2, '00')}:00`,
@@ -332,15 +335,49 @@ export default function DriverDashboard({ vehicleId, vehicleName, vehicleColor, 
     consumption: parseFloat((8 + Math.cos(i * 0.6) * 3 + Math.random() * 2).toFixed(1)),
   })), [])
 
+  // ─── Resolve & cache female TTS voice once ──────────────────────────────
+  useEffect(() => {
+    if (!('speechSynthesis' in window)) return
+    const FEMALE_PRIORITY = [
+      'Google UK English Female',
+      'Google US English',
+      'Samantha',
+      'Karen',
+      'Moira',
+      'Tessa',
+      'Veena',
+      'Fiona',
+    ]
+    const pickFemaleVoice = () => {
+      const voices = window.speechSynthesis.getVoices()
+      if (!voices.length) return
+      // Try priority list first
+      for (const name of FEMALE_PRIORITY) {
+        const v = voices.find(x => x.name === name)
+        if (v) { femaleVoiceRef.current = v; return }
+      }
+      // Fallback: any voice whose name contains 'female' (case-insensitive)
+      const fallback = voices.find(v => v.name.toLowerCase().includes('female'))
+      if (fallback) { femaleVoiceRef.current = fallback; return }
+      // Last resort: first en voice
+      const en = voices.find(v => v.lang.startsWith('en'))
+      if (en) femaleVoiceRef.current = en
+    }
+    pickFemaleVoice()
+    // Voices may load asynchronously in Chrome
+    window.speechSynthesis.onvoiceschanged = pickFemaleVoice
+    return () => { window.speechSynthesis.onvoiceschanged = null }
+  }, [])
+
   useEffect(() => {
     fetchRecent(60, vehicleId).then((rows: unknown) => {
       const data = (rows as TelemetryRow[]).slice(-40).reverse()
       setHistory(data.map((r, i) => ({ id: String(i), time: new Date(r.received_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }), batt: r.battery_pct, speed: r.speed_kmh, temp: r.motor_temp_c })))
       if (data.length > 0) { setLatest(data[0]); setMaxSpeed(Math.max(...data.map(r => r.speed_kmh))) }
-    }).catch(() => {})
+    }).catch(() => { })
     fetchConfig().then((cfg: any) => {
       setIsPro(cfg.ai_service_enabled === true)
-    }).catch(() => {})
+    }).catch(() => { })
 
     return () => {
       if (typewriterTimer.current) clearInterval(typewriterTimer.current)
@@ -386,7 +423,7 @@ export default function DriverDashboard({ vehicleId, vehicleName, vehicleColor, 
         if (['Motor Fault', 'Battery Overheating', 'Low Battery'].includes(r.mode)) {
           const id = ++alertId.current
           const msgs: Record<string, string> = { 'Motor Fault': `Motor fault \u2014 0x${r.fault_code.toString(16).toUpperCase()}`, 'Battery Overheating': `Batt temp critical: ${r.battery_temp_c.toFixed(0)}\u00b0C`, 'Low Battery': `Low battery: ${r.battery_pct.toFixed(0)}% \u2014 ${r.range_km.toFixed(0)}km range` }
-          
+
           setAlerts(prev => {
             if (prev.length > 0 && prev[0].msg.startsWith(msgs[r.mode].split(':')[0])) return prev;
             return [{ id, msg: msgs[r.mode] ?? r.mode, type: r.mode === 'Motor Fault' || r.mode === 'Battery Overheating' ? 'fault' : 'warn', time: new Date().toLocaleTimeString() }, ...prev.slice(0, 7)]
@@ -409,53 +446,126 @@ export default function DriverDashboard({ vehicleId, vehicleName, vehicleColor, 
     catch { setAiTyping(false) }
   }
 
-  const handleChat = async () => {
+  // ─── TTS helpers ───────────────────────────────────────────────────────────
+  const speakText = useCallback((text: string) => {
+    if (!('speechSynthesis' in window)) return
+    window.speechSynthesis.cancel()
+    // Strip markdown bold markers for cleaner speech
+    const clean = text.replace(/\*\*(.*?)\*\*/g, '$1')
+    const utt = new SpeechSynthesisUtterance(clean)
+    utt.rate = 1.0
+    utt.pitch = 1.05   // slightly higher pitch reinforces female tone
+    utt.volume = 1.0
+    // Always use the pre-resolved female voice
+    if (femaleVoiceRef.current) utt.voice = femaleVoiceRef.current
+    utt.onstart = () => setIsSpeaking(true)
+    utt.onend = () => setIsSpeaking(false)
+    utt.onerror = () => setIsSpeaking(false)
+    window.speechSynthesis.speak(utt)
+  }, [])
+
+  const stopSpeaking = useCallback(() => {
+    if ('speechSynthesis' in window) window.speechSynthesis.cancel()
+    setIsSpeaking(false)
+  }, [])
+
+  const handleChat = async (useVoice = false) => {
     if (!chatMsg.trim() || !latest) return
-    const msg = chatMsg.trim(); setChatMsg(''); setChatHistory(h => [...h, { role: 'user', text: msg }]); setChatLoading(true)
-    try { const res = await sendChat(latest.device_id, msg) as { reply: string }; setChatHistory(h => [...h, { role: 'ai', text: res.reply }]) }
-    catch (e: unknown) { setChatHistory(h => [...h, { role: 'ai', text: `Error: ${e instanceof Error ? e.message : 'AI unavailable'}` }]) }
-    finally { setChatLoading(false); setTimeout(() => chatBottom.current?.scrollIntoView({ behavior: 'smooth' }), 50) }
+    const msg = chatMsg.trim()
+    const shouldSpeak = useVoice || voiceTriggered.current
+    voiceTriggered.current = false
+    setChatMsg('')
+    setChatHistory(h => [...h, { role: 'user', text: msg }])
+    setChatLoading(true)
+    try {
+      const res = await sendChat(latest.device_id, msg) as { reply: string }
+      setChatHistory(h => [...h, { role: 'ai', text: res.reply }])
+      if (shouldSpeak) speakText(res.reply)
+    } catch (e: unknown) {
+      setChatHistory(h => [...h, { role: 'ai', text: `Error: ${e instanceof Error ? e.message : 'AI unavailable'}` }])
+    } finally {
+      setChatLoading(false)
+      setTimeout(() => chatBottom.current?.scrollIntoView({ behavior: 'smooth' }), 50)
+    }
   }
 
   const toggleListening = () => {
-    if (isListening) { 
+    if (isListening) {
       setIsListening(false)
       if (recognitionRef.current) recognitionRef.current.stop()
-      return 
+      return
     }
-    
+
     const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
-    if (!SpeechRecognition) { 
+    if (!SpeechRecognition) {
       alert("Voice recognition is not supported in this browser.")
-      return 
+      return
     }
 
     if (window.location.protocol !== 'https:' && window.location.hostname !== 'localhost') {
       alert("Note: Voice recognition usually requires HTTPS or localhost. If it fails, this is a browser security restriction.")
     }
 
+    // Stop any ongoing TTS before listening
+    stopSpeaking()
+
     try {
       const recognition = new SpeechRecognition()
       recognitionRef.current = recognition
       recognition.continuous = false
-      recognition.interimResults = true // Enable it to feel responsive, but handle it correctly
-      
+      recognition.interimResults = true
+
       const initialInput = chatMsg.trim()
+      let finalTranscript = ''
 
       recognition.onstart = () => setIsListening(true)
-      recognition.onresult = (event: any) => { 
+      recognition.onresult = (event: any) => {
         let currentTranscript = ''
         for (let i = 0; i < event.results.length; i++) {
           currentTranscript += event.results[i][0].transcript
+          if (event.results[i].isFinal) finalTranscript += event.results[i][0].transcript
         }
-        setChatMsg(initialInput ? `${initialInput} ${currentTranscript}` : currentTranscript) 
+        setChatMsg(initialInput ? `${initialInput} ${currentTranscript}` : currentTranscript)
       }
       recognition.onerror = (e: any) => {
-        console.error("Speech recognition error:", e.error || e)
+        if (e.error !== 'no-speech') {
+          console.error("Speech recognition error:", e.error || e)
+        }
         setIsListening(false)
+        voiceTriggered.current = false
       }
-      recognition.onend = () => setIsListening(false)
-      
+      recognition.onend = () => {
+        setIsListening(false)
+        // Auto-submit if we captured something via voice
+        const captured = finalTranscript.trim() || (initialInput ? '' : '')
+        if (captured || (!initialInput && finalTranscript.trim())) {
+          // Use a slight delay so setChatMsg has flushed
+          setTimeout(() => {
+            voiceTriggered.current = true
+            // Programmatically trigger submit by calling handleChat with the transcript
+            if (!latest) return
+            const msg = (initialInput ? `${initialInput} ${finalTranscript}` : finalTranscript).trim()
+            if (!msg) { voiceTriggered.current = false; return }
+            setChatMsg('')
+            setChatHistory(h => [...h, { role: 'user', text: msg }])
+            setChatLoading(true)
+            sendChat(latest.device_id, msg)
+              .then((res: any) => {
+                setChatHistory(h => [...h, { role: 'ai', text: res.reply }])
+                speakText(res.reply)
+              })
+              .catch((e: unknown) => {
+                setChatHistory(h => [...h, { role: 'ai', text: `Error: ${e instanceof Error ? e.message : 'AI unavailable'}` }])
+              })
+              .finally(() => {
+                setChatLoading(false)
+                voiceTriggered.current = false
+                setTimeout(() => chatBottom.current?.scrollIntoView({ behavior: 'smooth' }), 50)
+              })
+          }, 80)
+        }
+      }
+
       recognition.start()
     } catch (e) {
       console.error(e)
@@ -519,7 +629,7 @@ export default function DriverDashboard({ vehicleId, vehicleName, vehicleColor, 
   const handleForceMode = async (m: string | null) => {
     try {
       await api.post('/api/v1/config/mode', { mode: m })
-    } catch (e) {}
+    } catch (e) { }
   };
 
   return (
@@ -641,7 +751,7 @@ export default function DriverDashboard({ vehicleId, vehicleName, vehicleColor, 
                     <div style={{ marginTop: 10 }}><ModeSegments driveMode={driveMode} /></div>
                   </div>
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-                    {(['Healthy','Eco','Sport','Heavy Traffic','Low Battery','Battery Overheating','Charging','Motor Fault'] as const).map(m => {
+                    {(['Healthy', 'Eco', 'Sport', 'Heavy Traffic', 'Low Battery', 'Battery Overheating', 'Charging', 'Motor Fault'] as const).map(m => {
                       const isSelectable = ['Healthy', 'Eco', 'Sport', 'Heavy Traffic'].includes(m);
                       return isSelectable ? (
                         <button key={m} onClick={() => handleForceMode(m)} style={{ cursor: 'pointer', padding: '10px 12px', borderRadius: 6, background: mode === m ? `${modeOf(m).color}18` : 'rgba(0,0,0,0.04)', border: `1px solid ${mode === m ? modeOf(m).color + '55' : 'rgba(0,0,0,0.11)'}`, fontSize: 11, fontFamily: 'sans-serif', color: mode === m ? modeOf(m).color : 'rgba(0,0,0,0.52)', textAlign: 'center', fontWeight: mode === m ? 700 : 400 }}>
@@ -655,9 +765,9 @@ export default function DriverDashboard({ vehicleId, vehicleName, vehicleColor, 
                     })}
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'center', marginTop: -4 }}>
-                      <button onClick={() => handleForceMode(null)} style={{ cursor: 'pointer', fontSize: 10, color: '#0ea5e9', background: 'transparent', border: 'none', textDecoration: 'underline' }}>
-                        Resume Auto-Cycle
-                      </button>
+                    <button onClick={() => handleForceMode(null)} style={{ cursor: 'pointer', fontSize: 10, color: '#0ea5e9', background: 'transparent', border: 'none', textDecoration: 'underline' }}>
+                      Resume Auto-Cycle
+                    </button>
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 14px', background: 'rgba(0,0,0,0.04)', borderRadius: 6, border: '1px solid rgba(0,0,0,0.09)' }}>
                     <span style={{ fontSize: 12, color: 'rgba(0,0,0,0.60)', fontFamily: 'sans-serif' }}>Fault Code</span>
@@ -970,16 +1080,53 @@ export default function DriverDashboard({ vehicleId, vehicleName, vehicleColor, 
             </div>
             <div style={{ height: 320, overflowY: 'auto', padding: '16px', display: 'flex', flexDirection: 'column', gap: 12, background: '#ffffff' }}>
               {chatHistory.length === 0 && <div style={{ fontSize: 12, color: 'rgba(0,0,0,0.3)', textAlign: 'center', marginTop: 60, fontFamily: 'sans-serif', fontWeight: 600 }}>ASK CVIS ANYTHING ABOUT YOUR VEHICLE</div>}
-              {chatHistory.map((m, i) => (<div key={i} style={{ alignSelf: m.role === 'user' ? 'flex-end' : 'flex-start', maxWidth: '88%', padding: '10px 14px', borderRadius: m.role === 'user' ? '12px 12px 2px 12px' : '12px 12px 12px 2px', background: m.role === 'user' ? '#e0f2fe' : '#f1f5f9', border: `1px solid ${m.role === 'user' ? '#bae6fd' : '#e2e8f0'}`, fontSize: 13, color: m.role === 'user' ? '#0369a1' : '#334155', lineHeight: 1.5, fontFamily: 'sans-serif' }}>{m.text}</div>))}
+              {chatHistory.map((m, i) => (
+                <div key={i} style={{ alignSelf: m.role === 'user' ? 'flex-end' : 'flex-start', maxWidth: '88%' }}>
+                  <div style={{ padding: '10px 14px', borderRadius: m.role === 'user' ? '12px 12px 2px 12px' : '12px 12px 12px 2px', background: m.role === 'user' ? '#e0f2fe' : '#f1f5f9', border: `1px solid ${m.role === 'user' ? '#bae6fd' : '#e2e8f0'}`, fontSize: 13, color: m.role === 'user' ? '#0369a1' : '#334155', lineHeight: 1.5, fontFamily: 'sans-serif' }}>
+                    {m.text}
+                  </div>
+                  {m.role === 'ai' && (
+                    <div style={{ display: 'flex', justifyContent: 'flex-start', marginTop: 4 }}>
+                      <button
+                        onClick={() => isSpeaking ? stopSpeaking() : speakText(m.text)}
+                        title={isSpeaking ? 'Stop speaking' : 'Speak this reply'}
+                        style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '2px 4px', borderRadius: 4, color: isSpeaking ? '#0ea5e9' : 'rgba(0,0,0,0.3)', display: 'flex', alignItems: 'center', gap: 3, fontSize: 10, fontFamily: 'sans-serif', transition: 'color 0.2s' }}
+                      >
+                        {isSpeaking ? <Volume2 size={12} /> : <Volume2 size={12} />}
+                        <span>{isSpeaking ? 'Stop' : 'Speak'}</span>
+                      </button>
+                    </div>
+                  )}
+                </div>
+              ))}
               {chatLoading && <div style={{ alignSelf: 'flex-start', display: 'flex', gap: 5, padding: '10px 14px', background: '#f1f5f9', borderRadius: '12px 12px 12px 2px', border: '1px solid #e2e8f0' }}>{[0, 1, 2].map(i => <motion.div key={i} style={{ width: 6, height: 6, borderRadius: '50%', background: '#0ea5e9' }} animate={{ y: [0, -5, 0] }} transition={{ delay: i * 0.15, repeat: Infinity, duration: 0.7 }} />)}</div>}
               <div ref={chatBottom} />
             </div>
+            {/* Speaking indicator */}
+            {isSpeaking && (
+              <div style={{ padding: '6px 16px', background: 'linear-gradient(90deg,rgba(14,165,233,0.08),rgba(14,165,233,0.04))', borderTop: '1px solid rgba(14,165,233,0.15)', display: 'flex', alignItems: 'center', gap: 6 }}>
+                <motion.div animate={{ scale: [1, 1.3, 1] }} transition={{ repeat: Infinity, duration: 0.8 }} style={{ width: 6, height: 6, borderRadius: '50%', background: '#0ea5e9' }} />
+                <span style={{ fontSize: 10, color: '#0ea5e9', fontFamily: 'sans-serif', fontWeight: 600, letterSpacing: '0.06em' }}>AI SPEAKING...</span>
+                <button onClick={stopSpeaking} style={{ marginLeft: 'auto', background: 'none', border: 'none', color: '#0ea5e9', cursor: 'pointer', fontSize: 10, fontFamily: 'sans-serif', display: 'flex', alignItems: 'center', gap: 3 }}>
+                  <VolumeX size={12} /> Stop
+                </button>
+              </div>
+            )}
             <div style={{ padding: '12px 16px', borderTop: '1px solid rgba(0,0,0,0.06)', display: 'flex', gap: 8, background: '#f8fafc' }}>
-              <button onClick={toggleListening} style={{ background: isListening ? '#ef4444' : '#f1f5f9', border: `1px solid ${isListening ? '#fca5a5' : '#e2e8f0'}`, borderRadius: 6, padding: '10px', cursor: 'pointer', color: isListening ? '#ffffff' : '#475569', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: '0.2s' }}>
-                {isListening ? <MicOff size={14} /> : <Mic size={14} />}
+              <button
+                onClick={toggleListening}
+                title={isListening ? 'Stop listening' : 'Ask with voice — AI will speak the reply'}
+                style={{ background: isListening ? '#ef4444' : '#f1f5f9', border: `1px solid ${isListening ? '#fca5a5' : '#e2e8f0'}`, borderRadius: 6, padding: '10px', cursor: 'pointer', color: isListening ? '#ffffff' : '#475569', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: '0.2s', position: 'relative' }}>
+                {isListening
+                  ? <MicOff size={14} />
+                  : <Mic size={14} />}
+                {isListening && (
+                  <motion.span animate={{ opacity: [1, 0.3, 1] }} transition={{ repeat: Infinity, duration: 1 }}
+                    style={{ position: 'absolute', top: -3, right: -3, width: 8, height: 8, borderRadius: '50%', background: '#ef4444', border: '1.5px solid #fff' }} />
+                )}
               </button>
-              <input value={chatMsg} onChange={e => setChatMsg(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleChat()} placeholder={isListening ? "Listening..." : "Ask about your vehicle..."} style={{ flex: 1, background: '#ffffff', border: '1px solid rgba(0,0,0,0.1)', borderRadius: 6, padding: '10px 14px', color: '#0f172a', fontSize: 13, outline: 'none', fontFamily: 'sans-serif', boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.02)' }} />
-              <button onClick={handleChat} disabled={chatLoading} style={{ background: '#0ea5e9', border: 'none', borderRadius: 6, padding: '10px 14px', cursor: 'pointer', color: '#ffffff', opacity: chatLoading ? 0.5 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 8px rgba(14,165,233,0.3)' }}><Send size={14} /></button>
+              <input value={chatMsg} onChange={e => setChatMsg(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleChat()} placeholder={isListening ? '🎙 Listening... speak now' : 'Ask about your vehicle...'} style={{ flex: 1, background: '#ffffff', border: '1px solid rgba(0,0,0,0.1)', borderRadius: 6, padding: '10px 14px', color: '#0f172a', fontSize: 13, outline: 'none', fontFamily: 'sans-serif', boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.02)' }} />
+              <button onClick={() => handleChat(false)} disabled={chatLoading} style={{ background: '#0ea5e9', border: 'none', borderRadius: 6, padding: '10px 14px', cursor: 'pointer', color: '#ffffff', opacity: chatLoading ? 0.5 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 8px rgba(14,165,233,0.3)' }}><Send size={14} /></button>
             </div>
           </motion.div>
         )}

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback, useEffect } from 'react'
+import { useState, useCallback, useEffect, useRef, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   Shield, Lock, Wifi, WifiOff, RefreshCw, BrainCircuit,
@@ -275,6 +275,13 @@ export default function NocPage() {
   const [selectorOpen, setSelectorOpen] = useState(false)
   const [globalMobileAccess, setGlobalMobileAccess] = useState(true)
 
+  // Use a ref for selectedVehicleId so the WS handler (useCallback []) can always read the latest value
+  const selectedVehicleIdRef = useRef<string | null>(null)
+  useEffect(() => { selectedVehicleIdRef.current = selectedVehicleId }, [selectedVehicleId])
+
+  // Pause live updates while user is interacting with the table
+  const tableHovered = useRef(false)
+
   useEffect(() => {
     fetchConfig().then((c) => {
       const cfg = c as ServerConfig
@@ -286,29 +293,56 @@ export default function NocPage() {
         setGlobalMobileAccess(cfg.mobile_app_enabled)
       }
     }).catch(() => {})
-    fetchPackets(80, selectedVehicleId || undefined).then((rows) => setPackets(rows as PacketRow[])).catch(() => {})
+    // Always fetch ALL packets — vehicle filtering is done client-side
+    fetchPackets(200).then((rows) => setPackets(rows as PacketRow[])).catch(() => {})
     fetchVehicles().then((fleet) => {
       const f = fleet as FleetVehicle[]
       setVehicles(f)
     }).catch(() => {})
   }, [selectedVehicleId])
 
+  // ─── Live packet polling — 5 s, merges new rows only, pauses on hover ───
+  useEffect(() => {
+    const mergePackets = (fresh: PacketRow[]) => {
+      if (tableHovered.current) return  // don't disrupt while user reads
+      setPackets((prev) => {
+        const seen = new Set(prev.map((p) => p.packet_id))
+        const newOnes = fresh.filter((p) => !seen.has(p.packet_id))
+        if (newOnes.length === 0) return prev  // no-op — skip re-render
+        const merged = [...newOnes, ...prev]
+        merged.sort((a, b) => b.packet_id - a.packet_id)
+        return merged.slice(0, 200)
+      })
+    }
+    const id = setInterval(() => {
+      fetchPackets(200)
+        .then((rows) => mergePackets(rows as PacketRow[]))
+        .catch(() => {})
+    }, 5000)  // 5 s — fast enough to feel live, slow enough not to flicker
+    return () => clearInterval(id)
+  }, [])
+
   const handleWs = useCallback((ev: WsEvent) => {
     if (ev.event === 'telemetry') {
+      if (tableHovered.current) return  // skip WS push while user reads
       const t = ev as unknown as TelemetryRow & { encrypted?: number; encryption_method?: string; auth_status?: string }
-      setPackets((prev) => [{
-        packet_id:         t.packet_id,
-        timestamp:         t.received_at,
-        direction:         'inbound',
-        protocol:          t.protocol,
-        device_id:         t.device_id,
-        size_bytes:        t.size_bytes ?? 0,
-        status:            t.status || 'ok',
-        auth_status:       t.auth_status || 'ok',
-        encrypted:         t.encrypted ?? 0,
-        encryption_method: t.encryption_method ?? 'PLAIN',
-        raw_payload:       t.raw_payload ?? JSON.stringify(t),
-      }, ...prev.slice(0, 119)])
+      setPackets((prev) => {
+        // Skip if already in state (dedup)
+        if (prev.length > 0 && prev[0].packet_id === t.packet_id) return prev
+        return [{
+          packet_id:         t.packet_id,
+          timestamp:         t.received_at,
+          direction:         'inbound',
+          protocol:          t.protocol,
+          device_id:         t.device_id,
+          size_bytes:        t.size_bytes ?? 0,
+          status:            t.status || 'ok',
+          auth_status:       t.auth_status || 'ok',
+          encrypted:         t.encrypted ?? 0,
+          encryption_method: t.encryption_method ?? 'PLAIN',
+          raw_payload:       t.raw_payload ?? JSON.stringify(t),
+        }, ...prev.slice(0, 199)]
+      })
     }
     if (ev.event === 'ai_recommendation') {
       setPackets((prev) =>
@@ -325,6 +359,14 @@ export default function NocPage() {
       const mEv = ev as unknown as { event: string; enabled: boolean }
       setGlobalMobileAccess(mEv.enabled)
     }
+    if (ev.event === 'config_changed') {
+      fetchConfig().then((c) => {
+        const cfg = c as ServerConfig
+        setConfigState(cfg)
+        if (typeof cfg.ai_service_enabled === 'boolean') setAiEnabled(cfg.ai_service_enabled)
+        if (typeof cfg.mobile_app_enabled === 'boolean') setGlobalMobileAccess(cfg.mobile_app_enabled)
+      }).catch(() => {})
+    }
   }, [])
 
   const { connected } = useWebSocket(handleWs)
@@ -338,6 +380,16 @@ export default function NocPage() {
       if (typeof c.ai_service_enabled === 'boolean') {
         setAiEnabled(c.ai_service_enabled)
       }
+      // Merge fresh packets after control change (don't replace, to preserve live WS entries)
+      fetchPackets(200).then((fresh) => {
+        setPackets((prev) => {
+          const seen = new Set(prev.map((p) => p.packet_id))
+          const newOnes = (fresh as PacketRow[]).filter((p) => !seen.has(p.packet_id))
+          const merged = [...newOnes, ...prev]
+          merged.sort((a, b) => b.packet_id - a.packet_id)
+          return merged.slice(0, 200)
+        })
+      }).catch(() => {})
       toast.success(successMsg || `${key} updated`)
     } catch (e: unknown) {
       toast.error(e instanceof Error ? e.message : 'Error')
@@ -372,17 +424,17 @@ export default function NocPage() {
   const chaos   = config?.chaos
   const loading = (key: string) => saving === key
 
-  const filteredPackets = packets.filter((p) => {
+  const filteredPackets = useMemo(() => packets.filter((p) => {
     // Vehicle filter — only show packets for the selected vehicle
-    if (deviceId && p.device_id !== deviceId) return false
+    if (selectedVehicleId && p.device_id !== selectedVehicleId) return false
     if (filter === 'ok')       return p.status === 'ok' && p.auth_status !== 'fail' && p.auth_status !== 'tamper_detected'
     if (filter === 'rejected') return p.status !== 'ok' || p.auth_status === 'fail' || p.auth_status === 'tamper_detected'
     return true
-  })
+  }), [packets, selectedVehicleId, filter])
 
-  const scopedPackets  = deviceId ? packets.filter(p => p.device_id === deviceId) : packets
-  const totalOk        = scopedPackets.filter(p => p.status === 'ok').length
-  const totalRejected  = scopedPackets.filter(p => p.status !== 'ok').length
+  const scopedPackets  = useMemo(() => selectedVehicleId ? packets.filter(p => p.device_id === selectedVehicleId) : packets, [packets, selectedVehicleId])
+  const totalOk        = useMemo(() => scopedPackets.filter(p => p.status === 'ok').length, [scopedPackets])
+  const totalRejected  = useMemo(() => scopedPackets.filter(p => p.status !== 'ok').length, [scopedPackets])
 
   return (
     <>
@@ -621,8 +673,8 @@ export default function NocPage() {
                   {/* Vehicle dropdown */}
                   <div style={{ position: 'relative', marginBottom: 8 }}>
                     <select
-                      value={deviceId}
-                      onChange={(e) => setDeviceId(e.target.value)}
+                      value={selectedVehicleId ?? ''}
+                      onChange={(e) => setSelectedVehicleId(e.target.value || null)}
                       style={{
                         width: '100%',
                         background: 'rgba(0,0,0,0.06)',
@@ -638,12 +690,12 @@ export default function NocPage() {
                         WebkitAppearance: 'none',
                       }}
                     >
-                      <option value="" style={{ background: '#ffffff', color: 'rgba(0,0,0,0.4)' }}>— select vehicle —</option>
+                      <option value="" style={{ background: '#ffffff', color: 'rgba(0,0,0,0.4)' }}>— all vehicles —</option>
                       {vehicles.map((v) => (
                         <option
                           key={v.device_id}
                           value={v.device_id}
-                          style={{ background: '#ffffff', color: '#e2e8f0' }}
+                          style={{ background: '#ffffff', color: '#0f172a' }}
                         >
                           {v.name ?? v.device_id} ({v.device_id})
                         </option>
@@ -657,8 +709,8 @@ export default function NocPage() {
                   </div>
 
                   {/* Selected vehicle badge */}
-                  {deviceId && (() => {
-                    const v = vehicles.find(x => x.device_id === deviceId)
+                  {selectedVehicleId && (() => {
+                    const v = vehicles.find(x => x.device_id === selectedVehicleId)
                     return v ? (
                       <div style={{
                         display: 'flex', alignItems: 'center', gap: 6,
@@ -722,14 +774,14 @@ export default function NocPage() {
                 <span style={{ marginLeft: 4, fontSize: 12, color: 'rgba(0,0,0,0.4)' }}>· click to inspect</span>
 
                 {/* Active vehicle filter badge */}
-                {deviceId && (() => {
-                  const v = vehicles.find(x => x.device_id === deviceId)
+                {selectedVehicleId && (() => {
+                  const v = vehicles.find(x => x.device_id === selectedVehicleId)
                   return (
                     <div style={{
                       display: 'flex', alignItems: 'center', gap: 5,
                       padding: '2px 8px 2px 6px',
-                      background: 'rgba(0,0,0,0.06)',
-                      border: '1px solid rgba(0,0,0,0.06)',
+                      background: 'rgba(14,165,233,0.08)',
+                      border: '1px solid rgba(14,165,233,0.2)',
                       borderRadius: 3, marginLeft: 6,
                     }}>
                       <div style={{
@@ -737,14 +789,14 @@ export default function NocPage() {
                         background: '#0ea5e9', flexShrink: 0,
                       }} />
                       <span style={{ fontSize: 12, color: '#0ea5e9', fontFamily: 'Inter, sans-serif' }}>
-                        {v?.name ?? deviceId}
+                        {v?.name ?? selectedVehicleId}
                       </span>
                       <button
-                        onClick={() => setDeviceId('')}
+                        onClick={() => setSelectedVehicleId(null)}
                         style={{
                           background: 'none', border: 'none', cursor: 'pointer',
-                          color: 'rgba(0,0,0,0.06)', fontSize: 13, padding: '0 0 0 2px',
-                          lineHeight: 1,
+                          color: '#0ea5e9', fontSize: 13, padding: '0 0 0 2px',
+                          lineHeight: 1, opacity: 0.7,
                         }}
                         title="Clear vehicle filter"
                       >✕</button>
@@ -775,7 +827,11 @@ export default function NocPage() {
               </div>
 
               {/* Table */}
-              <div style={{ overflowX: 'auto', maxHeight: 'calc(100vh - 200px)', overflowY: 'auto' }}>
+              <div 
+                style={{ overflowX: 'auto', maxHeight: 'calc(100vh - 200px)', overflowY: 'auto' }}
+                onMouseEnter={() => { tableHovered.current = true }}
+                onMouseLeave={() => { tableHovered.current = false }}
+              >
                 <table className="noc-table">
                   <thead>
                     <tr>
