@@ -36,3 +36,13 @@ Thumbs.db
 .vscode/settings.json
 .idea/
 *.swp
+
+# ─── LaTeX build artifacts ──────────────────────────────────────────────────
+*.aux
+*.lof
+*.log
+*.lot
+*.out
+*.toc
+*.nav
+*.snm
