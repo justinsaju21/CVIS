@@ -84,8 +84,8 @@ const KEY_SUGGESTIONS: Record<string, { icon: string; title: string; desc: strin
   ],
 }
 
-function calcDriveScore(latest: TelemetryRow | null): { score: number; label: string } {
-  if (!latest) return { score: 8.5, label: 'Excellent Performance' }
+function calcDriveScore(latest: TelemetryRow | null): { score: number | string; label: string } {
+  if (!latest) return { score: 'NaN', label: 'Waiting for Telemetry...' }
   let score = 10
   if (latest.speed_kmh > 120) score -= 1.5
   else if (latest.speed_kmh > 100) score -= 0.5
@@ -579,13 +579,13 @@ export default function DriverDashboard({ vehicleId, vehicleName, vehicleColor, 
   const tires = getTirePressures(mode), ds = calcDriveScore(latest)
   const keySugs = KEY_SUGGESTIONS[mode] ?? KEY_SUGGESTIONS['Healthy']
   const avgSpd = history.length > 0 ? history.reduce((a, b) => a + b.speed, 0) / history.length : 0
-  const ambientTemp = latest ? Math.max(15, Math.min(40, latest.battery_temp_c - 5)) : 21
+  const ambientTemp = latest ? Math.max(15, Math.min(40, latest.battery_temp_c - 5)) : NaN
   const enginePct = mode === 'Charging' || mode === 'Motor Fault' ? 0 : mode === 'Eco' ? 55 : mode === 'Sport' ? 92 : 78
   const battPct2 = mode === 'Charging' ? 100 : mode === 'Motor Fault' ? 20 : mode === 'Eco' ? 82 : mode === 'Sport' ? 58 : 63
   const motorPct = mode === 'Motor Fault' ? 5 : mode === 'Eco' ? 35 : mode === 'Sport' ? 88 : 45
   const regenPct = mode === 'Eco' ? 85 : mode === 'Heavy Traffic' ? 72 : mode === 'Charging' ? 100 : 63
-  const totalKw = mode === 'Charging' ? (latest?.charging_rate_w ?? 0) / 1000 : mode === 'Sport' ? 320 : mode === 'Eco' ? 180 : 256
-  const totalHp = Math.round(totalKw * 1.341)
+  const totalKw = latest ? (mode === 'Charging' ? (latest?.charging_rate_w ?? 0) / 1000 : mode === 'Sport' ? 320 : mode === 'Eco' ? 180 : 256) : NaN
+  const totalHp = latest ? Math.round(totalKw * 1.341) : NaN
 
   // ─── Mobile: render compact app-style layout (same state, same WebSocket) ─
   if (isMobile) {
