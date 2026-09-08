@@ -39,8 +39,12 @@ class ConnectionManager:
         logger.info(f"[WS] Client connected — total: {len(self._connections)}")
 
     def disconnect(self, websocket: WebSocket) -> None:
-        """Remove a connection from the registry (called on close/error)."""
-        self._connections.remove(websocket)
+        """Remove a connection from the registry (called on close/error).
+        Guard against ValueError — the connection may have already been removed
+        by the dead-connection sweep inside broadcast().
+        """
+        if websocket in self._connections:
+            self._connections.remove(websocket)
         logger.info(f"[WS] Client disconnected — total: {len(self._connections)}")
 
     # ─── Messaging ─────────────────────────────────────────────

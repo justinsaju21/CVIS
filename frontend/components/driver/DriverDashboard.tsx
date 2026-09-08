@@ -412,6 +412,23 @@ export default function DriverDashboard({ vehicleId, vehicleName, vehicleColor, 
   }, [])
 
   const handleWs = useCallback((ev: WsEvent) => {
+    // ── Handle initial backfill on WS connect (last 10 rows from server) ──
+    if (ev.event === 'backfill') {
+      const records = ev.records.filter(r => r.device_id === vehicleId)
+      if (records.length > 0) {
+        // newest first from server — reverse to get oldest-first for history chart
+        const sorted = [...records].reverse()
+        setHistory(sorted.map((r) => ({
+          id: r.received_at + Math.random(),
+          time: new Date(r.received_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
+          batt: r.battery_pct,
+          speed: r.speed_kmh,
+          temp: r.motor_temp_c,
+        })))
+        setLatest(records[0])  // records[0] is the most recent
+        setMaxSpeed(Math.max(...records.map(r => r.speed_kmh)))
+      }
+    }
     if (ev.event === 'telemetry' || ev.event === 'telemetry_backfill') {
       const rows = ev.event === 'telemetry_backfill' ? (ev as { items: TelemetryRow[] }).items : [ev as unknown as TelemetryRow]
       rows.forEach((r) => {
@@ -574,16 +591,22 @@ export default function DriverDashboard({ vehicleId, vehicleName, vehicleColor, 
     }
   }
 
-  const mode = latest?.mode ?? 'Healthy', mconf = modeOf(mode)
-  const driveMode = DRIVE_MODE_LABEL[mode] ?? 'NORMAL'
+  // When there's no telemetry yet, use null mode so we don't falsely show 'Healthy'
+  const mode = latest?.mode ?? 'Healthy'
+  const mconf = modeOf(mode)
+  const driveMode = latest ? (DRIVE_MODE_LABEL[mode] ?? 'NORMAL') : '---'
   const tires = getTirePressures(mode), ds = calcDriveScore(latest)
   const keySugs = KEY_SUGGESTIONS[mode] ?? KEY_SUGGESTIONS['Healthy']
   const avgSpd = history.length > 0 ? history.reduce((a, b) => a + b.speed, 0) / history.length : 0
-  const ambientTemp = latest ? Math.max(15, Math.min(40, latest.battery_temp_c - 5)) : NaN
+  // Use actual ambient_temp_c from firmware if available, otherwise derive from battery temp
+  const ambientTemp = latest
+    ? (latest.ambient_temp_c != null ? latest.ambient_temp_c : Math.max(15, Math.min(40, latest.battery_temp_c - 5)))
+    : NaN
   const enginePct = mode === 'Charging' || mode === 'Motor Fault' ? 0 : mode === 'Eco' ? 55 : mode === 'Sport' ? 92 : 78
   const battPct2 = mode === 'Charging' ? 100 : mode === 'Motor Fault' ? 20 : mode === 'Eco' ? 82 : mode === 'Sport' ? 58 : 63
   const motorPct = mode === 'Motor Fault' ? 5 : mode === 'Eco' ? 35 : mode === 'Sport' ? 88 : 45
   const regenPct = mode === 'Eco' ? 85 : mode === 'Heavy Traffic' ? 72 : mode === 'Charging' ? 100 : 63
+  // Actual kW from telemetry when charging; estimated from mode otherwise
   const totalKw = latest ? (mode === 'Charging' ? (latest?.charging_rate_w ?? 0) / 1000 : mode === 'Sport' ? 320 : mode === 'Eco' ? 180 : 256) : NaN
   const totalHp = latest ? Math.round(totalKw * 1.341) : NaN
 

@@ -1,17 +1,24 @@
 // Shared TypeScript types for the CVIS frontend
 
 export interface TelemetryPayload {
-  device_id:       string
-  schema_version:  string
-  timestamp_ms:    number
-  mode:            VehicleMode
-  speed_kmh:       number
-  battery_pct:     number
-  battery_temp_c:  number
-  motor_temp_c:    number
-  range_km:        number
-  fault_code:      number
-  charging_rate_w: number
+  device_id:               string
+  schema_version:          string
+  timestamp_ms:            number
+  mode:                    VehicleMode
+  speed_kmh:               number
+  battery_pct:             number
+  battery_temp_c:          number
+  motor_temp_c:            number
+  range_km:                number
+  fault_code:              number
+  charging_rate_w:         number
+  // Phase 2.3 extended fields (optional — old firmware may not send these)
+  ambient_temp_c?:         number | null
+  headwind_kmh?:           number | null
+  road_gradient_pct?:      number | null
+  tire_pressure_psi?:      number | null
+  cabin_climate_w?:        number | null
+  max_cell_voltage_delta?: number | null
 }
 
 export type VehicleMode =
@@ -152,9 +159,10 @@ export interface FleetVehicle {
 
 // WebSocket event types
 export type WsEvent =
-  | { event: 'telemetry';            packet_id: number; received_at: string } & TelemetryPayload
+  | { event: 'telemetry';            packet_id: number; received_at: string; protocol: string; encrypted: number; encryption_method: string; size_bytes: number; raw_payload: string } & TelemetryPayload
   | { event: 'telemetry_backfill';   items: TelemetryRow[] }
-  | { event: 'ai_recommendation';    packet_id: number; device_id: string; mode: string; recommendation: string }
+  | { event: 'backfill';             records: TelemetryRow[] }  // sent on WS connect — last 10 rows
+  | { event: 'ai_recommendation';    packet_id: number; device_id: string; mode: string; recommendation: string; severity?: string }
   | { event: 'device_disconnected';  device_id: string; reason: string }
   | { event: 'device_reconnected';   device_id: string }
   | { event: 'ai_service_status';    enabled: boolean }
@@ -162,3 +170,5 @@ export type WsEvent =
   | { event: 'mobile_access_changed'; vehicle_id: string; enabled: boolean }
   | { event: 'global_mobile_app_changed'; enabled: boolean }
   | { event: 'config_changed' }
+  | { event: 'ping' }   // server keep-alive
+  | { event: 'pong' }   // response to client ping
