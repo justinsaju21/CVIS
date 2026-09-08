@@ -84,8 +84,8 @@ const KEY_SUGGESTIONS: Record<string, { icon: string; title: string; desc: strin
   ],
 }
 
-function calcDriveScore(latest: TelemetryRow | null): { score: number | string; label: string } {
-  if (!latest) return { score: 'NaN', label: 'Waiting for Telemetry...' }
+function calcDriveScore(latest: TelemetryRow | null): { score: number; label: string } {
+  if (!latest) return { score: NaN, label: 'Waiting for Telemetry...' }
   let score = 10
   if (latest.speed_kmh > 120) score -= 1.5
   else if (latest.speed_kmh > 100) score -= 0.5
