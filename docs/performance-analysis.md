@@ -6,10 +6,10 @@
 
 ## 1. Methodology
 
-All measurements taken on a single developer machine (Windows 11, Intel i7, 16 GB RAM) with:
-- Backend: `uvicorn main:asgi_app --port 8000` (single worker)
+All measurements taken on the Debian homeserver (`192.168.1.8`, Intel i5, 8 GB RAM) with:
+- Backend: `uvicorn main:asgi_app --port 8005` (single PM2 worker)
 - SQLite with WAL journal mode
-- No network hardware — all traffic on localhost loopback
+- Traffic arrives via Cloudflare Tunnel; ingest latency measured server-side (excludes Cloudflare RTT)
 
 Metrics were collected during `test_phase6.py` (45-packet end-to-end matrix) and extended concurrent load tests.
 
@@ -116,7 +116,7 @@ No race conditions observed. `aiosqlite` with WAL mode handles concurrent ingest
 
 | Metric | Observation |
 |---|---|
-| Initial page load (`/driver`) | ~800–1200 ms (Next.js dev mode) |
+| Initial page load (`/driver/alpha`) | ~400–700 ms (Next.js production build on homeserver) |
 | WebSocket reconnect on disconnect | < 2 s (exponential backoff starting at 1 s) |
 | Chart update latency (Recharts) | < 16 ms (60 fps capable) |
 | History buffer size | 60 points (rolling, no memory growth) |
@@ -136,7 +136,7 @@ No race conditions observed. `aiosqlite` with WAL mode handles concurrent ingest
 
 ## 10. Scalability Notes
 
-This system is an academic prototype running on a single laptop. Production scalability would require:
+This system is deployed as an academic prototype on a Debian homeserver. Production scalability would require:
 
 - **PostgreSQL** in place of SQLite (concurrent writers, connection pooling)
 - **Uvicorn with multiple workers** or **Gunicorn** for CPU parallelism

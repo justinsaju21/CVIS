@@ -26,7 +26,7 @@
 - **The Context:** The proliferation of connected vehicles requires robust architectures for intelligence and security.
 - **The Challenge:** Per-vehicle edge AI requires embedding expensive compute hardware in each unit, ties reasoning capability to manufacture dates, and complicates over-the-air updates.
 - **The Thesis:** This project argues for a centralised architecture where the vehicle is a thin, securely-networked client and AI runs in a cloud data centre.
-- **Focus Area:** The primary focus is the *secure communication layer*?"authenticating, encrypting, and delivering telemetry despite network instability.
+- **The Focus Area:** The primary focus is the *secure communication layer* — authenticating, encrypting, and delivering telemetry despite network instability.
 
 ---
 
@@ -65,7 +65,7 @@
 ---
 
 ## Slide 8: Proposed Methodology
-- **3-Tier Architecture:** Vehicle Node (ESP32), Backend (FastAPI), and Frontend (Next.js).
+- **3-Tier Architecture:** Vehicle Node (ESP8266), Backend (FastAPI on Debian homeserver), and Frontend (Next.js — live at `https://cvis.justinsaju.me`).
 - **Decoupled AI:** Centralised AI via Ollama (llama3.2:3b), triggered on telemetry ingest via fire-and-forget asynchronous tasks.
 - **Chaos Engineering:** Custom ASGI Middleware to probabilistically drop, delay, or tamper with packets.
 - **Stateful Physics Engine:** Real-time calculation of vehicle inertia, battery drain, and thermal drift instead of pure random data generation.
@@ -74,7 +74,7 @@
 
 ## Slide 9: System Architecture
 *Images Required: CVIS Architecture Diagram showing the 3 tiers.*
-1. **Vehicle Node (ESP32):** Arduino-framework firmware generating telemetry, hashing payloads (HMAC), encrypting (AES-GCM), and transmitting via HTTP/MQTT.
+1. **Vehicle Node (ESP8266):** Arduino-framework firmware generating telemetry, hashing payloads (HMAC-SHA256 via BearSSL), and transmitting via HTTP/MQTT. AES-GCM is stubbed due to hardware limitations.
 2. **Backend Cloud (FastAPI):** Ingest pipeline featuring ChaosMiddleware, API Key Auth, Crypto Verification, SQLite persistence, and WebSocket fan-out.
 3. **Unified Frontend (Next.js):** Three role-gated views:
    - `/driver`: Real-time dashboard & AI chat.
@@ -93,8 +93,8 @@
 
 ## Slide 11: Partial Results & Observations
 *Images Required: Screenshots of the NOC Dashboard or Terminal Output.*
-- **Performance:** Telemetry ingest `p50` latency of 4?"8 ms. WebSocket fan-out < 1 ms.
-- **AI Latency:** Centralised inference takes 8?"15s on CPU, completely decoupled from the 10ms telemetry ingest.
+- **Performance:** Telemetry ingest `p50` latency of 4–8 ms. WebSocket fan-out < 1 ms.
+- **AI Latency:** Centralised inference takes 8–15s on CPU, completely decoupled from the 10ms telemetry ingest.
 - **Security Validation:** 
   - Tampered packets (simulated by Chaos Middleware) are instantly rejected (401).
   - AES-GCM packets successfully decrypted in real-time.
@@ -115,9 +115,10 @@
 ---
 
 ## Slide 13: Conclusion
-- CVIS successfully demonstrates a complete, working implementation of secure vehicle-to-cloud communication. 
-- It is not merely a simulation?"cryptographic verification (HMAC, AES) and replay detection are executed on every packet by the backend. 
+- CVIS successfully demonstrates a complete, working implementation of secure vehicle-to-cloud communication.
+- It is not merely a simulation — cryptographic verification (HMAC, AES) and replay detection are executed on every packet by the backend.
 - The project validates the core thesis: intelligence should be centralised and the vehicle should be a thin, securely-networked client capable of withstanding real-world network chaos.
+- The system is live at `https://cvis.justinsaju.me` — accessible from anywhere in the world via Cloudflare Tunnel.
 
 ---
 

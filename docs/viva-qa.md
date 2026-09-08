@@ -13,13 +13,13 @@ JSON is a self-describing, human-readable, schema-agnostic format supported nati
 
 **Q2: What is adaptive telemetry interval and why does it matter?**
 
-The ESP32 adjusts its transmission frequency based on vehicle mode. Fault and overheating modes transmit every 1 second because they are safety-critical; normal modes transmit every 5–8 seconds. This mirrors DiffServ and priority queuing concepts — rather than treating all packets the same, the protocol encodes urgency in the transmission rate. It also reduces bandwidth consumption during routine operation.
+The ESP8266 adjusts its transmission frequency based on vehicle mode. Fault and overheating modes transmit every 1 second because they are safety-critical; normal modes transmit every 2–5 seconds. This mirrors DiffServ and priority queuing concepts — rather than treating all packets the same, the protocol encodes urgency in the transmission rate. It also reduces bandwidth consumption during routine operation.
 
 **Q3: How does schema versioning work in your system?**
 
 Every telemetry payload includes a `schema_version` field (currently `"1.0"`). If we add new telemetry fields in a future firmware version, we increment this field. The backend can inspect this field and apply the appropriate parsing logic for each version, maintaining backward compatibility.
 
-**Q4: How does the simulated telemetry generation work? Is it just random numbers?**
+**Q5: How does the simulated telemetry generation work? Is it just random numbers?**
 
 No, the simulated telemetry uses a **Continuous Stateful Physics Engine**. Both the ESP32 and the Python simulator track variables like speed, battery percentage, and temperature in their own memory. They calculate delta time (`dt`) between loop cycles and apply mathematical formulas for physical inertia and aerodynamic power drain. So when the vehicle switches to "Sport" mode, the speed spools up smoothly, the battery drains much faster, and the estimated range drops dynamically based on the live battery level. This guarantees the AI layer receives mathematically coherent, realistic data to reason over.
 
@@ -96,7 +96,7 @@ Per-vehicle AI would require embedding a language model or complex inference eng
 
 **Q17: How does CVIS ensure AI latency does not block telemetry ingestion?**
 
-The AI inference call is launched as `asyncio.create_task()` — a fire-and-forget background task. The telemetry ingest handler returns `200 OK` immediately after persisting the packet and broadcasting the telemetry WebSocket event. The AI recommendation arrives asynchronously via a separate `ai_recommendation` WebSocket event when inference completes (typically 8–15 seconds later). This decoupling ensures the secure communication layer remains responsive regardless of AI load.
+The AI inference call is launched as `asyncio.create_task()` — a fire-and-forget background task. The telemetry ingest handler returns `200 OK` immediately after persisting the packet and broadcasting the telemetry WebSocket event. The AI recommendation arrives asynchronously via a separate `ai_recommendation` WebSocket event when inference completes (typically 8–15 seconds on CPU). This decoupling ensures the secure communication layer remains responsive regardless of AI load.
 
 **Q18: How does CVIS handle the AI being unavailable?**
 
@@ -111,8 +111,9 @@ With REST polling, each frontend tab would periodically call `GET /api/v1/teleme
 | Component | Change |
 |---|---|
 | SQLite | Replace with PostgreSQL — concurrent writes, connection pooling |
-| Single FastAPI worker | Multiple Uvicorn workers behind Nginx, or Gunicorn |
+| Single FastAPI worker | Multiple Uvicorn workers behind a load balancer, or Gunicorn |
 | WebSocket | Redis pub/sub to fan-out across multiple server instances |
+| Cloudflare Tunnel | Dedicated load balancer with TLS termination (e.g., AWS ALB or Nginx) |
 | MQTT broker | Clustered HiveMQ or EMQX for IoT scale |
 | AI | GPU-accelerated Ollama or dedicated inference API (OpenAI, Vertex AI) |
 | Auth | Hardware HSM for key storage; mTLS for device certificates |

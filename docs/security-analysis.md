@@ -10,7 +10,7 @@ This document analyses the security properties of the CVIS communication layer, 
 
 ### 1.1 Authentication — API Key per Device
 
-- **What:** Each registered ESP32 device is issued a 64-character (32-byte) random API key at registration.
+- **What:** Each registered ESP8266 device is issued a 64-character (32-byte) random API key at registration.
 - **Storage:** Backend stores SHA-256(api_key) only — the plaintext is shown once and never recoverable.
 - **Transport:** Sent in the `X-API-Key` HTTP header on every request, or in the `_meta.api_key` field of MQTT envelopes.
 - **Verification:** The backend looks up the SHA-256 hash; timing is not a concern since hash lookup is constant-time per SQLite index scan.
@@ -90,19 +90,19 @@ This approach is entirely legitimate for a CCNS demonstration and is explicitly 
 | AES-256-GCM (not AES-128-CBC) | GCM provides AEAD (no separate MAC needed). CBC requires padding and a separate MAC. 256-bit key provides 128-bit security against Grover's algorithm. |
 | 96-bit GCM IV | NIST SP 800-38D recommended size for random IV with GCM. |
 | Per-call fresh IV | IV reuse under the same key in GCM is catastrophic (allows key recovery). Fresh IV per packet is mandatory. |
-| mbedTLS on ESP32 | Bundled with ESP32 Arduino SDK. FIPS-certified implementation. No additional library. |
+| BearSSL on ESP8266 | Bundled with the ESP8266 Arduino core (esp8266 community board package). No additional install needed. HMAC-SHA256 implemented; AES-GCM is stubbed due to hardware limitations. |
 | `hmac.compare_digest()` | Python's constant-time comparison for HMAC. Prevents timing-oracle attacks. |
 
 ---
 
 ## 5. Known Limitations (Acceptable for Academic Prototype)
 
-1. **No TLS on HTTP layer** — Traffic is plaintext HTTP over LAN. For production, HTTPS with a valid certificate is required. In the demo environment, the LAN is trusted and the cryptographic layer (HMAC/AES-GCM) provides the integrity guarantee at the application layer.
+1. **TLS on HTTP layer (Transport)** — Application traffic between ESP8266 and the backend passes through Cloudflare's edge, which provides TLS termination. The ESP8266 sends plain HTTP to `api-cvis.justinsaju.me`; Cloudflare handles HTTPS to the public internet. On the LAN, Cloudflare Tunnel provides an encrypted channel from the homeserver to Cloudflare's edge. For the demo, the application-layer HMAC/AES-GCM provides cryptographic integrity regardless.
 
 2. **MQTT broker has no auth** — Mosquitto is running without ACLs or TLS. Production would require TLS-MQTT and per-client certificates.
 
 3. **Replay window uses boot-relative millis()** — Since ESP32 millis() resets to 0 on boot, a reset followed by re-sending would use the same timestamp_ms values. Mitigated by: (a) replay set clears on server restart, (b) device must re-authenticate after boot, (c) a collision only occurs if the device reboots and sends the identical timestamp within the exact 60-second eviction window of its last packet.
 
-4. **No backend admin auth** — Admin and NOC endpoints are not behind a login gate in the prototype. The first-priority TODO before live demo.
+4. **No backend admin auth** — Admin and NOC endpoints are not behind a login gate in the prototype. Acceptable for an isolated homeserver demo; would require Bearer token or session auth before public deployment.
 
 5. **In-memory replay set** — Lost on server restart. Redis would provide persistence. Acceptable for demo.

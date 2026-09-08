@@ -46,7 +46,7 @@ All scripts register a test device, obtain an API key, and exercise the backend 
 | 13 | Retrieve recent telemetry | GET /api/v1/telemetry/recent | 200, list |
 | 14 | Get packets list | GET /api/v1/telemetry/packets | 200, list |
 | 15 | WebSocket connect | ws://localhost:8000/ws | 101 Upgrade |
-| 16 | WebSocket backfill received | ws receive | `telemetry_backfill` event |
+| 16 | WebSocket backfill received | ws receive | `backfill` event with `records` array |
 | 17 | DB persistence | Query SQLite directly | Rows present |
 | 18 | Concurrent POSTs (5 threads) | POST ×5 | All 200 |
 | 19 | Payload size logged | GET /packets | size_bytes > 0 |
@@ -151,7 +151,7 @@ Additional:
 
 ## 6. Frontend Manual Test Checklist
 
-Performed in-browser at `http://localhost:3000`
+Performed in-browser at `https://cvis.justinsaju.me`
 
 ### `/driver`
 - [ ] Loading animation plays and completes
@@ -187,6 +187,6 @@ Performed in-browser at `http://localhost:3000`
 
 | Item | Status | Notes |
 |---|---|---|
-| MQTT end-to-end | Partial | Mosquitto broker not always running. MQTT adapter code is complete and tested structurally; live publish requires `mosquitto` running |
-| ESP32 hardware | Pending | Physical board not available; telemetry simulated by test scripts |
-| AI latency | Variable | llama3.2:3b produces recommendations in 3–15s depending on hardware |
+| MQTT end-to-end | Partial | Mosquitto broker must be running on homeserver. MQTT adapter code is complete and tested structurally; run `sudo systemctl start mosquitto` on homeserver to enable |
+| ESP8266 hardware | ✅ Confirmed | Physical ESP8266 board connected, sending live telemetry to `https://api-cvis.justinsaju.me` |
+| AI latency | Variable | llama3.2:3b produces recommendations in 8–15s on CPU; AI is fire-and-forget so it never blocks telemetry ingest |

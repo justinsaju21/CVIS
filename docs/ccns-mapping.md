@@ -55,7 +55,7 @@
 | Replay protection | Replay attack prevention, protocol freshness | `(device_id, timestamp_ms)` deduplication in a bounded time window — prevents captured packets from being re-submitted |
 | Auth toggle + rejection logging | Access control audit trail | When auth is disabled, packets accepted as `no_auth` and logged — enables forensic analysis of what happened without auth |
 | `auth_logs` table | Security audit logging | All auth failures, tamper events, disconnects, re-registrations logged with timestamp and device_id |
-| mbedTLS on ESP32 | Hardware-side cryptographic implementation | HMAC-SHA256 and AES-256-GCM implemented using ESP32's bundled mbedTLS — FIPS-certifiable library |
+| BearSSL on ESP8266 | Hardware-side cryptographic implementation | HMAC-SHA256 implemented using BearSSL bundled with the ESP8266 Arduino core. AES-GCM is stubbed on hardware; fully functional backend-side. |
 
 ---
 
@@ -63,7 +63,7 @@
 
 | Feature | CCNS Topic | How It Demonstrates the Concept |
 |---|---|---|
-| Centralised AI (Ollama on server) | Cloud vs. edge intelligence, centralised reasoning | AI runs on the laptop (simulating cloud/data-centre). Vehicle is a thin client — demonstrates the "AI should not be embedded per-vehicle" thesis |
+| Centralised AI (Ollama on homeserver) | Cloud vs. edge intelligence, centralised reasoning | AI runs on the Debian homeserver (simulating cloud/data-centre). Vehicle is a thin client — demonstrates the "AI should not be embedded per-vehicle" thesis |
 | Multi-factor telemetry prompt | Intelligent network analysis, context-aware reasoning | Ollama receives all 8 telemetry fields simultaneously; prompt is structured to require cross-field reasoning (e.g., high temp + fault code → specific recommendation) |
 | Fire-and-forget AI task | Async processing, non-blocking pipeline | `asyncio.create_task()` runs AI inference without blocking the telemetry ingest response — demonstrates async concurrency in networked systems |
 | AI service kill-switch | Service degradation, graceful degradation | When AI is stopped, telemetry still flows — demonstrates that the secure comms layer is independent of the AI layer (project thesis) |
@@ -85,4 +85,4 @@
 
 ---
 
-*Last updated: Phase 2–6 complete*
+*Last updated: Phases 1–7 complete. Live deployment confirmed at `https://cvis.justinsaju.me`.*
