@@ -11,7 +11,7 @@ echo Starting CVIS Frontend in a new terminal...
 start cmd /k "cd frontend && npm run dev"
 
 echo Starting CVIS Simulator in a new terminal...
-start cmd /k "cd backend && call venv\Scripts\activate && python simulator.py"
+start cmd /k "cd backend && call venv\Scripts\activate && python simulate_vehicle.py"
 
 echo All services have been started!
 

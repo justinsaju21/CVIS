@@ -29,6 +29,9 @@ export interface TelemetryRow extends TelemetryPayload {
   received_at: string
   protocol:    'http' | 'mqtt'
   status:      string
+  auth_status?: string
+  size_bytes?: number
+  raw_payload?: string
 }
 
 export interface PacketRow {
@@ -157,3 +160,4 @@ export type WsEvent =
   | { event: 'ai_service_status';    enabled: boolean }
   | { event: 'vehicle_ai_status';    device_id: string; enabled: boolean }
   | { event: 'mobile_access_changed'; vehicle_id: string; enabled: boolean }
+  | { event: 'global_mobile_app_changed'; enabled: boolean }

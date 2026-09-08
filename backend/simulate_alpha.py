@@ -7,6 +7,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Simulator for ESP32-ALPHA")
     parser.add_argument("--url", default="http://127.0.0.1:8000")
     parser.add_argument("--interval", type=float, default=2.0)
+    parser.add_argument("--charge", action="store_true", help="Force charging mode")
     args = parser.parse_args()
     
     fleet = fetch_fleet(args.url)
@@ -21,8 +22,8 @@ if __name__ == "__main__":
         device_id=v_info["device_id"],
         name=v_info.get("name", "ESP32-ALPHA"),
         interval=args.interval,
-        cycle_secs=v_info.get("cycle_secs", 12),
-        start_mode=v_info.get("start_mode", 0),
+        cycle_secs=999999 if args.charge else v_info.get("cycle_secs", 12),
+        start_mode=6 if args.charge else v_info.get("start_mode", 0),
     )
     
     if not sim.register():

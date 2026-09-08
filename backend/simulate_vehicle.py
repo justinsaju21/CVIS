@@ -230,6 +230,12 @@ class VehicleSimulator:
             "range_km":       max(0.0, vary(estimated_range, 2.0)),
             "fault_code":     fault,
             "charging_rate_w": charge,
+            "ambient_temp_c": 25.0,
+            "headwind_kmh": max(0.0, vary(10.0, 5.0)),
+            "road_gradient_pct": vary(0.0, 2.0),
+            "tire_pressure_psi": max(28.0, vary(34.0, 1.0)),
+            "cabin_climate_w": vary(500.0, 50.0),
+            "max_cell_voltage_delta": vary(0.01, 0.005),
         }
 
     def send_http(self, packet: dict, encryption_enabled: bool, tamper: bool = False) -> tuple[int, str]:
@@ -377,6 +383,7 @@ if __name__ == "__main__":
     parser.add_argument("--count",    type=int,   default=0,    help="Max packets per vehicle (0=infinite)")
     parser.add_argument("--single",   default=None,             help="Run only this device_id (e.g. ESP32-ALPHA)")
     parser.add_argument("--tamper",   action="store_true",      help="Force inject payload tampering for testing rejection")
+    parser.add_argument("--charge",   action="store_true",      help="Force charging mode")
     args = parser.parse_args()
 
     # ── Single source of truth: fetch fleet from backend ──────────────────
@@ -403,8 +410,8 @@ if __name__ == "__main__":
             device_id    = v["device_id"],
             name         = v.get("name", v["device_id"]),
             interval     = args.interval,
-            cycle_secs   = v.get("cycle_secs", 12),
-            start_mode   = v.get("start_mode", 0),
+            cycle_secs   = 999999 if args.charge else v.get("cycle_secs", 12),
+            start_mode   = 6 if args.charge else v.get("start_mode", 0),
             force_tamper = args.tamper,
         )
         if not sim.register():
