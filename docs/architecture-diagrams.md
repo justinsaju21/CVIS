@@ -6,9 +6,9 @@
 
 ```mermaid
 graph TB
-    subgraph ESP32["ESP32 Vehicle Node (Simulated)"]
-        FW["firmware.ino — Stateful Physics Engine (Inertia, Drain, Range)"]
-        CRYPTO_FW["crypto_utils.h — mbedTLS HMAC-SHA256 + AES-256-GCM"]
+    subgraph ESP32["ESP8266 Vehicle Node (Simulated)"]
+        FW["firmware_esp8266.ino — Stateful Physics Engine (Inertia, Drain, Range)"]
+        CRYPTO_FW["crypto_utils.h — BearSSL HMAC-SHA256 (AES-GCM stubbed on ESP8266)"]
         BTN["Push Button GPIO — Mode Cycle ISR"]
         BTN --> FW
         FW --> CRYPTO_FW
@@ -23,7 +23,7 @@ graph TB
         SWITCH --> MQTT
     end
 
-    subgraph BACKEND["FastAPI Backend — Laptop = Cloud/Data Centre"]
+    subgraph BACKEND["FastAPI Backend — Homeserver (Debian) = Cloud/Data Centre"]
         CHAOS["ChaosMiddleware ASGI — Loss / Latency / Tamper"]
         AUTH["auth.py — API-key + HMAC verify"]
         INGEST["telemetry_service.py — Decrypt → Verify → Persist → Broadcast"]

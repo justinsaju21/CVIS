@@ -4,13 +4,13 @@
 ---
 
 ## Phase 1 — Core Pipeline, HTTP Only (Week 1–2)
-- [x] ESP32 firmware: 8 modes, adaptive intervals, HTTP POST, retry+backoff
+- [x] ESP8266 firmware: 8 modes, adaptive intervals, HTTP POST, retry+backoff
 - [x] FastAPI backend: telemetry ingest, SQLite persistence, WebSocket fan-out
 - [x] SQLite schema: `packets` + `telemetry` tables
 - [x] Smoke test script (`test_phase1.py`)
 - [x] Companion docs seeded (PROGRESS.md, build-plan.md, ccns-mapping.md)
-- [ ] Hardware test with physical ESP32 board
-- [ ] PROGRESS.md updated and signed off ← **gate for Phase 2**
+- [x] Hardware test with physical ESP8266 board — confirmed live at `https://cvis.justinsaju.me`
+- [x] PROGRESS.md updated and signed off ← **gate for Phase 2**
 
 ---
 
@@ -64,7 +64,7 @@
 ## Phase 6 — Hardening + Testing (Week 6–7)
 - [x] End-to-end test: all 8 modes × both protocols × all chaos settings (test_phase6.py: 45/45 passed)
 - [x] MQTT reconnect logic (Verified with local Mosquitto broker)
-- [ ] ESP32 WiFi drop/reconnect logic (pending hardware)
+- [x] ESP8266 WiFi drop/reconnect logic (confirmed with physical hardware)
 - [x] Replay protection (nonce/timestamp window) — implemented and tested
 - [x] PROGRESS.md updated ← gate for Phase 7
 
@@ -85,10 +85,14 @@
 - [x] Demo script → docs/demo-script.md
 - [x] Viva Q&A → docs/viva-qa.md
 - [x] CCNS Unit 1–5 mapping table (docs/ccns-mapping.md) — 34 features mapped
+- [x] End-to-end workflow documentation → docs/cvis-workflow.md
+- [x] Homeserver deployment guide → docs/homeserver_deployment_guide.md
 
 ---
 
 ## Phase 8 — Demo Rehearsal (End of Week 8)
-- [ ] Full demo run-through
+- [x] System deployed live at `https://cvis.justinsaju.me`
+- [x] ESP8266 confirmed sending live telemetry over Cloudflare Tunnel
+- [ ] Full demo run-through with demo-script.md
 - [ ] Fix any rehearsal failures
 - [ ] No new features

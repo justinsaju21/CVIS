@@ -1,109 +1,101 @@
 # CVIS — User Manual
 
-**Version:** 1.0  
-**System:** Connected Vehicle Intelligence System  
+**System:** Connected Vehicle Intelligence System (CVIS)  
+**Live URL:** `https://cvis.justinsaju.me`  
 **Audience:** Academic evaluators, demo operators, developers
 
 ---
 
-## 1. Overview
+## 1. What is CVIS?
 
-CVIS is a three-tier demonstration system showing how a connected vehicle securely transmits telemetry to a centralised AI reasoning layer. The system consists of:
+CVIS demonstrates a **centralised vehicle intelligence architecture**. The thesis: AI should live in the cloud (data centre), not embedded per-vehicle. The vehicle is a thin, securely-networked client.
 
-| Tier | Component | Location |
+The system has three physical layers:
+
+| Layer | Component | What it Does |
 |---|---|---|
-| Vehicle Node | ESP32 firmware (simulated) | `firmware/` |
-| Backend | FastAPI + SQLite + Ollama | `backend/` |
-| Frontend | Unified Next.js app | `frontend/` |
+| **Vehicle Node** | ESP8266 firmware | Simulates vehicle telemetry, signs every packet with HMAC-SHA256, sends every 2 seconds |
+| **Backend** | FastAPI + SQLite + Ollama | Receives packets, verifies auth/integrity, persists to DB, broadcasts in real-time, runs AI |
+| **Frontend** | Unified Next.js app | Three role-gated views: Driver, NOC, Admin |
+
+Everything is live on the internet via Cloudflare Tunnel — no port forwarding, no VPN.
 
 ---
 
-## 2. Starting the System
+## 2. Accessing the System
 
-### 2.1 Start the Backend
-
-```bash
-cd backend
-python -m venv venv
-venv\Scripts\activate        # Windows
-pip install -r requirements.txt
-uvicorn main:asgi_app --host 0.0.0.0 --port 8000
-```
-
-The backend will:
-- Initialise the SQLite database at `backend/cvis.db`
-- Restore chaos/auth settings from the previous session
-- Attempt to connect to a local Mosquitto MQTT broker (non-fatal if not running)
-- Start accepting HTTP telemetry on `POST http://localhost:8000/api/v1/telemetry`
-
-### 2.2 Start Ollama AI (optional but recommended)
-
-```bash
-ollama serve
-ollama pull llama3.2:3b
-```
-
-If Ollama is not running, the system degrades gracefully — telemetry still flows, AI recommendations are skipped.
-
-### 2.3 Start the Frontend
-
-```bash
-cd frontend
-npm install
-npm run dev
-```
-
-Open your browser to `http://localhost:3000`.
-
-### 2.4 Simulate Vehicle Telemetry
-
-Run the simulator script to push live telemetry into the system:
-
-```bash
-cd backend
-python test_phase6.py
-```
-
-Or, with a physical ESP32, flash `firmware/firmware.ino` (copy `firmware/secrets.h.example` to `firmware/secrets.h` first).
+| URL | View | Purpose |
+|---|---|---|
+| `https://cvis.justinsaju.me/driver/alpha` | Driver Dashboard | Vehicle health, AI recommendations, chat |
+| `https://cvis.justinsaju.me/noc` | Network Operations Centre | Packet visualisation, security controls |
+| `https://cvis.justinsaju.me/admin` | Admin Console | System stats, auth logs, device management |
 
 ---
 
-## 3. Driver Dashboard (`/driver`)
+## 3. Driver Dashboard (`/driver/alpha`)
 
-The Driver view shows a real-time health dashboard for the connected vehicle.
+The Driver Dashboard is a real-time vehicle health console. All data is live — from the ESP8266 via the backend WebSocket.
 
-| Widget | Description |
+### 3.1 On Page Load
+
+When you open the dashboard, the WebSocket connects and the server immediately sends the **last 10 telemetry rows** as a backfill — so the charts are populated even before the next packet arrives.
+
+### 3.2 Main Widgets
+
+| Widget | What it shows |
 |---|---|
-| **Mode Badge / Card** | Click this card to open the **Mode Selector**. You can manually force the vehicle into Healthy, Eco, Sport, or Heavy Traffic. |
-| **Speed Dial** | Current speed in km/h. Smoothly spools up/down based on physical inertia when modes change. |
-| **Battery Level** | Real-time battery %. Drains continuously based on aerodynamic drag (speed) and mode efficiency. |
-| **Est. Range** | Dynamically calculates based on actual live battery % multiplied by the active mode's efficiency curve. |
-| **Tire Pressure** | 4-wheel live tire pressure monitoring, highlighting over/under inflation. |
-| **Live Route Map** | Real GPS mapping integration. |
-| **Drive Score (Pro)** | Real-time AI grading out of 10 based on speed habits, braking, and efficiency. |
-| **Key Suggestions** | Actionable driving tips based on live telemetry. |
-| **AI Advisory / Chat** | Free-text chat grounded in current telemetry. |
+| **Mode Badge** | Current vehicle operating mode (Healthy / Eco / Sport / etc.) |
+| **Speed Dial** | Current speed in km/h — the ring animates smoothly (physics inertia) |
+| **Battery Arc** | State of charge %. Drains continuously based on speed + mode efficiency |
+| **Estimated Range** | Range in km. Calculated from live battery % × mode efficiency factor |
+| **Motor Temp** | Motor controller temperature in °C |
+| **Ambient Temp** | Outside temperature — read from `ambient_temp_c` field if sent by firmware, otherwise estimated from battery temp |
+| **Tire Pressure** | 4-wheel pressure monitoring — highlights over/under inflation per mode |
+| **Drive Score** | 0–10 score based on current speed, temp, and battery habits (live calculation) |
+| **History Charts** | Battery %, speed, and motor temp over the last 60 readings |
 
-### Physics Simulation
-This dashboard is driven by a stateful physics engine running on the backend (or physical ESP32). When you switch modes on the dashboard, values do not teleport randomly. Speed will accelerate smoothly via an inertia curve, battery will drain mathematically based on speed load, and the range estimate will dynamically shift to match your new power efficiency!
+### 3.3 Alerts
 
-### AI Chat Tips
-- "What is wrong with the vehicle right now?"
-- "Should I stop driving immediately?"
-- "How long will the battery last at current speed?"
+The dashboard raises alerts automatically:
+- **Low Battery** (mode = `Low Battery`) — amber warning
+- **Battery Overheating** (mode = `Battery Overheating`) — red fault
+- **Motor Fault** (mode = `Motor Fault`) — red fault with fault code in hex
+
+Alerts clear automatically when the mode returns to normal.
+
+### 3.4 AI Recommendation Panel
+
+- Updates automatically every time the vehicle mode changes, or every 20 seconds
+- Reasons across **all** telemetry fields simultaneously — not simple threshold rules
+- Shows `severity`: `ok`, `warn`, or `critical`
+- The text types in with a typewriter animation
+- Click **Refresh** to request an immediate new recommendation
+
+### 3.5 Chat with CVIS
+
+Click **Chat** to open the AI chat panel. The AI has access to the current telemetry snapshot and the last 10 readings as context.
+
+Example questions:
+- *"Should I continue driving at this speed?"*
+- *"How long will the battery last?"*
+- *"What does fault code 0x04 mean?"*
+
+### 3.6 Key Suggestions
+
+Mode-specific driving tips appear below the score card, updated whenever the mode changes.
 
 ---
 
-## 4. NOC — Network Operations Centre (`/noc`)
+## 4. Network Operations Centre (`/noc`)
 
-The NOC is the primary demonstration surface for CCNS concepts.
+The NOC is the **primary demo surface** for CCNS networking and security concepts. Every control here causes a real, verifiable backend behaviour change — nothing is cosmetic.
 
-### 4.1 Live Packet Visualisation
+### 4.1 Live Packet Flow
 
-A left-to-right animated packet flow shows every telemetry packet as it travels from the vehicle node (left) to the CVIS server (right). Colour indicates protocol:
-- **Cyan** — HTTP
-- **Amber** — MQTT
-- **Red** — Rejected / tampered
+An animated visualisation shows every telemetry packet travelling from the vehicle (left) to the server (right). Colour indicates:
+- **Cyan** — HTTP packet
+- **Amber** — MQTT packet
+- **Red** — Rejected / tampered packet
 
 ### 4.2 Packet Table
 
@@ -116,85 +108,117 @@ Every packet is logged with:
 | `Protocol` | HTTP or MQTT |
 | `Time` | Server receipt timestamp |
 | `Size` | Payload size in bytes |
-| `Auth` | auth_ok / auth_fail / no_auth |
-| `Encrypted` | Yes / No |
-| `Status` | ok / rejected / dropped |
+| `Auth` | `auth_ok` / `auth_fail` / `no_auth` / `tamper_detected` |
+| `Encrypted` | Yes / No + method (HMAC-SHA256 / AES-GCM / PLAIN) |
+| `Status` | `ok` / `rejected` / `dropped` |
 
-Click any row to open the **Packet Inspector** with full JSON payload, headers, and AI response.
+Click any row to expand the **Packet Inspector** — shows full JSON payload, headers, AI response, and all metadata.
 
 ### 4.3 Live Controls
 
-All controls cause immediate, real backend behaviour changes:
-
-| Control | Effect |
+| Control | What it does |
 |---|---|
-| **Protocol Switch** | Switch ESP32 ↔ backend between HTTP REST and MQTT (no restart) |
-| **Encryption Toggle** | Tell ESP32 to start/stop AES-256-GCM encryption |
-| **Auth Toggle** | Enable/disable API-key + HMAC verification. Packets still flow but logged as `no_auth` when disabled |
-| **Packet Loss (0/5/10/25%)** | Backend probabilistically drops N% of packets before processing |
-| **Latency (0/100/300/1000ms)** | Backend injects N ms delay before processing |
-| **Tamper Injector** | Backend mutates 1 byte of the payload after the signature — HMAC check will fail on the next packet |
-| **Disconnect Vehicle** | Deactivates the device — subsequent packets return 401 |
-| **Stop AI** | Disables AI inference — telemetry still flows but no recommendations are generated |
+| **Protocol Switch** | Switch ESP8266 ↔ backend between HTTP REST and MQTT — no restart required. The firmware polls `/api/v1/config/protocol` every 30s. |
+| **Encryption Toggle** | Instructs ESP8266 to wrap payload in AES-256-GCM envelope. Note: ESP8266 falls back to HMAC-only due to hardware limitations — use the Python simulator to demo AES-GCM. |
+| **Auth Toggle** | Enable/disable API-key + HMAC verification. When off, packets still arrive but are logged as `no_auth` — demonstrates open/insecure traffic. |
+| **Packet Loss (0/5/10/25%)** | Backend middleware probabilistically drops N% of packets before processing — returns 503, ESP8266 retries. |
+| **Latency (0/100/300/1000ms)** | Backend middleware sleeps N ms before processing — demonstrates queuing delay. |
+| **Tamper Injector** | Backend mutates the payload (`battery_pct = 999.9`) *after* the signature is computed. HMAC check fails → `tamper_detected` logged → packet rejected with 401. |
+| **Disconnect Vehicle** | Deactivates device in DB — next packet returns 401. Reconnect button re-activates. |
+| **Stop AI** | Disables AI inference. Telemetry still flows and is displayed; recommendations stop. |
 
 ---
 
 ## 5. Admin Console (`/admin`)
 
-The Admin view provides operational oversight.
+Provides operational visibility over the entire system.
 
 | Section | Data |
 |---|---|
-| **Server Stats** | Uptime, active WebSocket connections, phase |
-| **System Resources** | Live CPU %, memory usage (via psutil) |
-| **Packet Statistics** | Total / ok / rejected counts, protocol breakdown |
-| **Packet Timeline** | Bar chart of packet volume per hour |
-| **Mode Distribution** | Pie chart of vehicle mode frequencies |
-| **Auth Security** | Auth failures, tamper events, auth enabled state |
+| **Server Status** | Uptime, active WebSocket connections, backend version |
+| **System Resources** | Live CPU %, RAM usage (via psutil on the homeserver) |
+| **Packet Stats** | Total / ok / rejected counts, protocol breakdown |
+| **Packet Timeline** | Hourly bar chart of packet volume |
+| **Mode Distribution** | Vehicle mode frequency pie chart |
+| **Auth Security** | Auth failures, tamper events, enforcement state |
 | **AI Status** | Ollama running state, model loaded, service enabled |
 | **Chaos State** | Current loss %, latency, tamper state |
-| **Connected Devices** | All registered devices, last seen, last mode |
-| **Auth Log** | Filterable event log: auth_ok, auth_fail, tamper_detected, registered |
+| **Connected Devices** | All registered devices, last-seen timestamp, last mode |
+| **Auth Log** | Filterable event log: `auth_ok`, `auth_fail`, `tamper_detected`, `registered` |
 
 ---
 
 ## 6. Vehicle Modes Reference
 
-| Mode | Telemetry Characteristics | Alert |
-|---|---|---|
-| Healthy | Speed 60–100 km/h, battery 60–95%, temp 35–55°C | None |
-| Eco | Speed 30–60 km/h, battery 40–80%, regen active | None |
-| Sport | Speed 80–140 km/h, battery drain fast, temp 60–80°C | None |
-| Heavy Traffic | Speed 0–20 km/h, stop-start, temp moderate | None |
-| Low Battery | Battery < 20%, reduced range | ⚠ Warning |
-| Battery Overheating | Temp > 45°C, reduced range, fault code set | 🔴 Fault |
-| Charging | Speed 0, charging rate 6–11 kW | None |
-| Motor Fault | Fault code non-zero, reduced speed | 🔴 Fault |
+The ESP8266 cycles through 8 modes via a push button. Each mode produces physically coherent telemetry — values don't jump randomly.
+
+| Mode | Speed | Battery % | Battery Temp | Motor Temp | Fault | Alert |
+|---|---|---|---|---|---|---|
+| **Healthy** | 60–100 km/h | 60–95% | 30–45°C | 35–55°C | 0x00 | None |
+| **Eco** | 30–60 km/h | 40–90% | 25–38°C | 28–42°C | 0x00 | None |
+| **Sport** | 80–140 km/h | drains fast | 38–55°C | 60–80°C | 0x00 | None |
+| **Heavy Traffic** | 0–20 km/h | slow drain | 28–40°C | 32–50°C | 0x00 | None |
+| **Low Battery** | ↓ speed | < 20% | 30–42°C | 35–50°C | 0x00 | ⚠ Warn |
+| **Battery Overheating** | ↓ speed | reduced | > 55°C | 50–75°C | 0x02 | 🔴 Fault |
+| **Charging** | 0 km/h | rising | 30–40°C | 25°C | 0x00 | None |
+| **Motor Fault** | ↓ ↓ speed | reduced | 30–45°C | > 100°C | 0x04 | 🔴 Fault |
+
+**Physics rules:**
+- Sport mode → higher motor temp + faster battery drain + reduced range estimate
+- Battery Overheating → fault code 0x02 + reduced range
+- Motor Fault → fault code 0x04 + speed capped at 20 km/h
 
 ---
 
-## 7. Common Scenarios for Demo
+## 7. Demo Scenarios
 
-### Demo A — Normal Operation
-1. Start backend + frontend + simulator
-2. Navigate to `/driver` — watch live telemetry, battery arc, AI recommendations
+### Scenario A — Normal Operation (shows Unit 1, 2)
+1. Open `https://cvis.justinsaju.me/driver/alpha`
+2. Charts pre-populate from backfill immediately
+3. Live telemetry updates every 2 seconds
+4. AI recommendation types in automatically
 
-### Demo B — Tamper Detection
+### Scenario B — Tamper Detection (shows Unit 4 — Integrity)
 1. Open `/noc`
-2. Click **Tamper Inject** — backend will mutate next payload
-3. Observe: packet row turns red, status = `rejected`, auth log shows `tamper_detected`
+2. Click **Tamper Inject**
+3. Watch next packet row turn red — `tamper_detected` in auth column
+4. Open packet inspector — shows the mutated payload vs original signature
 
-### Demo C — Protocol Switch
-1. Click **MQTT** in the NOC protocol control
-2. Start a Mosquitto broker (`mosquitto`) in a separate terminal
-3. Observe packet colour change from cyan → amber
+### Scenario C — Auth Disabled → Open Traffic (shows Unit 4 — Authentication)
+1. Click **Auth: OFF**
+2. Packets arrive with `no_auth` — no credentials checked
+3. Click **Auth: ON** — security restored
 
-### Demo D — Chaos Simulation
-1. Set Packet Loss to **25%** in the NOC
-2. Watch packet table — ~1 in 4 packets shows `dropped`
-3. Observe AI adapter handles gaps gracefully
+### Scenario D — Packet Loss (shows Unit 3 — Reliability)
+1. Set **Packet Loss = 25%**
+2. ~1 in 4 packets shows `dropped` / 503
+3. ESP8266 retry logic kicks in (exponential backoff, 3 retries)
+4. Set back to **0%**
 
-### Demo E — AI Shutdown
+### Scenario E — Protocol Switch HTTP → MQTT (shows Unit 2)
+1. Click **MQTT** in protocol control
+2. Packet colour changes from cyan → amber
+3. Both adapters use identical auth + ingest pipeline
+
+### Scenario F — AI Shutdown (shows Unit 5 — Centralized AI)
 1. Click **Stop AI** in the NOC
-2. Send telemetry — packets arrive, but `/driver` AI panel stops updating
-3. Click **Start AI** — recommendations resume
+2. Telemetry still flows — dashboard still updates
+3. AI panel stops updating — AI is decoupled from transport
+4. Click **Start AI** — recommendations resume
+
+---
+
+## 8. What is Real vs. Simulated
+
+| Feature | Status |
+|---|---|
+| Telemetry physics engine | ✅ Real — stateful dt-based simulation (speed inertia, battery drain, heat exchange) |
+| HMAC-SHA256 signing | ✅ Real — BearSSL on ESP8266, verified backend with `hmac.compare_digest` |
+| API key auth | ✅ Real — SHA-256 hashed in DB, not stored plaintext |
+| AES-256-GCM | ✅ Real backend-side — stub on ESP8266 (no hardware support) |
+| Replay protection | ✅ Real — (device_id, timestamp_ms) deduplication window |
+| Packet loss | Simulated — middleware-level 503, not real network drop |
+| Latency | Simulated — `asyncio.sleep()`, not real network delay |
+| Tamper injection | Simulated — body mutation in middleware, detected by real HMAC verification |
+| Ollama AI | ✅ Real — llama3.2:3b reasoning over actual telemetry values |
+| WebSocket fan-out | ✅ Real — all three views receive the same event simultaneously |
