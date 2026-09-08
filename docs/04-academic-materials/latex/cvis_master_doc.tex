@@ -244,7 +244,7 @@ AI lives centrally (cloud/data-centre). The vehicle is a thin client. The projec
 \node[cloud, right=2.8cm of esp] (layer) {Secure\\Comms Layer\\(HTTP / MQTT)};
 
 % Row 3 — Backend
-\node[block, right=2.8cm of layer] (fastapi) {FastAPI\\Backend\\(Port 8000)};
+\node[block, right=2.8cm of layer] (fastapi) {FastAPI\\Backend\\(Port 8005)};
 
 % Row 4 — Storage
 \node[block, below=1.6cm of fastapi] (sqlite) {SQLite\\Database\\(cvis.db)};
@@ -850,7 +850,7 @@ The unified Next.js application (port 3000) provides:
 \end{itemize}
 \end{ccnsbox}
 
-Data flow: WebSocket \texttt{ws://localhost:8000/ws} → \texttt{event: telemetry} message → React state update → re-render gauges.
+Data flow: WebSocket \texttt{wss://api-cvis.justinsaju.me/ws} → \texttt{event: telemetry} message → React state update → re-render gauges.
 
 \section{NOC Dashboard (\texttt{/noc})}
 
@@ -1081,7 +1081,7 @@ Both scripts: (1) activate Python venv, (2) start FastAPI backend, (3) start Nex
 \toprule
 \textbf{Port} & \textbf{Service} & \textbf{Notes} \\
 \midrule
-8000 & FastAPI Backend & REST + WebSocket \\
+8005 & FastAPI Backend & REST + WebSocket \\
 3000 & Next.js Frontend & All three UI roles \\
 11434 & Ollama AI & HTTP API (\texttt{/api/chat}) \\
 1883 & Mosquitto MQTT & Optional \\

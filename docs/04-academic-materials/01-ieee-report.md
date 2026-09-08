@@ -73,7 +73,7 @@ Each ESP32 device registers via `POST /api/v1/devices/register`, receiving a 64-
 
 ### B. Payload Integrity — HMAC-SHA256
 
-The firmware computes `HMAC-SHA256(device_secret, canonical_json)` using mbedTLS. The signature is sent in the `X-HMAC-Signature` header. The backend recomputes the HMAC over the received body and compares using `hmac.compare_digest()` — a constant-time operation that prevents timing oracle attacks.
+The firmware computes `HMAC-SHA256(device_secret, canonical_json)` using BearSSL. The signature is sent in the `X-HMAC-Signature` header. The backend recomputes the HMAC over the received body and compares using `hmac.compare_digest()` — a constant-time operation that prevents timing oracle attacks.
 
 Any modification to the payload — including by the chaos middleware — invalidates the signature and causes a 401 rejection, logged as `tamper_detected`.
 
@@ -228,7 +228,7 @@ CVIS demonstrates a complete, working implementation of secure vehicle-to-cloud 
 
 [5] I. Fette, A. Melnikov, "The WebSocket Protocol," RFC 6455, IETF, 2011.
 
-[6] ARM Holdings, "mbedTLS Cryptographic Library," https://github.com/Mbed-TLS/mbedtls
+[6] Thomas Pornin, "BearSSL Cryptographic Library," https://bearssl.org/
 
 [7] Meta AI Research, "Llama 3," 2024. https://ai.meta.com/llama/
 
