@@ -161,3 +161,4 @@ export type WsEvent =
   | { event: 'vehicle_ai_status';    device_id: string; enabled: boolean }
   | { event: 'mobile_access_changed'; vehicle_id: string; enabled: boolean }
   | { event: 'global_mobile_app_changed'; enabled: boolean }
+  | { event: 'config_changed' }
