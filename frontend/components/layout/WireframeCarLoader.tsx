@@ -9,14 +9,14 @@ interface Props {
   message?: string
 }
 
-// Total duration in seconds (snappy yet cinematic)
+// Snappy yet cinematic boot sequence duration
 const TOTAL_DURATION = 2.8
 
 // Real-time boot diagnostics log messages mapped to progress intervals
 const STAGES = [
   { threshold: 0.15, text: 'INITIALIZING CAN-BUS TELEMETRY & TLS 1.3 HANDSHAKE...' },
   { threshold: 0.40, text: 'VALIDATING HMAC-SHA256 INTEGRITY & DEVICE PROVISIONING...' },
-  { threshold: 0.65, text: 'CALIBRATING 800V BMS BATTERY MATRIX & DUAL MOTOR INVERTERS...' },
+  { threshold: 0.65, text: 'CALIBRATING 800V STRUCTURAL BATTERY & DUAL INVERTERS...' },
   { threshold: 0.88, text: 'SPAWNING OLLAMA 3.2 3B MULTI-FACTOR REASONING PIPELINE...' },
   { threshold: 0.98, text: 'SYNCHRONIZING FULL-DUPLEX WEBSOCKET TELEMETRY STREAM...' },
   { threshold: 1.00, text: 'ALL SYSTEMS NOMINAL // ENGAGING VIRTUAL DRIVE COCKPIT...' },
@@ -72,7 +72,7 @@ export default function WireframeCarLoader({ onComplete, message = 'Initializing
           position: 'fixed',
           inset: 0,
           zIndex: 99999,
-          background: 'radial-gradient(ellipse at 50% 35%, #051424 0%, #02060b 55%, #000204 100%)',
+          background: 'radial-gradient(ellipse at 50% 38%, #051424 0%, #02060b 55%, #000204 100%)',
           display: 'flex',
           flexDirection: 'column',
           alignItems: 'center',
@@ -89,13 +89,13 @@ export default function WireframeCarLoader({ onComplete, message = 'Initializing
           {/* Subtle cyan glow spotlight */}
           <div style={{
             position: 'absolute',
-            top: '30%',
+            top: '32%',
             left: '50%',
             transform: 'translate(-50%, -50%)',
-            width: 700,
-            height: 350,
+            width: 750,
+            height: 380,
             background: 'radial-gradient(ellipse, rgba(0, 240, 255, 0.12) 0%, rgba(2, 132, 199, 0.04) 50%, transparent 75%)',
-            filter: 'blur(40px)',
+            filter: 'blur(45px)',
           }} />
 
           {/* Perspective 3D floor grid */}
@@ -116,7 +116,7 @@ export default function WireframeCarLoader({ onComplete, message = 'Initializing
             WebkitMaskImage: 'linear-gradient(to top, rgba(0,0,0,0.8) 0%, rgba(0,0,0,0.2) 60%, transparent 100%)',
           }} />
 
-          {/* Ambient horizontal scanline */}
+          {/* Ambient horizontal scanline texture */}
           <div style={{
             position: 'absolute',
             inset: 0,
@@ -155,7 +155,7 @@ export default function WireframeCarLoader({ onComplete, message = 'Initializing
                 fontFamily: "'Space Mono', monospace",
               }}>
                 <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#00f0ff', boxShadow: '0 0 8px #00f0ff' }} />
-                CVIS v2.4-ONLINE
+                CVIS-EV · TESLA ARCHITECTURE
               </span>
               <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.45)', fontFamily: "'Space Mono', monospace" }}>
                 // PROTOCOL: HYBRID (HTTP+MQTT)
@@ -177,10 +177,10 @@ export default function WireframeCarLoader({ onComplete, message = 'Initializing
           {/* Top Right: Aerospace Coordinate / Telemetry Specs */}
           <div style={{ textAlign: 'right', display: 'flex', flexDirection: 'column', gap: 3 }}>
             <div style={{ fontSize: 11, fontFamily: "'Space Mono', monospace", color: '#38bdf8', letterSpacing: '0.08em' }}>
-              TELEMETRY: <span style={{ color: '#00ffaa' }}>SYNCING</span>
+              AUTOPILOT / FSD: <span style={{ color: '#00ffaa' }}>HW4 ACTIVE</span>
             </div>
             <div style={{ fontSize: 10, fontFamily: "'Space Mono', monospace", color: 'rgba(255,255,255,0.45)' }}>
-              NODE: ESP32-VEHICLE-01 · 800V BMS
+              NODE: ESP32-ALPHA · 800V BMS
             </div>
           </div>
         </div>
@@ -194,14 +194,14 @@ export default function WireframeCarLoader({ onComplete, message = 'Initializing
           justifyContent: 'center',
           flex: 1,
           width: '100%',
-          maxWidth: 860,
+          maxWidth: 880,
           margin: '10px 0',
           zIndex: 10,
         }}>
           {/* Hologram Reticle Frame / Tech Markers */}
           <div style={{
             position: 'absolute',
-            inset: '5% 2%',
+            inset: '4% 2%',
             border: '1px solid rgba(0, 240, 255, 0.08)',
             borderRadius: 12,
             pointerEvents: 'none',
@@ -220,7 +220,7 @@ export default function WireframeCarLoader({ onComplete, message = 'Initializing
             transition={{ duration: 0.5 }}
             style={{
               position: 'absolute',
-              top: '12%',
+              top: '10%',
               left: '4%',
               background: 'rgba(4, 16, 32, 0.8)',
               border: '1px solid rgba(0, 240, 255, 0.25)',
@@ -232,10 +232,10 @@ export default function WireframeCarLoader({ onComplete, message = 'Initializing
             }}
           >
             <div style={{ fontSize: 9, color: '#38bdf8', fontFamily: "'Space Mono', monospace", fontWeight: 700 }}>
-              [ 01 // LIDAR MATRIX ]
+              [ 01 // AUTOPILOT HW4 ]
             </div>
             <div style={{ fontSize: 11, color: '#ffffff', fontWeight: 600 }}>
-              Roof Array · 250m FOV
+              Tri-Camera & Fender Suite
             </div>
           </motion.div>
 
@@ -245,7 +245,7 @@ export default function WireframeCarLoader({ onComplete, message = 'Initializing
             transition={{ duration: 0.5 }}
             style={{
               position: 'absolute',
-              top: '12%',
+              top: '10%',
               right: '4%',
               background: 'rgba(4, 16, 32, 0.8)',
               border: '1px solid rgba(0, 240, 255, 0.25)',
@@ -258,10 +258,10 @@ export default function WireframeCarLoader({ onComplete, message = 'Initializing
             }}
           >
             <div style={{ fontSize: 9, color: '#38bdf8', fontFamily: "'Space Mono', monospace", fontWeight: 700 }}>
-              [ 02 // AI NEURAL CORE ]
+              [ 02 // COCKPIT TOUCHSCREEN ]
             </div>
             <div style={{ fontSize: 11, color: '#00ffaa', fontWeight: 600 }}>
-              Ollama 3B Multi-Factor OK
+              15&quot; Center Console Online
             </div>
           </motion.div>
 
@@ -283,34 +283,41 @@ export default function WireframeCarLoader({ onComplete, message = 'Initializing
             }}
           >
             <div style={{ fontSize: 9, color: '#38bdf8', fontFamily: "'Space Mono', monospace", fontWeight: 700 }}>
-              [ 03 // 800V ARCHITECTURE ]
+              [ 03 // STRUCTURAL BATTERY ]
             </div>
             <div style={{ fontSize: 11, color: '#ffffff', fontWeight: 600 }}>
-              Dual Motor Inverters · Active
+              4680 Matrix · 800V Architecture
             </div>
           </motion.div>
 
-          {/* SVG Futuristic EV Wireframe Vehicle */}
-          <div style={{ width: '100%', maxWidth: 720, position: 'relative' }}>
+          {/* SVG Futuristic Tesla EV Wireframe Vehicle */}
+          <div style={{ width: '100%', maxWidth: 740, position: 'relative' }}>
             <svg
-              viewBox="0 0 680 290"
+              viewBox="0 0 700 280"
               style={{ width: '100%', height: 'auto', overflow: 'visible' }}
             >
               <defs>
-                {/* Glow Filter */}
+                {/* Glow Filters */}
                 <filter id="cyanGlow" x="-20%" y="-20%" width="140%" height="140%">
-                  <feGaussianBlur stdDeviation="3.5" result="blur" />
+                  <feGaussianBlur stdDeviation="3" result="blur" />
                   <feMerge>
                     <feMergeNode in="blur" />
                     <feMergeNode in="SourceGraphic" />
                   </feMerge>
                 </filter>
                 <filter id="intenseGlow" x="-30%" y="-30%" width="160%" height="160%">
-                  <feGaussianBlur stdDeviation="7" result="blur1" />
-                  <feGaussianBlur stdDeviation="3" result="blur2" />
+                  <feGaussianBlur stdDeviation="6" result="blur1" />
+                  <feGaussianBlur stdDeviation="2.5" result="blur2" />
                   <feMerge>
                     <feMergeNode in="blur1" />
                     <feMergeNode in="blur2" />
+                    <feMergeNode in="SourceGraphic" />
+                  </feMerge>
+                </filter>
+                <filter id="redGlow" x="-30%" y="-30%" width="160%" height="160%">
+                  <feGaussianBlur stdDeviation="5" result="blur" />
+                  <feMerge>
+                    <feMergeNode in="blur" />
                     <feMergeNode in="SourceGraphic" />
                   </feMerge>
                 </filter>
@@ -331,46 +338,45 @@ export default function WireframeCarLoader({ onComplete, message = 'Initializing
 
                 {/* Headlight beam */}
                 <linearGradient id="headlightBeam" x1="0%" y1="0%" x2="100%" y2="0%">
-                  <stop offset="0%" stopColor="rgba(0, 240, 255, 0.5)" />
+                  <stop offset="0%" stopColor="rgba(0, 240, 255, 0.45)" />
                   <stop offset="100%" stopColor="rgba(0, 240, 255, 0)" />
                 </linearGradient>
               </defs>
 
               {/* Holographic Ground Shadow / Underglow */}
               <ellipse
-                cx="340" cy="240" rx="270" ry="22"
-                fill="radial-gradient(ellipse, rgba(0, 240, 255, 0.18) 0%, transparent 70%)"
+                cx="350" cy="235" rx="285" ry="18"
+                fill="radial-gradient(ellipse, rgba(0, 240, 255, 0.22) 0%, transparent 70%)"
                 opacity={0.4 + progress * 0.6}
               />
 
               {/* Headlight Projector Cones (Front Beam) */}
               <motion.polygon
-                points="560,178 680,165 680,225 560,188"
+                points="628,178 700,165 700,225 635,195"
                 fill="url(#headlightBeam)"
                 initial={{ opacity: 0 }}
                 animate={{ opacity: progress > 0.4 ? [0.4, 0.7, 0.5] : 0 }}
                 transition={{ repeat: Infinity, duration: 2 }}
               />
 
-              {/* ── INTERNAL X-RAY TELEMETRY LAYER ────────────────────── */}
-              
-              {/* 1. 800V Battery Modular Pack (Underfloor Matrix) */}
+              {/* ── INTERNAL TESLA X-RAY POWERTRAIN LAYER ────────────────── */}
+
+              {/* 1. Structural Skateboard Battery Pack (Low Center of Gravity) */}
               <g opacity={progress > 0.3 ? 1 : 0.2} style={{ transition: 'opacity 0.4s' }}>
                 {/* Pack Tray */}
                 <rect
-                  x="200" y="206" width="280" height="18" rx="4"
-                  fill="rgba(2, 132, 199, 0.08)"
+                  x="225" y="206" width="250" height="12" rx="3"
+                  fill="rgba(2, 132, 199, 0.12)"
                   stroke="rgba(0, 240, 255, 0.4)"
                   strokeWidth="1.5"
-                  strokeDasharray="4 2"
                 />
-                {/* Individual Battery Cells */}
+                {/* 4680 Cylindrical Matrix / Module Blocks */}
                 {[0, 1, 2, 3, 4, 5, 6, 7].map(idx => {
                   const cellActive = progress >= (0.35 + idx * 0.05)
                   return (
                     <rect
                       key={idx}
-                      x={210 + idx * 33} y="210" width="24" height="10" rx="2"
+                      x={232 + idx * 30} y="209" width="22" height="6" rx="1.5"
                       fill={cellActive ? 'url(#battGrad)' : 'rgba(0, 240, 255, 0.1)'}
                       stroke={cellActive ? '#00f0ff' : 'rgba(0, 240, 255, 0.2)'}
                       strokeWidth="1"
@@ -380,224 +386,260 @@ export default function WireframeCarLoader({ onComplete, message = 'Initializing
                 })}
               </g>
 
-              {/* 2. High Voltage Conduits connecting Motors & Battery */}
+              {/* 2. High Voltage Bus Cables connecting Motors */}
               <path
-                d="M 170 215 L 200 215 M 480 215 L 510 215"
+                d="M 175 200 L 225 210 M 475 210 L 525 200"
                 fill="none"
                 stroke="#00f0ff"
                 strokeWidth="2"
-                strokeDasharray="6 3"
+                strokeDasharray="5 3"
                 filter="url(#cyanGlow)"
                 opacity={progress > 0.4 ? 1 : 0.2}
               />
 
               {/* 3. Dual Electric Drive Motors (Front & Rear Axles) */}
-              {/* Rear Motor */}
-              <g transform="translate(170, 215)">
-                <circle r="18" fill="rgba(2, 132, 199, 0.15)" stroke="#00f0ff" strokeWidth="1.5" />
-                <circle r="8" fill="none" stroke="#00ffaa" strokeWidth="1.5" strokeDasharray="3 2" filter="url(#cyanGlow)" />
+              {/* Rear Permanent Magnet Motor */}
+              <g transform="translate(175, 200)">
+                <circle r="16" fill="rgba(2, 132, 199, 0.15)" stroke="#00f0ff" strokeWidth="1.5" />
+                <circle r="7" fill="none" stroke="#00ffaa" strokeWidth="1.5" strokeDasharray="3 2" filter="url(#cyanGlow)" />
                 <motion.circle
-                  r="4"
+                  r="3.5"
                   fill="#00ffaa"
-                  animate={{ scale: [0.8, 1.2, 0.8] }}
+                  animate={{ scale: [0.8, 1.25, 0.8] }}
                   transition={{ repeat: Infinity, duration: 1.2 }}
                 />
               </g>
-              {/* Front Motor */}
-              <g transform="translate(510, 215)">
-                <circle r="18" fill="rgba(2, 132, 199, 0.15)" stroke="#00f0ff" strokeWidth="1.5" />
-                <circle r="8" fill="none" stroke="#00ffaa" strokeWidth="1.5" strokeDasharray="3 2" filter="url(#cyanGlow)" />
+              {/* Front Induction Motor */}
+              <g transform="translate(525, 200)">
+                <circle r="16" fill="rgba(2, 132, 199, 0.15)" stroke="#00f0ff" strokeWidth="1.5" />
+                <circle r="7" fill="none" stroke="#00ffaa" strokeWidth="1.5" strokeDasharray="3 2" filter="url(#cyanGlow)" />
                 <motion.circle
-                  r="4"
+                  r="3.5"
                   fill="#00ffaa"
-                  animate={{ scale: [0.8, 1.2, 0.8] }}
+                  animate={{ scale: [0.8, 1.25, 0.8] }}
                   transition={{ repeat: Infinity, duration: 1.2 }}
                 />
               </g>
 
-              {/* 4. Cockpit AI Core / ECU Processor */}
-              <g transform="translate(365, 155)">
-                <rect x="-14" y="-14" width="28" height="28" rx="4" fill="rgba(4, 20, 42, 0.9)" stroke="#00f0ff" strokeWidth="1.5" filter="url(#cyanGlow)" />
-                <circle r="6" fill="#00ffaa" filter="url(#intenseGlow)" />
-                {/* Traces radiating from processor */}
-                <path d="M 0 -14 L 0 -28 M 0 14 L 0 50 M -14 0 L -40 0 M 14 0 L 40 0" stroke="rgba(0, 240, 255, 0.4)" strokeWidth="1.2" strokeDasharray="2 2" />
+              {/* 4. Tesla Center Touchscreen (15" Horizontal Display) */}
+              <g transform="translate(378, 136)">
+                {/* Screen Mount / Stand */}
+                <line x1="0" y1="12" x2="0" y2="24" stroke="rgba(0, 240, 255, 0.6)" strokeWidth="1.5" />
+                {/* 15" Floating Horizontal Tablet */}
+                <rect x="-14" y="-8" width="28" height="18" rx="2" fill="rgba(4, 20, 42, 0.95)" stroke="#00f0ff" strokeWidth="1.5" filter="url(#cyanGlow)" />
+                {/* Mini Visualizer lines on screen */}
+                <line x1="-10" y1="-3" x2="-2" y2="-3" stroke="#00ffaa" strokeWidth="1.2" />
+                <line x1="-10" y1="2" x2="6" y2="2" stroke="#38bdf8" strokeWidth="1" />
+                <circle cx="8" cy="-2" r="2.5" fill="#00f0ff" />
               </g>
 
-              {/* 5. Roof LiDAR Sensor & Sweeping Wave */}
-              <g transform="translate(355, 84)">
-                <rect x="-10" y="-4" width="20" height="7" rx="3" fill="#00f0ff" filter="url(#cyanGlow)" />
+              {/* 5. Minimalist Steering Yoke Contour */}
+              <path
+                d="M 436 138 C 438 135 448 135 450 138 L 448 144 C 445 146 441 146 438 144 Z"
+                fill="none"
+                stroke="rgba(0, 240, 255, 0.7)"
+                strokeWidth="1.2"
+              />
+
+              {/* 6. Front & Rear Minimalist Seat Bolsters */}
+              <path
+                d="M 405 130 C 405 120 412 115 418 115 C 424 115 428 120 425 148 L 398 152"
+                fill="none"
+                stroke="rgba(0, 240, 255, 0.25)"
+                strokeWidth="1.2"
+              />
+              <path
+                d="M 285 130 C 285 120 292 115 298 115 C 304 115 308 120 305 148 L 278 152"
+                fill="none"
+                stroke="rgba(0, 240, 255, 0.2)"
+                strokeWidth="1.2"
+              />
+
+              {/* 7. Autopilot Windshield Camera Array (Subtle Vision Cone) */}
+              <g transform="translate(450, 108)">
+                <circle r="3" fill="#00ffaa" filter="url(#cyanGlow)" />
                 {progress > 0.25 && (
-                  <>
-                    <motion.circle
-                      r="12"
-                      fill="none"
-                      stroke="rgba(0, 240, 255, 0.6)"
-                      strokeWidth="1.2"
-                      initial={{ scale: 0.5, opacity: 1 }}
-                      animate={{ scale: 2.4, opacity: 0 }}
-                      transition={{ repeat: Infinity, duration: 1.4, ease: 'easeOut' }}
-                    />
-                    <motion.circle
-                      r="20"
-                      fill="none"
-                      stroke="rgba(0, 240, 255, 0.4)"
-                      strokeWidth="1"
-                      initial={{ scale: 0.5, opacity: 1 }}
-                      animate={{ scale: 2.8, opacity: 0 }}
-                      transition={{ repeat: Infinity, duration: 1.4, delay: 0.4, ease: 'easeOut' }}
-                    />
-                  </>
+                  <path
+                    d="M 3 0 L 35 -14 L 35 14 Z"
+                    fill="rgba(0, 255, 170, 0.06)"
+                    stroke="rgba(0, 255, 170, 0.3)"
+                    strokeWidth="0.8"
+                    strokeDasharray="2 2"
+                  />
                 )}
               </g>
 
-              {/* ── EXTERNAL CHASSIS & AERODYNAMIC BODYWORK ───────────── */}
+              {/* ── EXTERNAL CHASSIS & TESLA AERODYNAMIC BODYWORK ───────── */}
 
-              {/* Sleek Aerodynamic Body Silhouette */}
+              {/* The Iconic Tesla Sweeping Silhouette */}
               <path
                 d={`
-                  M 75 220
-                  L 120 220
-                  A 48 48 0 0 1 220 220
-                  L 460 220
-                  A 48 48 0 0 1 560 220
-                  L 595 218
-                  C 605 215 615 205 605 190
-                  L 565 178
-                  L 480 148
-                  L 410 118
-                  L 360 86
-                  C 340 85 270 88 230 102
-                  L 140 145
-                  L 85 162
-                  C 68 170 65 190 68 205
+                  M 85 195
+                  C 85 208, 98 218, 125 218
+                  L 133 218
+                  A 42 42 0 0 1 217 218
+                  L 483 218
+                  A 42 42 0 0 1 567 218
+                  L 590 218
+                  C 610 216, 630 208, 635 202
+                  C 638 196, 635 186, 628 178
+                  C 605 168, 555 156, 500 142
+                  C 440 102, 380 82, 330 82
+                  C 270 82, 200 98, 130 148
+                  C 115 150, 103 151, 98 155
+                  C 90 162, 85 178, 85 195
                   Z
                 `}
                 fill="rgba(0, 240, 255, 0.03)"
                 stroke="#00f0ff"
-                strokeWidth="2"
+                strokeWidth="2.2"
                 strokeLinecap="round"
                 strokeLinejoin="round"
                 filter="url(#cyanGlow)"
               />
 
-              {/* Aerodynamic Greenhouse / Windows */}
+              {/* All-Glass Panoramic Teardrop Window Canopy */}
               <path
                 d={`
-                  M 400 122
-                  L 355 93
-                  C 335 93 280 96 245 108
-                  L 175 145
-                  L 290 145
-                  L 395 145
+                  M 480 142
+                  C 425 106, 375 88, 330 88
+                  C 280 88, 225 102, 165 146
+                  L 480 142
                   Z
                 `}
-                fill="rgba(0, 240, 255, 0.07)"
-                stroke="rgba(0, 240, 255, 0.75)"
+                fill="rgba(0, 240, 255, 0.08)"
+                stroke="rgba(0, 240, 255, 0.8)"
                 strokeWidth="1.6"
               />
 
-              {/* B-Pillar & Door Seam */}
-              <line x1="290" y1="100" x2="290" y2="145" stroke="rgba(0, 240, 255, 0.6)" strokeWidth="1.5" />
-              <line x1="290" y1="145" x2="290" y2="206" stroke="rgba(0, 240, 255, 0.35)" strokeWidth="1.2" strokeDasharray="3 3" />
-              <line x1="400" y1="145" x2="400" y2="206" stroke="rgba(0, 240, 255, 0.35)" strokeWidth="1.2" strokeDasharray="3 3" />
+              {/* Frameless Window B-Pillar & Rear Quarter Glass */}
+              <line x1="325" y1="88" x2="325" y2="144" stroke="rgba(0, 240, 255, 0.6)" strokeWidth="1.8" />
+              <line x1="215" y1="108" x2="208" y2="145" stroke="rgba(0, 240, 255, 0.5)" strokeWidth="1.4" />
 
-              {/* Flush Door Handles */}
-              <rect x="305" y="152" width="22" height="3" rx="1.5" fill="#00f0ff" filter="url(#cyanGlow)" />
-              <rect x="415" y="152" width="22" height="3" rx="1.5" fill="#00f0ff" filter="url(#cyanGlow)" />
+              {/* Autopilot B-Pillar Camera */}
+              <circle cx="325" cy="115" r="2.5" fill="#00ffaa" filter="url(#cyanGlow)" />
 
-              {/* High-tech Character Body Crease */}
+              {/* Front Fender Autopilot Repeater Camera Blade */}
+              <rect x="478" y="150" width="5" height="11" rx="2" fill="#00f0ff" filter="url(#cyanGlow)" />
+              <circle cx="480.5" cy="155.5" r="1.5" fill="#ffffff" />
+
+              {/* Tesla Flush Door Handles */}
+              <rect x="350" y="152" width="22" height="3" rx="1.5" fill="#00f0ff" filter="url(#cyanGlow)" />
+              <rect x="245" y="152" width="22" height="3" rx="1.5" fill="#00f0ff" filter="url(#cyanGlow)" />
+
+              {/* Door Cutlines */}
+              <path d="M 325 144 L 325 214" stroke="rgba(0, 240, 255, 0.35)" strokeWidth="1.2" strokeDasharray="3 3" />
+              <path d="M 445 142 L 445 214" stroke="rgba(0, 240, 255, 0.35)" strokeWidth="1.2" strokeDasharray="3 3" />
+
+              {/* Sculpted Tesla Shoulder Body Crease */}
               <path
-                d="M 85 162 L 180 162 L 470 160 L 565 178"
+                d="M 98 155 C 150 152, 280 156, 480 154 L 575 166"
                 fill="none"
-                stroke="rgba(0, 240, 255, 0.5)"
+                stroke="rgba(0, 240, 255, 0.45)"
                 strokeWidth="1.2"
               />
 
-              {/* Front Matrix LED Headlight Blade */}
+              {/* Tesla Matrix LED Headlight (Eyebrow DRL Blade) */}
               <path
-                d="M 565 178 L 598 184 L 602 188"
+                d="M 628 178 L 575 166 L 590 172"
                 fill="none"
                 stroke="#ffffff"
-                strokeWidth="3"
+                strokeWidth="3.2"
                 filter="url(#intenseGlow)"
               />
 
-              {/* Rear Cyber Light Blade (OLED Taillight) */}
+              {/* Tesla Signature LED Taillight (Red OLED Blade) */}
               <path
-                d="M 72 170 L 92 165"
+                d="M 98 156 L 125 153"
                 fill="none"
-                stroke="#ff2a5f"
-                strokeWidth="3.5"
-                filter="url(#intenseGlow)"
+                stroke="#ff1744"
+                strokeWidth="3.6"
+                filter="url(#redGlow)"
               />
 
-              {/* ── HIGH-TECH MULTI-SPOKE AERO WHEELS ────────────────── */}
+              {/* ── HIGH-TECH TESLA ÜBERTURBINE AERO WHEELS ──────────── */}
 
-              {/* Rear Wheel (Aero Turbine Disc) */}
-              <g transform="translate(170, 220)">
-                {/* Tire Outer Glow */}
-                <circle r="44" fill="none" stroke="rgba(0, 240, 255, 0.25)" strokeWidth="5" />
-                <circle r="40" fill="rgba(3, 14, 28, 0.9)" stroke="#00f0ff" strokeWidth="2" filter="url(#cyanGlow)" />
-                {/* Wheel Turbine Blades */}
-                <motion.g animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 4, ease: 'linear' }}>
-                  {[0, 45, 90, 135, 180, 225, 270, 315].map(deg => (
-                    <line
-                      key={deg}
-                      x1="0" y1="0" x2={35 * Math.cos((deg * Math.PI) / 180)} y2={35 * Math.sin((deg * Math.PI) / 180)}
-                      stroke="rgba(0, 240, 255, 0.7)"
-                      strokeWidth="1.5"
-                    />
-                  ))}
-                  <circle r="14" fill="#041220" stroke="#00f0ff" strokeWidth="2" />
-                  {/* Hexagon Hub */}
-                  <polygon
-                    points="0,-8 7,-4 7,4 0,8 -7,4 -7,-4"
-                    fill="none"
-                    stroke="#00ffaa"
-                    strokeWidth="1.5"
-                  />
+              {/* Rear Wheel (Überturbine Aero Wheel) */}
+              <g transform="translate(175, 200)">
+                {/* Outer Tire & Stance */}
+                <circle r="36" fill="none" stroke="rgba(0, 240, 255, 0.25)" strokeWidth="4.5" />
+                <circle r="33" fill="rgba(3, 14, 28, 0.95)" stroke="#00f0ff" strokeWidth="2" filter="url(#cyanGlow)" />
+                {/* Performance Red Brake Caliper */}
+                <path
+                  d="M -14 -16 A 20 20 0 0 1 -4 -20 L -2 -14 A 14 14 0 0 0 -10 -11 Z"
+                  fill="#ff1744"
+                  filter="url(#redGlow)"
+                />
+                {/* 10-Spoke Directional Turbine Blades */}
+                <motion.g animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 3.5, ease: 'linear' }}>
+                  {[0, 36, 72, 108, 144, 180, 216, 252, 288, 324].map(deg => {
+                    const rad = (deg * Math.PI) / 180
+                    const radEnd = ((deg + 14) * Math.PI) / 180
+                    return (
+                      <line
+                        key={deg}
+                        x1={8 * Math.cos(rad)}
+                        y1={8 * Math.sin(rad)}
+                        x2={28 * Math.cos(radEnd)}
+                        y2={28 * Math.sin(radEnd)}
+                        stroke="rgba(0, 240, 255, 0.75)"
+                        strokeWidth="1.6"
+                      />
+                    )
+                  })}
+                  <circle r="10" fill="#041220" stroke="#00f0ff" strokeWidth="1.8" />
+                  {/* Central Tesla "T" Accent */}
+                  <path d="M -4 -3 L 4 -3 M 0 -3 L 0 4" stroke="#00ffaa" strokeWidth="1.5" strokeLinecap="round" />
                 </motion.g>
               </g>
 
-              {/* Front Wheel (Aero Turbine Disc) */}
-              <g transform="translate(510, 220)">
-                {/* Tire Outer Glow */}
-                <circle r="44" fill="none" stroke="rgba(0, 240, 255, 0.25)" strokeWidth="5" />
-                <circle r="40" fill="rgba(3, 14, 28, 0.9)" stroke="#00f0ff" strokeWidth="2" filter="url(#cyanGlow)" />
-                {/* Wheel Turbine Blades */}
-                <motion.g animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 4, ease: 'linear' }}>
-                  {[0, 45, 90, 135, 180, 225, 270, 315].map(deg => (
-                    <line
-                      key={deg}
-                      x1="0" y1="0" x2={35 * Math.cos((deg * Math.PI) / 180)} y2={35 * Math.sin((deg * Math.PI) / 180)}
-                      stroke="rgba(0, 240, 255, 0.7)"
-                      strokeWidth="1.5"
-                    />
-                  ))}
-                  <circle r="14" fill="#041220" stroke="#00f0ff" strokeWidth="2" />
-                  {/* Hexagon Hub */}
-                  <polygon
-                    points="0,-8 7,-4 7,4 0,8 -7,4 -7,-4"
-                    fill="none"
-                    stroke="#00ffaa"
-                    strokeWidth="1.5"
-                  />
+              {/* Front Wheel (Überturbine Aero Wheel) */}
+              <g transform="translate(525, 200)">
+                {/* Outer Tire & Stance */}
+                <circle r="36" fill="none" stroke="rgba(0, 240, 255, 0.25)" strokeWidth="4.5" />
+                <circle r="33" fill="rgba(3, 14, 28, 0.95)" stroke="#00f0ff" strokeWidth="2" filter="url(#cyanGlow)" />
+                {/* Performance Red Brake Caliper */}
+                <path
+                  d="M -14 -16 A 20 20 0 0 1 -4 -20 L -2 -14 A 14 14 0 0 0 -10 -11 Z"
+                  fill="#ff1744"
+                  filter="url(#redGlow)"
+                />
+                {/* 10-Spoke Directional Turbine Blades */}
+                <motion.g animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 3.5, ease: 'linear' }}>
+                  {[0, 36, 72, 108, 144, 180, 216, 252, 288, 324].map(deg => {
+                    const rad = (deg * Math.PI) / 180
+                    const radEnd = ((deg + 14) * Math.PI) / 180
+                    return (
+                      <line
+                        key={deg}
+                        x1={8 * Math.cos(rad)}
+                        y1={8 * Math.sin(rad)}
+                        x2={28 * Math.cos(radEnd)}
+                        y2={28 * Math.sin(radEnd)}
+                        stroke="rgba(0, 240, 255, 0.75)"
+                        strokeWidth="1.6"
+                      />
+                    )
+                  })}
+                  <circle r="10" fill="#041220" stroke="#00f0ff" strokeWidth="1.8" />
+                  {/* Central Tesla "T" Accent */}
+                  <path d="M -4 -3 L 4 -3 M 0 -3 L 0 4" stroke="#00ffaa" strokeWidth="1.5" strokeLinecap="round" />
                 </motion.g>
               </g>
 
               {/* ── DYNAMIC HOLOGRAPHIC VERTICAL LASER SCANNER ───────── */}
               <motion.g
-                initial={{ x: 60 }}
-                animate={{ x: [60, 610, 60] }}
+                initial={{ x: 75 }}
+                animate={{ x: [75, 635, 75] }}
                 transition={{ repeat: Infinity, duration: 2.2, ease: 'easeInOut' }}
               >
                 {/* Vertical laser beam curtain */}
-                <rect x="-24" y="60" width="24" height="190" fill="url(#laserBeam)" opacity={0.6} />
+                <rect x="-24" y="65" width="24" height="175" fill="url(#laserBeam)" opacity={0.65} />
                 {/* Primary laser stroke */}
-                <line x1="0" y1="55" x2="0" y2="245" stroke="#ffffff" strokeWidth="2.5" filter="url(#intenseGlow)" />
+                <line x1="0" y1="60" x2="0" y2="238" stroke="#ffffff" strokeWidth="2.5" filter="url(#intenseGlow)" />
                 {/* Top & Bottom Emitter Nodes */}
-                <circle cx="0" cy="55" r="4" fill="#00ffaa" filter="url(#intenseGlow)" />
-                <circle cx="0" cy="245" r="4" fill="#00ffaa" filter="url(#intenseGlow)" />
+                <circle cx="0" cy="60" r="3.5" fill="#00ffaa" filter="url(#intenseGlow)" />
+                <circle cx="0" cy="238" r="3.5" fill="#00ffaa" filter="url(#intenseGlow)" />
               </motion.g>
             </svg>
           </div>
