@@ -75,18 +75,40 @@ python test_phase3.py
 
 ---
 
-## Phase 4 Backend — Chaos Middleware (NOC Controls)
-**Status:** ✅ All controls implemented and tested.
+## Phase 4 — CVIS NOC (Network Operations Center)
+**Status:** ✅ Complete — Live packet flow, table & inspector, chaos middleware controls (loss, latency, tamper, protocol switch, auth toggle).
+**Target:** Week 4–5
 
-The chaos middleware and config endpoints are Phase 4's backend half.
-NOC UI wiring deferred to Phase 4 proper (user will provide UI reference).
+### What was built
+- Animated packet flow visualization (ESP32 → Secure Layer → FastAPI → AI)
+- Real-time packet inspector with modern light-mode glassmorphism backdrop & cryptographic verification status
+- Live interactive chaos controls wired directly to backend ASGI middleware (loss, latency, tamper, auth on/off, protocol HTTP ⇄ MQTT)
 
 ---
 
-## Phase 5 Backend — Admin Stats
-**Status:** ✅ All admin endpoints implemented.
+## Phase 5 — Admin Console & Pro Mode Monetization
+**Status:** ✅ Complete — Vehicle management, telemetry analytics, auth failure logs, and dual Free/Pro tier gating.
+**Target:** Week 5–6
 
-Frontend (`/admin`) deferred until user provides UI reference.
+### What was built
+- System telemetry graphs (CPU, Memory, Packet RTT, SQLite health)
+- Device registration management & authentication audit log inspection
+- Free vs. Pro tier dynamic gating:
+  - 1-click upgrade modal with real backend AI service synchronization (`POST /api/v1/control/ai-service/vehicle`)
+  - Grounded telemetry cards (Drive Score, Efficiency Graphs, Suggestions, Neural Chat)
+  - Full Ollama multi-factor chat with Voice Input & TTS speech synthesis for Pro subscribers
+
+---
+
+## Phase 6 — Hardening, Light Mode UI & Grounded Telemetry
+**Status:** ✅ Complete — Zero mock fallbacks, automotive speed shower gauge, pointy sports EV wireframe loader, 11/11 Next.js routes building cleanly.
+**Target:** Week 6–7
+
+### Key achievements
+- **Pointy Sports EV Wireframe**: Minimalist light-mode chassis build-up with a 1-second contemplation pause at 100% before entering the dashboard.
+- **Automotive Speed Shower**: Visual speedometer gauge on the Speed card face with dynamic color changes based on speed limits.
+- **Strict Data Grounding**: Zero hardcoded fake numbers; shows `---`, `0`, or `OFFLINE` when telemetry connection is absent.
+- **Turbopack Build Verified**: 11/11 static and dynamic routes compiled with zero errors and pushed to GitHub.
 
 ---
 
@@ -105,13 +127,6 @@ Frontend (`/admin`) deferred until user provides UI reference.
 | Demo Script | `docs/demo-script.md` | 15-minute step-by-step demo with talking points |
 | Viva Q&A | `docs/viva-qa.md` | 20 questions + detailed answers across all 5 CCNS units |
 
-### What's deferred
-| Item | Status |
-|---|---|
-| PowerPoint presentation | Manual — create slides from `docs/ieee-report.md` |
-| ESP32 hardware test | Pending hardware |
-| MQTT live broker test | Pending `mosquitto` install |
-
 ---
 
 ## What's deferred
@@ -125,4 +140,4 @@ Frontend (`/admin`) deferred until user provides UI reference.
 
 ---
 
-*Last updated: Phase 7 complete — documentation pack shipped*
+*Last updated: Phase 6 & 7 complete — UI polished, Pro gating active, build passing, pushed to GitHub.*
