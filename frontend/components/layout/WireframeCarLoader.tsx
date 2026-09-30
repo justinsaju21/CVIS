@@ -2,272 +2,842 @@
 
 import { useEffect, useState, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
+import { Cpu, ShieldCheck, Activity, Radio, ChevronRight, Zap } from 'lucide-react'
 
 interface Props {
   onComplete?: () => void
   message?: string
 }
 
-// Wireframe car SVG paths — side profile of a sedan
-// Broken into segments that light up one by one
-const CAR_PATHS = [
-  // 1. Outline segments (Cybertruck profile)
-  { d: 'M 40 100 L 220 50', delay: 0.0, dur: 0.6 }, // Vault (roof to tailgate)
-  { d: 'M 220 50 L 330 95 L 420 115', delay: 0.6, dur: 0.8 }, // Windshield & Hood
-  { d: 'M 420 115 L 420 130 L 410 140 L 395 145', delay: 1.4, dur: 0.5 }, // Nose & Front Bumper
-  { d: 'M 395 145 L 380 110 L 325 110 L 310 145', delay: 1.9, dur: 0.6 }, // Front Arch (Angular)
-  { d: 'M 310 145 L 155 145', delay: 2.5, dur: 0.5 }, // Side skirt
-  { d: 'M 155 145 L 140 110 L 85 110 L 70 145', delay: 3.0, dur: 0.6 }, // Rear Arch (Angular)
-  { d: 'M 70 145 L 55 145 L 45 140 L 40 100', delay: 3.6, dur: 0.6 }, // Rear bumper & tailgate
+// Total duration in seconds (snappy yet cinematic)
+const TOTAL_DURATION = 2.8
 
-  // 2. Windows / Greenhouse (Angular)
-  { d: 'M 220 58 L 150 82 L 150 97 L 315 97 L 330 87 Z', delay: 1.0, dur: 1.5 }, // Window outline
-  { d: 'M 230 65 L 235 97', delay: 2.5, dur: 0.3 }, // B-pillar
-
-  // 3. Wheels (Chunky Hex/Circles)
-  { d: 'M 327.5 145 A 25 25 0 1 0 377.5 145 A 25 25 0 1 0 327.5 145', delay: 4.0, dur: 0.6 }, // front wheel
-  { d: 'M 352.5 135 L 361 140 L 361 150 L 352.5 155 L 344 150 L 344 140 Z', delay: 4.2, dur: 0.5 }, // front hex hub
-  { d: 'M 87.5 145 A 25 25 0 1 0 137.5 145 A 25 25 0 1 0 87.5 145', delay: 4.5, dur: 0.6 }, // rear wheel
-  { d: 'M 112.5 135 L 121 140 L 121 150 L 112.5 155 L 104 150 L 104 140 Z', delay: 4.7, dur: 0.5 }, // rear hex hub
-
-  // 4. Character Lines & Details
-  { d: 'M 420 115 L 40 100', delay: 5.0, dur: 1.0 }, // Main angular body crease
-  { d: 'M 235 97 L 235 145', delay: 5.5, dur: 0.3 }, // Front door gap
-  { d: 'M 160 97 L 160 145', delay: 5.7, dur: 0.3 }, // Rear door gap
-  
-  // 5. Door Handles & Lights
-  { d: 'M 175 105 L 185 105', delay: 6.0, dur: 0.1 }, // Rear door handle
-  { d: 'M 250 105 L 260 105', delay: 6.1, dur: 0.1 }, // Front door handle
-  { d: 'M 420 115 L 410 115', delay: 6.2, dur: 0.2 }, // Headlight slit
-  { d: 'M 40 100 L 45 102', delay: 6.3, dur: 0.2 }, // Taillight slit
+// Real-time boot diagnostics log messages mapped to progress intervals
+const STAGES = [
+  { threshold: 0.15, text: 'INITIALIZING CAN-BUS TELEMETRY & TLS 1.3 HANDSHAKE...' },
+  { threshold: 0.40, text: 'VALIDATING HMAC-SHA256 INTEGRITY & DEVICE PROVISIONING...' },
+  { threshold: 0.65, text: 'CALIBRATING 800V BMS BATTERY MATRIX & DUAL MOTOR INVERTERS...' },
+  { threshold: 0.88, text: 'SPAWNING OLLAMA 3.2 3B MULTI-FACTOR REASONING PIPELINE...' },
+  { threshold: 0.98, text: 'SYNCHRONIZING FULL-DUPLEX WEBSOCKET TELEMETRY STREAM...' },
+  { threshold: 1.00, text: 'ALL SYSTEMS NOMINAL // ENGAGING VIRTUAL DRIVE COCKPIT...' },
 ]
 
-const TOTAL_DURATION = 7.0
-
-export default function WireframeCarLoader({ onComplete, message = 'Connecting to CVIS...' }: Props) {
-  const [progress,   setProgress]   = useState(0)
-  const [phase,      setPhase]      = useState<'drawing' | 'glowing' | 'done'>('drawing')
-  const [show,       setShow]       = useState(true)
+export default function WireframeCarLoader({ onComplete, message = 'Initializing Console...' }: Props) {
+  const [progress, setProgress] = useState(0)
+  const [isFinishing, setIsFinishing] = useState(false)
   const startTime = useRef(Date.now())
-  const raf       = useRef<number | null>(null)
+  const raf = useRef<number | null>(null)
 
   useEffect(() => {
     const tick = () => {
       const elapsed = (Date.now() - startTime.current) / 1000
-      const pct     = Math.min(elapsed / TOTAL_DURATION, 1)
+      const pct = Math.min(elapsed / TOTAL_DURATION, 1)
       setProgress(pct)
 
-      if (pct >= 1 && phase === 'drawing') {
-        setPhase('glowing')
-        setTimeout(() => {
-          setPhase('done')
-          setTimeout(() => {
-            setShow(false)
-            onComplete?.()
-          }, 600)
-        }, 800)
-        return
-      }
-      if (pct < 1) {
+      if (pct >= 1) {
+        setIsFinishing(true)
+        const timeout = setTimeout(() => {
+          onComplete?.()
+        }, 400)
+        return () => clearTimeout(timeout)
+      } else {
         raf.current = requestAnimationFrame(tick)
       }
     }
-    raf.current = requestAnimationFrame(tick)
-    return () => { if (raf.current) cancelAnimationFrame(raf.current) }
-  }, [phase, onComplete])
 
-  const pathLength = 800
+    raf.current = requestAnimationFrame(tick)
+    return () => {
+      if (raf.current) cancelAnimationFrame(raf.current)
+    }
+  }, [onComplete])
+
+  // Current diagnostic message
+  const currentMessage = STAGES.find(s => progress <= s.threshold)?.text || STAGES[STAGES.length - 1].text
+  const pctInt = Math.round(progress * 100)
+
+  // Subsystem states
+  const telemetryOk = progress >= 0.25
+  const authOk = progress >= 0.50
+  const aiOk = progress >= 0.75
+  const wsOk = progress >= 0.92
 
   return (
     <AnimatePresence>
-      {show && (
-        <motion.div
-          initial={{ opacity: 1 }}
-          exit={{ opacity: 0, scale: 1.04 }}
-          transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
-          style={{
-            position: 'fixed',
-            inset: 0,
-            zIndex: 9999,
-            background: 'radial-gradient(ellipse at center, #050a0f 0%, #000000 70%)',
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: 40,
-          }}
-        >
-          {/* Aurora blobs */}
-          <div style={{ position: 'absolute', inset: 0, overflow: 'hidden', pointerEvents: 'none' }}>
-            <div className="aurora-1" style={{
-              position: 'absolute', top: '20%', left: '15%',
-              width: 600, height: 600,
-              background: 'radial-gradient(circle, rgba(0,212,255,0.06) 0%, transparent 70%)',
-              borderRadius: '50%',
-            }} />
-            <div className="aurora-2" style={{
-              position: 'absolute', bottom: '10%', right: '10%',
-              width: 500, height: 500,
-              background: 'radial-gradient(circle, rgba(0,100,255,0.05) 0%, transparent 70%)',
-              borderRadius: '50%',
-            }} />
-          </div>
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0, scale: 1.03 }}
+        transition={{ duration: 0.45, ease: [0.16, 1, 0.3, 1] }}
+        style={{
+          position: 'fixed',
+          inset: 0,
+          zIndex: 99999,
+          background: 'radial-gradient(ellipse at 50% 35%, #051424 0%, #02060b 55%, #000204 100%)',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          padding: '24px 20px',
+          overflow: 'hidden',
+          userSelect: 'none',
+          color: '#ffffff',
+          fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif",
+        }}
+      >
+        {/* Background Cyber Ambient Grid & Horizon */}
+        <div style={{ position: 'absolute', inset: 0, overflow: 'hidden', pointerEvents: 'none' }}>
+          {/* Subtle cyan glow spotlight */}
+          <div style={{
+            position: 'absolute',
+            top: '30%',
+            left: '50%',
+            transform: 'translate(-50%, -50%)',
+            width: 700,
+            height: 350,
+            background: 'radial-gradient(ellipse, rgba(0, 240, 255, 0.12) 0%, rgba(2, 132, 199, 0.04) 50%, transparent 75%)',
+            filter: 'blur(40px)',
+          }} />
 
-          {/* CVIS Brand */}
-          <motion.div
-            initial={{ opacity: 0, y: -20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.2, duration: 0.6 }}
-            style={{ textAlign: 'center' }}
-          >
-            <div className="font-display" style={{
-              fontSize: 13,
-              letterSpacing: '0.3em',
-              color: 'var(--cyan)',
-              marginBottom: 8,
+          {/* Perspective 3D floor grid */}
+          <div style={{
+            position: 'absolute',
+            bottom: 0,
+            left: '-20%',
+            right: '-20%',
+            height: '45%',
+            backgroundImage: `
+              linear-gradient(rgba(0, 240, 255, 0.08) 1px, transparent 1px),
+              linear-gradient(90deg, rgba(0, 240, 255, 0.08) 1px, transparent 1px)
+            `,
+            backgroundSize: '40px 40px',
+            transform: 'perspective(500px) rotateX(65deg)',
+            transformOrigin: 'bottom center',
+            maskImage: 'linear-gradient(to top, rgba(0,0,0,0.8) 0%, rgba(0,0,0,0.2) 60%, transparent 100%)',
+            WebkitMaskImage: 'linear-gradient(to top, rgba(0,0,0,0.8) 0%, rgba(0,0,0,0.2) 60%, transparent 100%)',
+          }} />
+
+          {/* Ambient horizontal scanline */}
+          <div style={{
+            position: 'absolute',
+            inset: 0,
+            backgroundImage: 'repeating-linear-gradient(0deg, transparent, transparent 3px, rgba(0, 240, 255, 0.015) 3px, rgba(0, 240, 255, 0.015) 4px)',
+            opacity: 0.7,
+          }} />
+        </div>
+
+        {/* ── TOP HUD HEADER ──────────────────────────────────────────────── */}
+        <div style={{
+          width: '100%',
+          maxWidth: 960,
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'flex-start',
+          position: 'relative',
+          zIndex: 10,
+          borderBottom: '1px solid rgba(0, 240, 255, 0.12)',
+          paddingBottom: 14,
+        }}>
+          {/* Top Left: System Title & Badges */}
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+              <span style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 5,
+                background: 'rgba(0, 240, 255, 0.12)',
+                border: '1px solid rgba(0, 240, 255, 0.3)',
+                padding: '2px 8px',
+                borderRadius: 4,
+                fontSize: 10,
+                letterSpacing: '0.15em',
+                fontWeight: 700,
+                color: '#38bdf8',
+                fontFamily: "'Space Mono', monospace",
+              }}>
+                <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#00f0ff', boxShadow: '0 0 8px #00f0ff' }} />
+                CVIS v2.4-ONLINE
+              </span>
+              <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.45)', fontFamily: "'Space Mono', monospace" }}>
+                // PROTOCOL: HYBRID (HTTP+MQTT)
+              </span>
+            </div>
+            <h1 style={{
+              fontSize: 18,
+              fontWeight: 800,
+              letterSpacing: '0.18em',
+              color: '#ffffff',
               textTransform: 'uppercase',
+              textShadow: '0 0 20px rgba(0, 240, 255, 0.4)',
+              margin: 0,
             }}>
               Connected Vehicle Intelligence System
+            </h1>
+          </div>
+
+          {/* Top Right: Aerospace Coordinate / Telemetry Specs */}
+          <div style={{ textAlign: 'right', display: 'flex', flexDirection: 'column', gap: 3 }}>
+            <div style={{ fontSize: 11, fontFamily: "'Space Mono', monospace", color: '#38bdf8', letterSpacing: '0.08em' }}>
+              TELEMETRY: <span style={{ color: '#00ffaa' }}>SYNCING</span>
+            </div>
+            <div style={{ fontSize: 10, fontFamily: "'Space Mono', monospace", color: 'rgba(255,255,255,0.45)' }}>
+              NODE: ESP32-VEHICLE-01 · 800V BMS
+            </div>
+          </div>
+        </div>
+
+        {/* ── CENTER VEHICLE HOLOGRAM ────────────────────────────────────── */}
+        <div style={{
+          position: 'relative',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          flex: 1,
+          width: '100%',
+          maxWidth: 860,
+          margin: '10px 0',
+          zIndex: 10,
+        }}>
+          {/* Hologram Reticle Frame / Tech Markers */}
+          <div style={{
+            position: 'absolute',
+            inset: '5% 2%',
+            border: '1px solid rgba(0, 240, 255, 0.08)',
+            borderRadius: 12,
+            pointerEvents: 'none',
+          }}>
+            {/* Corner Bracket Accents */}
+            <div style={{ position: 'absolute', top: -1, left: -1, width: 14, height: 14, borderTop: '2px solid #00f0ff', borderLeft: '2px solid #00f0ff' }} />
+            <div style={{ position: 'absolute', top: -1, right: -1, width: 14, height: 14, borderTop: '2px solid #00f0ff', borderRight: '2px solid #00f0ff' }} />
+            <div style={{ position: 'absolute', bottom: -1, left: -1, width: 14, height: 14, borderBottom: '2px solid #00f0ff', borderLeft: '2px solid #00f0ff' }} />
+            <div style={{ position: 'absolute', bottom: -1, right: -1, width: 14, height: 14, borderBottom: '2px solid #00f0ff', borderRight: '2px solid #00f0ff' }} />
+          </div>
+
+          {/* Floating Sensor Callout Badges */}
+          <motion.div
+            initial={{ opacity: 0, x: -15 }}
+            animate={{ opacity: progress > 0.35 ? 1 : 0.2, x: 0 }}
+            transition={{ duration: 0.5 }}
+            style={{
+              position: 'absolute',
+              top: '12%',
+              left: '4%',
+              background: 'rgba(4, 16, 32, 0.8)',
+              border: '1px solid rgba(0, 240, 255, 0.25)',
+              borderRadius: 6,
+              padding: '6px 12px',
+              backdropFilter: 'blur(8px)',
+              pointerEvents: 'none',
+              boxShadow: '0 4px 16px rgba(0,0,0,0.5)',
+            }}
+          >
+            <div style={{ fontSize: 9, color: '#38bdf8', fontFamily: "'Space Mono', monospace", fontWeight: 700 }}>
+              [ 01 // LIDAR MATRIX ]
+            </div>
+            <div style={{ fontSize: 11, color: '#ffffff', fontWeight: 600 }}>
+              Roof Array · 250m FOV
             </div>
           </motion.div>
 
-          {/* Wireframe car SVG */}
           <motion.div
-            initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ delay: 0.3, duration: 0.5 }}
-            style={{ position: 'relative' }}
-          >
-            {/* Glow backdrop */}
-            <div style={{
+            initial={{ opacity: 0, x: 15 }}
+            animate={{ opacity: progress > 0.65 ? 1 : 0.2, x: 0 }}
+            transition={{ duration: 0.5 }}
+            style={{
               position: 'absolute',
-              inset: '-40px',
-              background: 'radial-gradient(ellipse at center, rgba(0,212,255,0.08) 0%, transparent 70%)',
-              borderRadius: '50%',
+              top: '12%',
+              right: '4%',
+              background: 'rgba(4, 16, 32, 0.8)',
+              border: '1px solid rgba(0, 240, 255, 0.25)',
+              borderRadius: 6,
+              padding: '6px 12px',
+              backdropFilter: 'blur(8px)',
               pointerEvents: 'none',
-              opacity: phase === 'glowing' ? 1 : 0,
-              transition: 'opacity 0.5s',
-            }} />
-
-            <svg
-              viewBox="0 0 440 230"
-              width={Math.min(480, typeof window !== 'undefined' ? window.innerWidth * 0.85 : 480)}
-              style={{ overflow: 'visible' }}
-            >
-              {/* Dark fill */}
-              <path
-                d="M 50 160 C 45 160 40 155 40 145 C 40 125 45 115 55 112 C 60 110 70 108 80 108 C 120 95 180 65 240 55 C 270 52 290 55 315 65 C 340 75 360 90 380 105 C 410 115 435 125 440 135 C 445 140 445 155 430 160 L 405 160 C 405 128 345 128 345 160 L 145 160 C 145 128 85 128 85 160 L 50 160 Z"
-                fill="rgba(0,212,255,0.02)"
-                stroke="none"
-              />
-
-              {/* Animated strokes */}
-              {CAR_PATHS.map((p, i) => {
-                const pathProgress = Math.max(0, Math.min(1,
-                  (progress * TOTAL_DURATION - p.delay) / p.dur
-                ))
-                const glowIntensity = phase === 'glowing' ? 1 : pathProgress
-
-                return (
-                  <path
-                    key={i}
-                    d={p.d}
-                    fill="none"
-                    stroke={`rgba(0,212,255,${0.3 + glowIntensity * 0.7})`}
-                    strokeWidth={phase === 'glowing' ? 2 : 1.5}
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeDasharray={pathLength}
-                    strokeDashoffset={pathLength * (1 - pathProgress)}
-                    style={{
-                      filter: pathProgress > 0.5
-                        ? `drop-shadow(0 0 ${4 + glowIntensity * 8}px rgba(0,212,255,${glowIntensity * 0.8}))`
-                        : 'none',
-                      transition: 'filter 0.3s, stroke 0.3s',
-                    }}
-                  />
-                )
-              })}
-
-
-
-              {/* Node dots at key points */}
-              {[
-                { cx: 115, cy: 160 }, { cx: 375, cy: 160 },  // wheel centers
-                { cx: 245, cy: 62 },                           // B-pillar top
-                { cx: 200, cy: 70 },                          // C-pillar top
-                { cx: 440, cy: 135 },                         // Headlight tip
-              ].map((pt, i) => (
-                <motion.circle
-                  key={i}
-                  cx={pt.cx} cy={pt.cy} r={3}
-                  fill="var(--cyan)"
-                  initial={{ opacity: 0, scale: 0 }}
-                  animate={progress > 0.7 ? { opacity: [0, 1, 0.6], scale: [0, 1.5, 1] } : { opacity: 0 }}
-                  transition={{ delay: i * 0.1, duration: 0.4 }}
-                  style={{ filter: 'drop-shadow(0 0 6px rgba(0,212,255,0.8))' }}
-                />
-              ))}
-            </svg>
+              textAlign: 'right',
+              boxShadow: '0 4px 16px rgba(0,0,0,0.5)',
+            }}
+          >
+            <div style={{ fontSize: 9, color: '#38bdf8', fontFamily: "'Space Mono', monospace", fontWeight: 700 }}>
+              [ 02 // AI NEURAL CORE ]
+            </div>
+            <div style={{ fontSize: 11, color: '#00ffaa', fontWeight: 600 }}>
+              Ollama 3B Multi-Factor OK
+            </div>
           </motion.div>
 
-          {/* Progress bar + status */}
-          <div style={{ width: Math.min(400, typeof window !== 'undefined' ? window.innerWidth * 0.8 : 400) }}>
+          <motion.div
+            initial={{ opacity: 0, y: 15 }}
+            animate={{ opacity: progress > 0.5 ? 1 : 0.2, y: 0 }}
+            transition={{ duration: 0.5 }}
+            style={{
+              position: 'absolute',
+              bottom: '10%',
+              left: '6%',
+              background: 'rgba(4, 16, 32, 0.8)',
+              border: '1px solid rgba(0, 240, 255, 0.25)',
+              borderRadius: 6,
+              padding: '6px 12px',
+              backdropFilter: 'blur(8px)',
+              pointerEvents: 'none',
+              boxShadow: '0 4px 16px rgba(0,0,0,0.5)',
+            }}
+          >
+            <div style={{ fontSize: 9, color: '#38bdf8', fontFamily: "'Space Mono', monospace", fontWeight: 700 }}>
+              [ 03 // 800V ARCHITECTURE ]
+            </div>
+            <div style={{ fontSize: 11, color: '#ffffff', fontWeight: 600 }}>
+              Dual Motor Inverters · Active
+            </div>
+          </motion.div>
+
+          {/* SVG Futuristic EV Wireframe Vehicle */}
+          <div style={{ width: '100%', maxWidth: 720, position: 'relative' }}>
+            <svg
+              viewBox="0 0 680 290"
+              style={{ width: '100%', height: 'auto', overflow: 'visible' }}
+            >
+              <defs>
+                {/* Glow Filter */}
+                <filter id="cyanGlow" x="-20%" y="-20%" width="140%" height="140%">
+                  <feGaussianBlur stdDeviation="3.5" result="blur" />
+                  <feMerge>
+                    <feMergeNode in="blur" />
+                    <feMergeNode in="SourceGraphic" />
+                  </feMerge>
+                </filter>
+                <filter id="intenseGlow" x="-30%" y="-30%" width="160%" height="160%">
+                  <feGaussianBlur stdDeviation="7" result="blur1" />
+                  <feGaussianBlur stdDeviation="3" result="blur2" />
+                  <feMerge>
+                    <feMergeNode in="blur1" />
+                    <feMergeNode in="blur2" />
+                    <feMergeNode in="SourceGraphic" />
+                  </feMerge>
+                </filter>
+
+                {/* Laser scan gradient */}
+                <linearGradient id="laserBeam" x1="0%" y1="0%" x2="100%" y2="0%">
+                  <stop offset="0%" stopColor="transparent" />
+                  <stop offset="50%" stopColor="rgba(0, 240, 255, 0.35)" />
+                  <stop offset="100%" stopColor="#00f0ff" />
+                </linearGradient>
+
+                {/* Battery gradient */}
+                <linearGradient id="battGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+                  <stop offset="0%" stopColor="#0284c7" />
+                  <stop offset="50%" stopColor="#00f0ff" />
+                  <stop offset="100%" stopColor="#00ffaa" />
+                </linearGradient>
+
+                {/* Headlight beam */}
+                <linearGradient id="headlightBeam" x1="0%" y1="0%" x2="100%" y2="0%">
+                  <stop offset="0%" stopColor="rgba(0, 240, 255, 0.5)" />
+                  <stop offset="100%" stopColor="rgba(0, 240, 255, 0)" />
+                </linearGradient>
+              </defs>
+
+              {/* Holographic Ground Shadow / Underglow */}
+              <ellipse
+                cx="340" cy="240" rx="270" ry="22"
+                fill="radial-gradient(ellipse, rgba(0, 240, 255, 0.18) 0%, transparent 70%)"
+                opacity={0.4 + progress * 0.6}
+              />
+
+              {/* Headlight Projector Cones (Front Beam) */}
+              <motion.polygon
+                points="560,178 680,165 680,225 560,188"
+                fill="url(#headlightBeam)"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: progress > 0.4 ? [0.4, 0.7, 0.5] : 0 }}
+                transition={{ repeat: Infinity, duration: 2 }}
+              />
+
+              {/* ── INTERNAL X-RAY TELEMETRY LAYER ────────────────────── */}
+              
+              {/* 1. 800V Battery Modular Pack (Underfloor Matrix) */}
+              <g opacity={progress > 0.3 ? 1 : 0.2} style={{ transition: 'opacity 0.4s' }}>
+                {/* Pack Tray */}
+                <rect
+                  x="200" y="206" width="280" height="18" rx="4"
+                  fill="rgba(2, 132, 199, 0.08)"
+                  stroke="rgba(0, 240, 255, 0.4)"
+                  strokeWidth="1.5"
+                  strokeDasharray="4 2"
+                />
+                {/* Individual Battery Cells */}
+                {[0, 1, 2, 3, 4, 5, 6, 7].map(idx => {
+                  const cellActive = progress >= (0.35 + idx * 0.05)
+                  return (
+                    <rect
+                      key={idx}
+                      x={210 + idx * 33} y="210" width="24" height="10" rx="2"
+                      fill={cellActive ? 'url(#battGrad)' : 'rgba(0, 240, 255, 0.1)'}
+                      stroke={cellActive ? '#00f0ff' : 'rgba(0, 240, 255, 0.2)'}
+                      strokeWidth="1"
+                      filter={cellActive ? 'url(#cyanGlow)' : 'none'}
+                    />
+                  )
+                })}
+              </g>
+
+              {/* 2. High Voltage Conduits connecting Motors & Battery */}
+              <path
+                d="M 170 215 L 200 215 M 480 215 L 510 215"
+                fill="none"
+                stroke="#00f0ff"
+                strokeWidth="2"
+                strokeDasharray="6 3"
+                filter="url(#cyanGlow)"
+                opacity={progress > 0.4 ? 1 : 0.2}
+              />
+
+              {/* 3. Dual Electric Drive Motors (Front & Rear Axles) */}
+              {/* Rear Motor */}
+              <g transform="translate(170, 215)">
+                <circle r="18" fill="rgba(2, 132, 199, 0.15)" stroke="#00f0ff" strokeWidth="1.5" />
+                <circle r="8" fill="none" stroke="#00ffaa" strokeWidth="1.5" strokeDasharray="3 2" filter="url(#cyanGlow)" />
+                <motion.circle
+                  r="4"
+                  fill="#00ffaa"
+                  animate={{ scale: [0.8, 1.2, 0.8] }}
+                  transition={{ repeat: Infinity, duration: 1.2 }}
+                />
+              </g>
+              {/* Front Motor */}
+              <g transform="translate(510, 215)">
+                <circle r="18" fill="rgba(2, 132, 199, 0.15)" stroke="#00f0ff" strokeWidth="1.5" />
+                <circle r="8" fill="none" stroke="#00ffaa" strokeWidth="1.5" strokeDasharray="3 2" filter="url(#cyanGlow)" />
+                <motion.circle
+                  r="4"
+                  fill="#00ffaa"
+                  animate={{ scale: [0.8, 1.2, 0.8] }}
+                  transition={{ repeat: Infinity, duration: 1.2 }}
+                />
+              </g>
+
+              {/* 4. Cockpit AI Core / ECU Processor */}
+              <g transform="translate(365, 155)">
+                <rect x="-14" y="-14" width="28" height="28" rx="4" fill="rgba(4, 20, 42, 0.9)" stroke="#00f0ff" strokeWidth="1.5" filter="url(#cyanGlow)" />
+                <circle r="6" fill="#00ffaa" filter="url(#intenseGlow)" />
+                {/* Traces radiating from processor */}
+                <path d="M 0 -14 L 0 -28 M 0 14 L 0 50 M -14 0 L -40 0 M 14 0 L 40 0" stroke="rgba(0, 240, 255, 0.4)" strokeWidth="1.2" strokeDasharray="2 2" />
+              </g>
+
+              {/* 5. Roof LiDAR Sensor & Sweeping Wave */}
+              <g transform="translate(355, 84)">
+                <rect x="-10" y="-4" width="20" height="7" rx="3" fill="#00f0ff" filter="url(#cyanGlow)" />
+                {progress > 0.25 && (
+                  <>
+                    <motion.circle
+                      r="12"
+                      fill="none"
+                      stroke="rgba(0, 240, 255, 0.6)"
+                      strokeWidth="1.2"
+                      initial={{ scale: 0.5, opacity: 1 }}
+                      animate={{ scale: 2.4, opacity: 0 }}
+                      transition={{ repeat: Infinity, duration: 1.4, ease: 'easeOut' }}
+                    />
+                    <motion.circle
+                      r="20"
+                      fill="none"
+                      stroke="rgba(0, 240, 255, 0.4)"
+                      strokeWidth="1"
+                      initial={{ scale: 0.5, opacity: 1 }}
+                      animate={{ scale: 2.8, opacity: 0 }}
+                      transition={{ repeat: Infinity, duration: 1.4, delay: 0.4, ease: 'easeOut' }}
+                    />
+                  </>
+                )}
+              </g>
+
+              {/* ── EXTERNAL CHASSIS & AERODYNAMIC BODYWORK ───────────── */}
+
+              {/* Sleek Aerodynamic Body Silhouette */}
+              <path
+                d={`
+                  M 75 220
+                  L 120 220
+                  A 48 48 0 0 1 220 220
+                  L 460 220
+                  A 48 48 0 0 1 560 220
+                  L 595 218
+                  C 605 215 615 205 605 190
+                  L 565 178
+                  L 480 148
+                  L 410 118
+                  L 360 86
+                  C 340 85 270 88 230 102
+                  L 140 145
+                  L 85 162
+                  C 68 170 65 190 68 205
+                  Z
+                `}
+                fill="rgba(0, 240, 255, 0.03)"
+                stroke="#00f0ff"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                filter="url(#cyanGlow)"
+              />
+
+              {/* Aerodynamic Greenhouse / Windows */}
+              <path
+                d={`
+                  M 400 122
+                  L 355 93
+                  C 335 93 280 96 245 108
+                  L 175 145
+                  L 290 145
+                  L 395 145
+                  Z
+                `}
+                fill="rgba(0, 240, 255, 0.07)"
+                stroke="rgba(0, 240, 255, 0.75)"
+                strokeWidth="1.6"
+              />
+
+              {/* B-Pillar & Door Seam */}
+              <line x1="290" y1="100" x2="290" y2="145" stroke="rgba(0, 240, 255, 0.6)" strokeWidth="1.5" />
+              <line x1="290" y1="145" x2="290" y2="206" stroke="rgba(0, 240, 255, 0.35)" strokeWidth="1.2" strokeDasharray="3 3" />
+              <line x1="400" y1="145" x2="400" y2="206" stroke="rgba(0, 240, 255, 0.35)" strokeWidth="1.2" strokeDasharray="3 3" />
+
+              {/* Flush Door Handles */}
+              <rect x="305" y="152" width="22" height="3" rx="1.5" fill="#00f0ff" filter="url(#cyanGlow)" />
+              <rect x="415" y="152" width="22" height="3" rx="1.5" fill="#00f0ff" filter="url(#cyanGlow)" />
+
+              {/* High-tech Character Body Crease */}
+              <path
+                d="M 85 162 L 180 162 L 470 160 L 565 178"
+                fill="none"
+                stroke="rgba(0, 240, 255, 0.5)"
+                strokeWidth="1.2"
+              />
+
+              {/* Front Matrix LED Headlight Blade */}
+              <path
+                d="M 565 178 L 598 184 L 602 188"
+                fill="none"
+                stroke="#ffffff"
+                strokeWidth="3"
+                filter="url(#intenseGlow)"
+              />
+
+              {/* Rear Cyber Light Blade (OLED Taillight) */}
+              <path
+                d="M 72 170 L 92 165"
+                fill="none"
+                stroke="#ff2a5f"
+                strokeWidth="3.5"
+                filter="url(#intenseGlow)"
+              />
+
+              {/* ── HIGH-TECH MULTI-SPOKE AERO WHEELS ────────────────── */}
+
+              {/* Rear Wheel (Aero Turbine Disc) */}
+              <g transform="translate(170, 220)">
+                {/* Tire Outer Glow */}
+                <circle r="44" fill="none" stroke="rgba(0, 240, 255, 0.25)" strokeWidth="5" />
+                <circle r="40" fill="rgba(3, 14, 28, 0.9)" stroke="#00f0ff" strokeWidth="2" filter="url(#cyanGlow)" />
+                {/* Wheel Turbine Blades */}
+                <motion.g animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 4, ease: 'linear' }}>
+                  {[0, 45, 90, 135, 180, 225, 270, 315].map(deg => (
+                    <line
+                      key={deg}
+                      x1="0" y1="0" x2={35 * Math.cos((deg * Math.PI) / 180)} y2={35 * Math.sin((deg * Math.PI) / 180)}
+                      stroke="rgba(0, 240, 255, 0.7)"
+                      strokeWidth="1.5"
+                    />
+                  ))}
+                  <circle r="14" fill="#041220" stroke="#00f0ff" strokeWidth="2" />
+                  {/* Hexagon Hub */}
+                  <polygon
+                    points="0,-8 7,-4 7,4 0,8 -7,4 -7,-4"
+                    fill="none"
+                    stroke="#00ffaa"
+                    strokeWidth="1.5"
+                  />
+                </motion.g>
+              </g>
+
+              {/* Front Wheel (Aero Turbine Disc) */}
+              <g transform="translate(510, 220)">
+                {/* Tire Outer Glow */}
+                <circle r="44" fill="none" stroke="rgba(0, 240, 255, 0.25)" strokeWidth="5" />
+                <circle r="40" fill="rgba(3, 14, 28, 0.9)" stroke="#00f0ff" strokeWidth="2" filter="url(#cyanGlow)" />
+                {/* Wheel Turbine Blades */}
+                <motion.g animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 4, ease: 'linear' }}>
+                  {[0, 45, 90, 135, 180, 225, 270, 315].map(deg => (
+                    <line
+                      key={deg}
+                      x1="0" y1="0" x2={35 * Math.cos((deg * Math.PI) / 180)} y2={35 * Math.sin((deg * Math.PI) / 180)}
+                      stroke="rgba(0, 240, 255, 0.7)"
+                      strokeWidth="1.5"
+                    />
+                  ))}
+                  <circle r="14" fill="#041220" stroke="#00f0ff" strokeWidth="2" />
+                  {/* Hexagon Hub */}
+                  <polygon
+                    points="0,-8 7,-4 7,4 0,8 -7,4 -7,-4"
+                    fill="none"
+                    stroke="#00ffaa"
+                    strokeWidth="1.5"
+                  />
+                </motion.g>
+              </g>
+
+              {/* ── DYNAMIC HOLOGRAPHIC VERTICAL LASER SCANNER ───────── */}
+              <motion.g
+                initial={{ x: 60 }}
+                animate={{ x: [60, 610, 60] }}
+                transition={{ repeat: Infinity, duration: 2.2, ease: 'easeInOut' }}
+              >
+                {/* Vertical laser beam curtain */}
+                <rect x="-24" y="60" width="24" height="190" fill="url(#laserBeam)" opacity={0.6} />
+                {/* Primary laser stroke */}
+                <line x1="0" y1="55" x2="0" y2="245" stroke="#ffffff" strokeWidth="2.5" filter="url(#intenseGlow)" />
+                {/* Top & Bottom Emitter Nodes */}
+                <circle cx="0" cy="55" r="4" fill="#00ffaa" filter="url(#intenseGlow)" />
+                <circle cx="0" cy="245" r="4" fill="#00ffaa" filter="url(#intenseGlow)" />
+              </motion.g>
+            </svg>
+          </div>
+        </div>
+
+        {/* ── BOTTOM CONSOLE & TELEMETRY PROGRESS ─────────────────────────── */}
+        <div style={{
+          width: '100%',
+          maxWidth: 960,
+          background: 'rgba(5, 16, 32, 0.85)',
+          border: '1px solid rgba(0, 240, 255, 0.25)',
+          borderRadius: 14,
+          padding: '18px 24px',
+          boxShadow: '0 12px 40px rgba(0, 0, 0, 0.7), 0 0 30px rgba(0, 240, 255, 0.08)',
+          backdropFilter: 'blur(16px)',
+          position: 'relative',
+          zIndex: 10,
+        }}>
+          {/* Status Message Line & Percentage Counter */}
+          <div style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            marginBottom: 12,
+            gap: 12,
+          }}>
+            {/* Real-time Stage Status */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
+              <div style={{
+                width: 8,
+                height: 8,
+                borderRadius: '50%',
+                background: isFinishing ? '#00ffaa' : '#00f0ff',
+                boxShadow: isFinishing ? '0 0 10px #00ffaa' : '0 0 10px #00f0ff',
+                animation: 'pulse 1.5s infinite',
+              }} />
+              <div style={{
+                fontFamily: "'Space Mono', monospace",
+                fontSize: 12,
+                fontWeight: 700,
+                color: '#ffffff',
+                letterSpacing: '0.08em',
+                whiteSpace: 'nowrap',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+              }}>
+                {isFinishing ? '>>> BOOT SEQUENCE COMPLETE // LAUNCHING...' : currentMessage}
+              </div>
+            </div>
+
+            {/* Glowing Big Percentage Badge */}
             <div style={{
               display: 'flex',
-              justifyContent: 'space-between',
-              marginBottom: 10,
-              alignItems: 'center',
+              alignItems: 'baseline',
+              gap: 4,
+              fontFamily: "'Space Mono', monospace",
+              fontWeight: 800,
             }}>
-              <span style={{ fontSize: 11, color: 'var(--text-muted)', letterSpacing: '0.12em', textTransform: 'uppercase' }}>
-                {phase === 'glowing' ? 'CVIS ONLINE' : message}
+              <span style={{
+                fontSize: 22,
+                color: '#00f0ff',
+                textShadow: '0 0 15px rgba(0, 240, 255, 0.6)',
+              }}>
+                {String(pctInt).padStart(3, '0')}
               </span>
-              <span className="font-mono" style={{ fontSize: 12, color: 'var(--cyan)' }}>
-                {Math.round(progress * 100)}%
-              </span>
-            </div>
-            <div style={{
-              height: 2,
-              background: 'rgba(255,255,255,0.06)',
-              borderRadius: 1,
-              overflow: 'hidden',
-            }}>
-              <motion.div
-                style={{
-                  height: '100%',
-                  background: 'linear-gradient(90deg, var(--cyan), rgba(0,212,255,0.4))',
-                  borderRadius: 1,
-                  boxShadow: '0 0 8px rgba(0,212,255,0.6)',
-                  width: `${progress * 100}%`,
-                }}
-                transition={{ duration: 0.05 }}
-              />
+              <span style={{ fontSize: 13, color: '#38bdf8' }}>%</span>
             </div>
           </div>
 
-          {/* Status dots */}
-          <div style={{ display: 'flex', gap: 24, alignItems: 'center' }}>
-            {[
-              { label: 'Telemetry', done: progress > 0.3 },
-              { label: 'Auth Layer', done: progress > 0.5 },
-              { label: 'AI Engine',  done: progress > 0.7 },
-              { label: 'WebSocket', done: progress > 0.9 },
-            ].map((item) => (
-              <div key={item.label} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                <div style={{
-                  width: 6, height: 6, borderRadius: '50%',
-                  background: item.done ? 'var(--cyan)' : 'var(--text-muted)',
-                  boxShadow: item.done ? '0 0 8px rgba(0,212,255,0.6)' : 'none',
-                  transition: 'all 0.3s',
-                }} />
-                <span style={{ fontSize: 10, color: item.done ? 'var(--text-secondary)' : 'var(--text-muted)', letterSpacing: '0.1em' }}>
-                  {item.label}
+          {/* Precision Dual-Rail Progress Bar */}
+          <div style={{
+            height: 6,
+            background: 'rgba(255, 255, 255, 0.08)',
+            borderRadius: 3,
+            overflow: 'hidden',
+            position: 'relative',
+            marginBottom: 18,
+            border: '1px solid rgba(0, 240, 255, 0.2)',
+          }}>
+            <motion.div
+              style={{
+                height: '100%',
+                width: `${pctInt}%`,
+                background: 'linear-gradient(90deg, #0284c7 0%, #00f0ff 70%, #ffffff 100%)',
+                borderRadius: 3,
+                boxShadow: '0 0 12px #00f0ff',
+                position: 'relative',
+              }}
+              transition={{ ease: 'easeOut', duration: 0.1 }}
+            />
+          </div>
+
+          {/* 4 Subsystem Status Cards */}
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))',
+            gap: 12,
+          }}>
+            {/* 1. Telemetry */}
+            <div style={{
+              background: telemetryOk ? 'rgba(0, 240, 255, 0.08)' : 'rgba(255, 255, 255, 0.02)',
+              border: `1px solid ${telemetryOk ? 'rgba(0, 240, 255, 0.35)' : 'rgba(255, 255, 255, 0.08)'}`,
+              borderRadius: 8,
+              padding: '10px 14px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              transition: 'all 0.3s ease',
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
+                <Activity size={16} color={telemetryOk ? '#00f0ff' : 'rgba(255,255,255,0.4)'} />
+                <span style={{ fontSize: 12, fontWeight: 600, color: telemetryOk ? '#ffffff' : 'rgba(255,255,255,0.45)', letterSpacing: '0.04em' }}>
+                  Telemetry
                 </span>
               </div>
-            ))}
+              <span style={{
+                fontSize: 10,
+                fontFamily: "'Space Mono', monospace",
+                fontWeight: 700,
+                color: telemetryOk ? '#00ffaa' : 'rgba(255,255,255,0.3)',
+              }}>
+                {telemetryOk ? 'ONLINE' : 'STANDBY'}
+              </span>
+            </div>
+
+            {/* 2. Auth Layer */}
+            <div style={{
+              background: authOk ? 'rgba(0, 240, 255, 0.08)' : 'rgba(255, 255, 255, 0.02)',
+              border: `1px solid ${authOk ? 'rgba(0, 240, 255, 0.35)' : 'rgba(255, 255, 255, 0.08)'}`,
+              borderRadius: 8,
+              padding: '10px 14px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              transition: 'all 0.3s ease',
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
+                <ShieldCheck size={16} color={authOk ? '#00f0ff' : 'rgba(255,255,255,0.4)'} />
+                <span style={{ fontSize: 12, fontWeight: 600, color: authOk ? '#ffffff' : 'rgba(255,255,255,0.45)', letterSpacing: '0.04em' }}>
+                  Auth & HMAC
+                </span>
+              </div>
+              <span style={{
+                fontSize: 10,
+                fontFamily: "'Space Mono', monospace",
+                fontWeight: 700,
+                color: authOk ? '#00ffaa' : 'rgba(255,255,255,0.3)',
+              }}>
+                {authOk ? 'VERIFIED' : 'WAITING'}
+              </span>
+            </div>
+
+            {/* 3. AI Engine */}
+            <div style={{
+              background: aiOk ? 'rgba(0, 240, 255, 0.08)' : 'rgba(255, 255, 255, 0.02)',
+              border: `1px solid ${aiOk ? 'rgba(0, 240, 255, 0.35)' : 'rgba(255, 255, 255, 0.08)'}`,
+              borderRadius: 8,
+              padding: '10px 14px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              transition: 'all 0.3s ease',
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
+                <Cpu size={16} color={aiOk ? '#00f0ff' : 'rgba(255,255,255,0.4)'} />
+                <span style={{ fontSize: 12, fontWeight: 600, color: aiOk ? '#ffffff' : 'rgba(255,255,255,0.45)', letterSpacing: '0.04em' }}>
+                  Ollama 3B AI
+                </span>
+              </div>
+              <span style={{
+                fontSize: 10,
+                fontFamily: "'Space Mono', monospace",
+                fontWeight: 700,
+                color: aiOk ? '#00ffaa' : 'rgba(255,255,255,0.3)',
+              }}>
+                {aiOk ? 'ACTIVE' : 'IDLE'}
+              </span>
+            </div>
+
+            {/* 4. WebSocket */}
+            <div style={{
+              background: wsOk ? 'rgba(0, 240, 255, 0.08)' : 'rgba(255, 255, 255, 0.02)',
+              border: `1px solid ${wsOk ? 'rgba(0, 240, 255, 0.35)' : 'rgba(255, 255, 255, 0.08)'}`,
+              borderRadius: 8,
+              padding: '10px 14px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              transition: 'all 0.3s ease',
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
+                <Radio size={16} color={wsOk ? '#00f0ff' : 'rgba(255,255,255,0.4)'} />
+                <span style={{ fontSize: 12, fontWeight: 600, color: wsOk ? '#ffffff' : 'rgba(255,255,255,0.45)', letterSpacing: '0.04em' }}>
+                  WebSocket
+                </span>
+              </div>
+              <span style={{
+                fontSize: 10,
+                fontFamily: "'Space Mono', monospace",
+                fontWeight: 700,
+                color: wsOk ? '#00ffaa' : 'rgba(255,255,255,0.3)',
+              }}>
+                {wsOk ? 'CONNECTED' : 'POLLING'}
+              </span>
+            </div>
           </div>
-        </motion.div>
-      )}
+        </div>
+
+        {/* Quick Launch Skip Action */}
+        <div style={{ marginTop: 8, position: 'relative', zIndex: 10 }}>
+          <button
+            onClick={() => onComplete?.()}
+            style={{
+              background: 'transparent',
+              border: 'none',
+              color: 'rgba(255, 255, 255, 0.45)',
+              fontSize: 11,
+              fontFamily: "'Space Mono', monospace",
+              letterSpacing: '0.12em',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 4,
+              cursor: 'pointer',
+              padding: '4px 10px',
+              borderRadius: 4,
+              transition: 'all 0.2s ease',
+            }}
+            onMouseEnter={e => {
+              e.currentTarget.style.color = '#38bdf8'
+              e.currentTarget.style.background = 'rgba(0, 240, 255, 0.08)'
+            }}
+            onMouseLeave={e => {
+              e.currentTarget.style.color = 'rgba(255, 255, 255, 0.45)'
+              e.currentTarget.style.background = 'transparent'
+            }}
+          >
+            QUICK LAUNCH <ChevronRight size={13} />
+          </button>
+        </div>
+      </motion.div>
     </AnimatePresence>
   )
 }
