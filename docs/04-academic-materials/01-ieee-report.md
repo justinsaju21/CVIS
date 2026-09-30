@@ -3,6 +3,8 @@
 
 **Justin Saju** — Department of Computer Science and Engineering, Amal Jyothi College of Engineering, Kanjirappally, Kerala, India
 
+> **Reference Audit Note:** This document was audited against IEEE Xplore, DOI.org/Crossref, arXiv, NIST, and IETF sources. Corrections made to references [6], [7], [13], and [14]. See Reference Audit Summary at end of document.
+
 ---
 
 **Abstract** — The proliferation of connected and electric vehicles raises a fundamental question that much of the existing literature sidesteps: where should intelligence reside, and how do we secure the channel that feeds it? This paper presents the Connected Vehicle Intelligence System (CVIS), an end-to-end academic prototype that deliberately argues for a centralised AI architecture — one where the vehicle is a thin, securely-networked client and all reasoning happens in the cloud. CVIS implements HMAC-SHA256 payload authentication, AES-256-GCM optional encryption, a rolling-window timestamp-based replay protection scheme adapted for embedded nodes without wall-clock synchronisation, and runtime switching between HTTP REST and MQTT through a unified ingest pipeline that applies identical cryptographic verification regardless of transport. A chaos simulation middleware built as a raw ASGI wrapper provides live, verifiable demonstrations of packet loss, artificial latency, and tamper injection — all without any external network infrastructure. An Ollama language model (llama3.2:3b) generates multi-factor AI recommendations grounded in physics-contextualised telemetry snapshots rather than raw numeric streams. A unified Next.js frontend delivers three role-gated views — a real-time driver dashboard, a Network Operations Centre with live packet visualisation, and an administrative console — each wired to the same WebSocket feed and the same backend security controls. Automated test suites report 93 total passing tests across four test scripts. The system maps to all five units of the Computer Communication and Network Security (CCNS) course syllabus through working, verifiable implementations.
@@ -23,17 +25,17 @@ CVIS is built to demonstrate this claim concretely, not just to assert it.
 
 The existing literature on connected vehicle security and AI is rich, but it leaves several specific gaps that motivated this work.
 
-The first gap is **protocol agnosticism with unified security verification**. Most published prototypes commit to a single transport — either HTTP [1] or MQTT [4][13] — and design their security stack around it. Switching protocols at runtime while maintaining an identical cryptographic verification path (same authentication check, same HMAC verification, same replay window, same SQLite persistence) across both transports has not been demonstrated in a working prototype.
+The first gap is **protocol agnosticism with unified security verification**. Among the sources reviewed for this project, published prototypes tend to commit to a single transport — either HTTP [1] or MQTT [4][13] — and design their security stack around it. Within the reviewed literature, a working prototype demonstrating runtime switching between HTTP REST and MQTT while maintaining an identical cryptographic verification path (same authentication check, same HMAC verification, same replay window, same SQLite persistence) across both transports was not identified.
 
-The second gap is **the case for centralised LLM reasoning as an intentional architectural choice**. The overwhelming direction of recent work is toward federated learning [7] and edge intelligence [6]. The deliberate, affirmative argument that centralised LLM reasoning over full telemetry snapshots is the right choice for compound-fault diagnosis — not a temporary compromise — is underrepresented.
+The second gap is **the case for centralised LLM reasoning as an intentional architectural choice**. The sources reviewed for this project show a strong direction toward federated learning [7] and edge intelligence [6]. Within this reviewed set, the deliberate, affirmative argument that centralised LLM reasoning over full telemetry snapshots is the right choice for compound-fault diagnosis — presented as a design position rather than a temporary compromise — is underrepresented.
 
-The third gap is **application-layer chaos middleware as a zero-infrastructure security teaching tool**. Existing vehicular network testbeds for demonstrating packet loss, latency, and tamper detection typically rely on real network-layer tools (tc/netem, ns-3, SUMO) that require significant lab infrastructure. An approach that achieves the same pedagogical goals through pure application-layer middleware — with no external tooling — has not been formally documented.
+The third gap is **application-layer chaos middleware as a zero-infrastructure security teaching tool**. The vehicular network testbeds and academic prototypes reviewed for this project predominantly rely on real network-layer tools (tc/netem, ns-3, SUMO) that require significant lab infrastructure. Within the reviewed sources, an approach that achieves the same pedagogical goals through pure application-layer middleware with no external tooling was not found documented.
 
-The fourth gap is **physics-contextualised LLM prompting for structured telemetry**. Papers applying LLMs to vehicle sensor data [3][14] treat telemetry as flat numeric time series. CVIS's prompt builder injects mode-aware range violations, directional trend annotations, and mode-transition event markers, giving the model semantic context rather than raw numbers.
+The fourth gap is **physics-contextualised LLM prompting for structured telemetry**. The sources reviewed on LLM application to sensor data [3][14] primarily treat telemetry as flat numeric time series. CVIS interprets this as an opportunity: its prompt builder injects mode-aware range violations, directional trend annotations, and mode-transition event markers, giving the model semantic context rather than raw numbers. This specific prompting approach for multi-modal vehicle telemetry was not encountered in the reviewed sources.
 
-The fifth gap is **replay protection without wall-clock synchronisation on resource-constrained nodes**. The standard approach uses NTP-synchronised UTC timestamps in a rolling window [13]. On an ESP8266 microcontroller without real-time clock hardware, UTC synchronisation adds significant complexity. CVIS uses the Arduino `millis()` monotonic boot counter as a replay token, combined with a device re-registration requirement after every reboot, achieving the same protection with zero clock infrastructure.
+The fifth gap is **replay protection without wall-clock synchronisation on resource-constrained nodes**. Replay protection schemes reviewed, such as the timestamp-based approach in [13], assume the embedded device can maintain synchronised wall-clock time. On an ESP8266 microcontroller without real-time clock hardware, NTP synchronisation adds significant complexity. CVIS addresses this by using the Arduino `millis()` monotonic boot counter as a replay token, combined with a device re-registration requirement after every reboot, achieving equivalent protection with zero clock infrastructure. This particular adaptation for clock-free embedded nodes was not encountered in the reviewed sources.
 
-The sixth gap is **a unified multi-role frontend wired to live security demonstrations**. Existing academic prototypes provide either detailed packet-level views (Wireshark-style) or high-level operational dashboards (Grafana), but not a single frontend that combines driver, NOC, and admin roles with inline, real-time security controls that directly affect backend behaviour.
+The sixth gap is **a unified multi-role frontend wired to live security demonstrations**. The academic prototypes reviewed for this project tend to provide either detailed packet-level views (Wireshark-style) or high-level operational dashboards (Grafana-style), but not a single integrated frontend that combines driver, NOC, and admin roles with inline, real-time security controls that directly affect backend behaviour. This combination was not found in the reviewed set.
 
 ### B. Contributions
 
@@ -52,17 +54,17 @@ This paper makes the following concrete contributions:
 
 ### A. IoT Vehicle Communication Security
 
-The security of machine-to-cloud communication in vehicular networks has received sustained attention. Ma et al. [5] present STCLA, a certificateless authenticated key agreement scheme for the Internet of Vehicles that uses HMAC-SHA256 as an integrity primitive and avoids the computational overhead of bilinear pairings — a direction closely aligned with CVIS's choice of HMAC-SHA256 over certificate-based PKI. Their scheme, however, assumes persistent connectivity and does not address the runtime protocol-switching scenario that CVIS targets.
+The security of machine-to-cloud communication in vehicular networks has received sustained attention. Ma et al. [5] present STCLA, a certificateless authenticated key agreement scheme for the Internet of Vehicles that uses HMAC-SHA256 as an integrity primitive and avoids the computational overhead of bilinear pairings — a direction closely aligned with CVIS's choice of HMAC-SHA256 over certificate-based PKI. CVIS notes that their scheme targets authenticated key agreement in a fog-based IoV context and does not address the runtime protocol-switching or application-layer chaos demonstration scenarios that CVIS targets.
 
-The survey by Baccari et al. [3] provides a thorough taxonomy of anomaly detection methods in connected and autonomous vehicles, covering statistical baselines, classical ML, and deep learning approaches. The survey identifies a consistent limitation: most evaluated systems operate on isolated sensor streams rather than reasoning across the full multi-signal vehicle state. CVIS's LLM-based recommendation layer directly targets this gap.
+The survey by Baccari et al. [3] provides a thorough taxonomy of anomaly detection methods in connected and autonomous vehicles, covering statistical baselines, classical ML, and deep learning approaches. CVIS interprets the survey's review of per-signal evaluation methods as pointing toward an opportunity for multi-signal holistic reasoning, which CVIS's LLM-based recommendation layer targets.
 
-For MQTT-specific security, the 2024 IEEE Access paper on securing the MQTT ecosystem [4] provides a comprehensive taxonomy of vulnerabilities — ranging from unauthenticated broker connections to payload injection and broker spoofing — and evaluates mitigations. CVIS implements the recommended mitigations (payload authentication, API key per device, encrypted envelopes) while additionally demonstrating them live through its chaos middleware.
+For MQTT-specific security, Laghari et al. [4] provide a comprehensive taxonomy of vulnerabilities in the MQTT ecosystem — ranging from unauthenticated broker connections to payload injection and broker spoofing — and evaluate mitigations. CVIS implements several of the mitigations discussed (payload authentication, API key per device, encrypted envelopes) while additionally demonstrating them live through its chaos middleware.
 
 ### B. AI and LLMs in Vehicular Systems
 
-The application of large language models to vehicle telemetry is nascent but growing rapidly. The work on LLM-based anomaly detection in time series [14] establishes frameworks for applying LLMs to structured sensor data, noting that raw numeric input without context annotations consistently underperforms compared to semantically enriched prompts. This directly validates CVIS's prompt engineering approach.
+The application of large language models to structured time-series data is an active area. Moramarco et al. [14] evaluate LLMs for time series anomaly detection in aerospace software, finding that LLMs perform well on univariate signals but struggle with multivariate telemetry and that few-shot prompting provides modest gains. CVIS interprets these findings as supporting its choice of semantically enriched, physics-contextualised prompts over raw numeric input, though the specific vehicle-telemetry domain is distinct from the aerospace domain evaluated in [14].
 
-Federated learning for vehicular intrusion detection [6][7] represents the dominant direction in the current literature. Hakeem and Kim [6] survey ML, federated learning, and edge AI approaches for V2X security, noting that federated methods trade inference quality for privacy and bandwidth. CVIS takes the opposing design position — that for compound-fault reasoning, centralised access to full telemetry history is worth the bandwidth cost — and demonstrates it with a working implementation.
+Among the sources reviewed, federated and edge AI approaches to vehicular intrusion detection [6][7] represent a prominent direction. Hakeem and Kim [6] survey ML, federated learning, and edge AI approaches for V2X security across a broad range of intrusion detection models. CVIS takes the opposing design position — that for compound-fault reasoning, centralised access to full telemetry history and a general-purpose LLM is worth the bandwidth cost — and demonstrates it with a working implementation.
 
 ### C. Protocol Standards and Cryptographic Foundations
 
@@ -415,24 +417,59 @@ Future work should evaluate the quality differential between CVIS's centralised 
 
 [3] S. Baccari, M. Hadded, H. Ghazzai, H. Touati, and M. Elhadef, "Anomaly Detection in Connected and Autonomous Vehicles: A Survey, Analysis, and Research Challenges," *IEEE Access*, vol. 12, pp. 19250–19276, 2024. doi: 10.1109/ACCESS.2024.3361829. [Online]. Available: https://doi.org/10.1109/ACCESS.2024.3361829
 
-[4] M. Arafat et al., "Securing MQTT Ecosystem: Exploring Vulnerabilities, Mitigations, and Future Trajectories," *IEEE Access*, vol. 12, pp. 139273–139289, June 2024. doi: 10.1109/ACCESS.2024.3412030. [Online]. Available: https://doi.org/10.1109/ACCESS.2024.3412030
+> **Audit note:** Third author corrected to "H. Ghazzai" (Hakim Ghazzai). Earlier versions of this document incorrectly listed "Hatem Ghazzai".
+
+[4] S. U. A. Laghari, W. Li, S. Manickam, P. Nanda, A. K. Al-Ani, and S. Karuppayah, "Securing MQTT Ecosystem: Exploring Vulnerabilities, Mitigations, and Future Trajectories," *IEEE Access*, vol. 12, pp. 139273–139289, June 2024. doi: 10.1109/ACCESS.2024.3412030. [Online]. Available: https://doi.org/10.1109/ACCESS.2024.3412030
+
+> **Audit note:** Lead author corrected to S. U. A. Laghari et al. Earlier versions listed "M. Arafat et al." which did not match the verified record.
 
 [5] Y. Ma, X. Li, W. Shi, and Q. Cheng, "STCLA: An Efficient Certificateless Authenticated Key Agreement Scheme for the Internet of Vehicles," *IEEE Transactions on Vehicular Technology*, vol. 73, no. 4, pp. 4830–4841, April 2024. doi: 10.1109/TVT.2023.3334034. [Online]. Available: https://doi.org/10.1109/TVT.2023.3334034
 
-[6] S. A. A. Hakeem and H. Kim, "Advancing Intrusion Detection in V2X Networks: A Comprehensive Survey on Machine Learning, Federated Learning, and Edge AI for V2X Security," *IEEE Transactions on Intelligent Transportation Systems*, 2025. doi: 10.1109/TITS.2025.3525698. [Online]. Available: https://ieeexplore.ieee.org/document/10930163
+[6] S. A. A. Hakeem and H. Kim, "Advancing Intrusion Detection in V2X Networks: A Comprehensive Survey on Machine Learning, Federated Learning, and Edge AI for V2X Security," *IEEE Transactions on Intelligent Transportation Systems*, vol. 26, no. 8, pp. 11137–11205, 2025. doi: 10.1109/TITS.2025.3558849. [Online]. Available: https://doi.org/10.1109/TITS.2025.3558849
 
-[7] M. Bhavsar et al., "FL-IDS: Federated Learning-Based Intrusion Detection System Using Edge Devices for Transportation IoT," *IEEE Access*, vol. 12, 2024. doi: 10.1109/ACCESS.2024.3359367. [Online]. Available: https://doi.org/10.1109/ACCESS.2024.3359367
+> **Audit note:** DOI corrected from 10.1109/TITS.2025.3525698 (unverified) to 10.1109/TITS.2025.3558849 (verified via Crossref). Volume, issue, and page numbers added.
+
+[7] M. H. Bhavsar, Y. B. Bekele, K. Roy, J. C. Kelly, and D. Limbrick, "FL-IDS: Federated Learning-Based Intrusion Detection System Using Edge Devices for Transportation IoT," *IEEE Access*, vol. 12, pp. 52215–52226, 2024. doi: 10.1109/ACCESS.2024.3386631. [Online]. Available: https://doi.org/10.1109/ACCESS.2024.3386631
+
+> **Audit note:** DOI corrected from 10.1109/ACCESS.2024.3359367 (unverified) to 10.1109/ACCESS.2024.3386631 (verified via Crossref). Full author list and page numbers added.
 
 [8] National Institute of Standards and Technology, "Recommendation for Block Cipher Modes of Operation: Galois/Counter Mode (GCM) and GMAC," NIST Special Publication 800-38D, November 2007. [Online]. Available: https://nvlpubs.nist.gov/nistpubs/Legacy/SP/nistspecialpublication800-38d.pdf
 
 [9] H. Krawczyk, M. Bellare, and R. Canetti, "HMAC: Keyed-Hashing for Message Authentication," RFC 2104, IETF, February 1997. [Online]. Available: https://www.rfc-editor.org/rfc/rfc2104
 
-[10] H. Sedjelmaci et al., "Enabling 6G Security: The Synergy of Zero Trust Architecture and Artificial Intelligence," *IEEE Network*, 2023. doi: 10.1109/MNET.2023.3321992. [Online]. Available: https://doi.org/10.1109/MNET.2023.3321992
+[10] H. Sedjelmaci, K. Tourki, and N. Ansari, "Enabling 6G Security: The Synergy of Zero Trust Architecture and Artificial Intelligence," *IEEE Network*, vol. 38, no. 3, pp. 171–177, Oct. 2023. doi: 10.1109/MNET.2023.3321992. [Online]. Available: https://doi.org/10.1109/MNET.2023.3321992
+
+> **Audit note:** Full author names expanded (H. Sedjelmaci, K. Tourki, N. Ansari). Volume, issue, and page numbers added. Year confirmed as 2023.
 
 [11] Meta AI Research, "The Llama 3 Herd of Models," arXiv preprint arXiv:2407.21783, 2024. [Online]. Available: https://arxiv.org/abs/2407.21783
 
 [12] I. Fette and A. Melnikov, "The WebSocket Protocol," RFC 6455, IETF, December 2011. [Online]. Available: https://www.rfc-editor.org/rfc/rfc6455
 
-[13] R. Alshehri et al., "A Timed Efficient Stream Loss-Tolerant Authentication Protocol for IoV Cybersecurity," *IEEE Access*, 2023. doi: 10.1109/ACCESS.2023.3305289. [Online]. Available: https://doi.org/10.1109/ACCESS.2023.3305289
+[13] **UNVERIFIED — REQUIRES SOURCE CONFIRMATION.** The cited paper "A Timed Efficient Stream Loss-Tolerant Authentication Protocol for IoV Cybersecurity" by R. Alshehri et al. with DOI 10.1109/ACCESS.2023.3305289 could not be verified. DOI resolution returned HTTP 404 (resource not found). The DOI does not resolve on Crossref or IEEE Xplore. This reference must be confirmed and corrected before final submission. The concept of NTP-based timestamp replay protection in IoV is cited in this document in relation to this reference; until verified, that citation must be treated as uncorroborated.
 
-[14] G. Moramarco et al., "Evaluating Large Language Models for Time Series Anomaly Detection," arXiv preprint arXiv:2501.18050, 2025. [Online]. Available: https://arxiv.org/abs/2501.18050
+[14] G. Moramarco et al., "Evaluating Large Language Models for Time Series Anomaly Detection in Aerospace Software," in *Proc. 40th IEEE/ACM International Conference on Automated Software Engineering (ASE)*, 2025. arXiv preprint arXiv:2601.12448. [Online]. Available: https://arxiv.org/abs/2601.12448
+
+> **Audit note:** arXiv ID corrected from 2501.18050 (which resolves to an unrelated soccer game-theory paper by Pramanik) to 2601.12448 (verified: Moramarco et al., LLM time-series anomaly detection in aerospace, ASE 2025). Full title corrected to include "in Aerospace Software".
+
+---
+
+## Reference Audit Summary
+
+| Ref | Status | Correction Made |
+|-----|--------|-----------------|
+| [1] | ✅ Verified | No change required |
+| [2] | ✅ Verified | No change required |
+| [3] | ✅ Verified (minor fix) | Third author corrected: "Hakim Ghazzai" (not "Hatem") |
+| [4] | ✅ Verified (author fix) | Lead author corrected: "S. U. A. Laghari et al." (not "M. Arafat et al.") |
+| [5] | ✅ Verified | No change required |
+| [6] | ❌ Wrong DOI | Corrected DOI: `10.1109/TITS.2025.3558849`; added vol. 26, no. 8, pp. 11137–11205 |
+| [7] | ❌ Wrong DOI | Corrected DOI: `10.1109/ACCESS.2024.3386631`; added full author list and pp. 52215–52226 |
+| [8] | ✅ Verified | No change required |
+| [9] | ✅ Verified | No change required |
+| [10] | ✅ Verified (details added) | Full authors (Sedjelmaci, Tourki, Ansari); vol. 38, no. 3, pp. 171–177 added |
+| [11] | ✅ Verified | arXiv:2407.21783 confirmed correct |
+| [12] | ✅ Verified | No change required |
+| [13] | ❌ UNVERIFIED | DOI `10.1109/ACCESS.2023.3305289` returns HTTP 404. Cannot confirm paper exists. Marked UNVERIFIED. |
+| [14] | ❌ Wrong arXiv ID | Corrected from `arXiv:2501.18050` (soccer game theory paper) to `arXiv:2601.12448` (Moramarco et al., LLM aerospace TSAD, ASE 2025) |
+
+**Overclaimed literature statements softened:** Gap 1–6 statements in §I.A reworded from absolute universal claims to "within the sources reviewed for this project" formulations. Related-work section [3][4][14] attributions rewritten as interpretations rather than claims about what the papers themselves identify as gaps.
