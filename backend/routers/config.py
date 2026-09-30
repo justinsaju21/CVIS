@@ -48,9 +48,11 @@ async def set_protocol(body: ProtocolConfig) -> dict:
     protocol to all MQTT subscribers so ESP32 nodes self-switch without restart.
     """
     from comms.mqtt_adapter import mqtt_adapter
+    from ws_manager import manager
     await set_config("active_protocol", body.protocol)
     # Broadcast to ESP32 nodes subscribed to cvis/config/protocol
     mqtt_adapter.publish_config("protocol", body.protocol)
+    await manager.broadcast({"event": "config_changed", "active_protocol": body.protocol})
     logger.info(f"[CONFIG] Protocol switched to: {body.protocol}")
     return {"active_protocol": body.protocol, "status": "ok"}
 
@@ -75,9 +77,11 @@ async def set_encryption(body: EncryptionConfig) -> dict:
     Backend decrypts and verifies the GCM authentication tag.
     """
     from comms.mqtt_adapter import mqtt_adapter
+    from ws_manager import manager
     value = "true" if body.enabled else "false"
     await set_config("encryption_enabled", value)
     mqtt_adapter.publish_config("encryption", value)
+    await manager.broadcast({"event": "config_changed", "encryption_enabled": body.enabled})
     logger.info(f"[CONFIG] Encryption {'ENABLED' if body.enabled else 'DISABLED'}")
     return {"encryption_enabled": body.enabled, "status": "ok"}
 
@@ -100,8 +104,10 @@ async def set_auth(body: AuthConfig) -> dict:
     When disabled, the backend accepts unauthenticated packets and logs them
     as 'no_auth' events — useful for demonstrating open vs. secured traffic.
     """
+    from ws_manager import manager
     await set_config("auth_enabled", "true" if body.enabled else "false")
     auth_module.set_auth_enabled(body.enabled)
+    await manager.broadcast({"event": "config_changed", "auth_enabled": body.enabled})
     logger.info(f"[CONFIG] Auth enforcement {'ENABLED' if body.enabled else 'DISABLED'}")
     return {"auth_enabled": body.enabled, "status": "ok"}
 
@@ -151,6 +157,16 @@ async def set_chaos(body: ChaosConfig) -> dict:
     await set_config("chaos_latency_ms", str(body.latency_ms))
     await set_config("chaos_tamper",     "true" if body.tamper else "false")
 
+    from ws_manager import manager
+    await manager.broadcast({
+        "event": "config_changed",
+        "chaos": {
+            "loss_pct": body.loss_pct,
+            "latency_ms": body.latency_ms,
+            "tamper": body.tamper,
+        }
+    })
+
     logger.info(
         f"[CONFIG] Chaos updated: loss={body.loss_pct}% "
         f"latency={body.latency_ms}ms tamper={body.tamper}"
@@ -183,6 +199,8 @@ async def set_replay(body: ReplayConfig) -> dict:
     """
     await set_config("replay_protection", "true" if body.enabled else "false")
     set_replay_protection_enabled(body.enabled)
+    from ws_manager import manager
+    await manager.broadcast({"event": "config_changed", "replay_protection_enabled": body.enabled})
     return {"replay_protection_enabled": body.enabled, "status": "ok"}
 
 
@@ -217,6 +235,8 @@ class ModeConfig(BaseModel):
 async def set_force_mode(body: ModeConfig) -> dict:
     value = body.mode if body.mode else ""
     await set_config("force_mode", value)
+    from ws_manager import manager
+    await manager.broadcast({"event": "config_changed", "force_mode": body.mode})
     return {"force_mode": body.mode, "status": "ok"}
 
 
