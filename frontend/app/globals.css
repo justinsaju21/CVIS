@@ -3,37 +3,37 @@
 @import "leaflet/dist/leaflet.css";
 
 :root {
-  /* Core palette */
-  --bg-primary:    #e2e8f0;
+  /* Core palette - Clean Luxury Light Mode */
+  --bg-primary:    #f8fafc;
   --bg-secondary:  #ffffff;
-  --bg-tertiary:   #cbd5e1;
+  --bg-tertiary:   #f1f5f9;
   --bg-card:       #ffffff;
 
   /* Borders */
-  --border:        rgba(0,0,0,0.1);
-  --border-hover:  rgba(0,0,0,0.2);
-  --border-active: rgba(0,0,0,0.35);
+  --border:        rgba(0,0,0,0.08);
+  --border-hover:  rgba(0,0,0,0.16);
+  --border-active: rgba(2,132,199,0.4);
 
   /* Text */
   --text-primary:  #0f172a;
-  --text-secondary: rgba(0, 0, 0, 0.65);
-  --text-muted:    rgba(0, 0, 0, 0.4);
+  --text-secondary: rgba(15, 23, 42, 0.68);
+  --text-muted:    rgba(15, 23, 42, 0.42);
 
   /* Accents */
   --cyan:          #0284c7;
-  --cyan-dim:      rgba(2,132,199,0.1);
-  --cyan-glow:     0 0 20px rgba(2,132,199,0.4), 0 0 60px rgba(2,132,199,0.15);
+  --cyan-dim:      rgba(2,132,199,0.08);
+  --cyan-glow:     0 0 16px rgba(2,132,199,0.25);
   --amber:         #d97706;
-  --amber-dim:     rgba(217,119,6,0.12);
+  --amber-dim:     rgba(217,119,6,0.10);
   --red:           #dc2626;
-  --red-dim:       rgba(220,38,38,0.12);
+  --red-dim:       rgba(220,38,38,0.10);
   --green:         #16a34a;
-  --green-dim:     rgba(22,163,74,0.12);
+  --green-dim:     rgba(22,163,74,0.10);
 
   /* Glass */
-  --glass:         rgba(255,255,255,0.7);
-  --glass-border:  rgba(0,0,0,0.1);
-  --glass-hover:   rgba(255,255,255,0.9);
+  --glass:         rgba(255,255,255,0.85);
+  --glass-border:  rgba(0,0,0,0.08);
+  --glass-hover:   rgba(255,255,255,0.98);
 }
 
 /* ─── Reset ──────────────────────────────────────────────────────────────── */
@@ -45,13 +45,13 @@
 
 html {
   scroll-behavior: smooth;
-  color-scheme: dark;
+  color-scheme: light;
 }
 
 body {
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-  font-weight: 600;
-  background: var(--bg-primary);
+  font-weight: 500;
+  background: #f8fafc;
   color: var(--text-primary);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
@@ -305,3 +305,9 @@ body {
     transition-duration: 0.01ms !important;
   }
 }
+
+/* ─── Luxury Automotive Map Tiles (Neutral muted palette without API keys) ─── */
+.luxury-map-tiles .leaflet-tile {
+  filter: saturate(0.35) contrast(0.96) brightness(1.02);
+}
+

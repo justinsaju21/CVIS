@@ -315,11 +315,13 @@ export default function LiveMap({ speed_kmh }: { speed_kmh: number }) {
     })
     
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      attribution: '&copy; OpenStreetMap'
+      attribution: '&copy; OpenStreetMap',
+      className: 'luxury-map-tiles',
+      maxZoom: 19
     }).addTo(map)
 
-    // Solid blue route line like Google Maps
-    L.polyline(ROUTE as [number, number][], { color: '#2563eb', weight: 6, opacity: 0.9 }).addTo(map)
+    // Sleek automotive navigation cyan-blue route line
+    L.polyline(ROUTE as [number, number][], { color: '#0284c7', weight: 6, opacity: 0.95 }).addTo(map)
     L.marker(endPos, { icon: destIcon }).addTo(map)
 
     mapRef.current = map

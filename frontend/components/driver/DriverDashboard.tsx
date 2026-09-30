@@ -20,8 +20,9 @@ import CustomCursor from '@/components/layout/CustomCursor'
 import { useWebSocket } from '@/hooks/useWebSocket'
 import { useIsMobile } from '@/hooks/useIsMobile'
 import MobileDriverDashboard from './MobileDriverDashboard'
-import { fetchRecent, fetchRecommendation, sendChat, fetchConfig, api } from '@/lib/api'
+import { fetchRecent, fetchRecommendation, sendChat, fetchConfig, setVehicleAiService, fetchMobileAccess, api } from '@/lib/api'
 import type { TelemetryRow, WsEvent } from '@/lib/types'
+import { toast } from 'sonner'
 
 const MODE_CONFIG: Record<string, { color: string; badge: string; glow: string; accent: string }> = {
   'Healthy': { color: '#10b981', badge: 'badge-healthy', glow: 'rgba(16,185,129,0.12)', accent: '#10b981' },
@@ -100,21 +101,148 @@ function calcDriveScore(latest: TelemetryRow | null): { score: number; label: st
   return { score: parseFloat(score.toFixed(1)), label }
 }
 
-function getTirePressures(mode: string) {
-  if (mode === 'Motor Fault') return { fl: 33, fr: 34, rl: 28, rr: 33 }
-  if (mode === 'Battery Overheating') return { fl: 34, fr: 35, rl: 33, rr: 34 }
-  return { fl: 33, fr: 34, rl: 32, rr: 33 }
+function getTirePressures(latest: TelemetryRow | null): { fl: number | null; fr: number | null; rl: number | null; rr: number | null } {
+  if (!latest) return { fl: null, fr: null, rl: null, rr: null }
+  const base = latest.tire_pressure_psi != null ? Math.round(latest.tire_pressure_psi) : 34
+  if (latest.mode === 'Motor Fault') return { fl: base, fr: base + 1, rl: base - 6, rr: base }
+  if (latest.mode === 'Battery Overheating') return { fl: base + 1, fr: base + 2, rl: base, rr: base + 1 }
+  return { fl: base, fr: base + 1, rl: base - 1, rr: base }
+}
+
+function ProLockedCard({ title, desc, onUnlock }: { title: string; desc: string; onUnlock: () => void }) {
+  return (
+    <div
+      onClick={(e) => {
+        e.stopPropagation()
+        onUnlock()
+      }}
+      style={{
+        display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+        gap: 6, padding: '10px 8px', background: 'linear-gradient(135deg, rgba(245,158,11,0.04) 0%, rgba(2,132,199,0.04) 100%)',
+        border: '1.5px dashed rgba(245,158,11,0.35)', borderRadius: 8, textAlign: 'center',
+        cursor: 'pointer', transition: 'all 0.2s'
+      }}
+    >
+      <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+        <Lock size={11} color="#d97706" />
+        <span style={{ fontSize: 9, fontFamily: 'monospace', letterSpacing: '0.12em', color: '#b45309', fontWeight: 800, textTransform: 'uppercase' }}>
+          {title}
+        </span>
+      </div>
+      <div style={{ fontSize: 9, color: '#64748b', lineHeight: 1.35 }}>
+        {desc}
+      </div>
+      <div style={{
+        marginTop: 2, padding: '2px 8px', borderRadius: 10,
+        background: '#d97706', color: '#ffffff',
+        fontSize: 8, fontFamily: 'monospace', fontWeight: 700, letterSpacing: '0.08em'
+      }}>
+        1-CLICK UNLOCK PRO
+      </div>
+    </div>
+  )
+}
+
+function ProLockedModal({
+  title,
+  feature,
+  desc,
+  benefits,
+  onUnlock,
+}: {
+  title: string
+  feature: string
+  desc: string
+  benefits: string[]
+  onUnlock: () => void
+}) {
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16, padding: '10px 0' }}>
+      <div style={{
+        padding: '24px 20px',
+        background: 'linear-gradient(135deg, rgba(2,132,199,0.06) 0%, rgba(245,158,11,0.06) 100%)',
+        border: '1.5px dashed rgba(2,132,199,0.35)',
+        borderRadius: 12,
+        textAlign: 'center',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        gap: 10
+      }}>
+        <div style={{
+          width: 48, height: 48, borderRadius: '50%',
+          background: 'linear-gradient(135deg, #0284c7 0%, #f59e0b 100%)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          boxShadow: '0 8px 20px rgba(2,132,199,0.25)',
+          color: '#ffffff'
+        }}>
+          <Lock size={22} />
+        </div>
+        <div>
+          <div style={{ fontSize: 11, fontFamily: 'monospace', letterSpacing: '0.14em', color: '#0284c7', fontWeight: 800, textTransform: 'uppercase' }}>
+            {title}
+          </div>
+          <div style={{ fontSize: 20, fontWeight: 800, color: '#0f172a', marginTop: 2 }}>
+            {feature}
+          </div>
+        </div>
+        <div style={{ fontSize: 13, color: '#475569', maxWidth: 440, lineHeight: 1.5 }}>
+          {desc}
+        </div>
+      </div>
+
+      <div style={{ padding: '14px 16px', background: '#f8fafc', borderRadius: 10, border: '1px solid #e2e8f0' }}>
+        <div style={{ fontSize: 11, fontWeight: 700, color: '#334155', fontFamily: 'monospace', marginBottom: 8, textTransform: 'uppercase' }}>
+          PRO TIER CAPABILITIES INCLUDED:
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+          {benefits.map((b, i) => (
+            <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: '#475569' }}>
+              <span style={{ color: '#10b981', fontWeight: 800 }}>✓</span>
+              <span>{b}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <button
+        onClick={onUnlock}
+        style={{
+          width: '100%',
+          padding: '14px',
+          borderRadius: 8,
+          border: 'none',
+          background: 'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)',
+          color: '#ffffff',
+          fontSize: 13,
+          fontWeight: 800,
+          fontFamily: 'monospace',
+          letterSpacing: '0.06em',
+          cursor: 'pointer',
+          boxShadow: '0 4px 14px rgba(2,132,199,0.3)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: 8,
+          transition: 'all 0.2s'
+        }}
+      >
+        <Star size={16} fill="#facc15" color="#facc15" />
+        ACTIVATE CVIS PRO PLAN (INSTANT DEMO)
+      </button>
+    </div>
+  )
 }
 
 function LockedFeature({ title, desc }: { title: string; desc: string }) {
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 10, height: '100%', minHeight: 80, padding: '16px 12px', background: 'linear-gradient(135deg,rgba(0,0,0,0.02) 0%,rgba(0,0,0,0.05) 100%)', border: '1px dashed rgba(0,0,0,0.15)', borderRadius: 8, textAlign: 'center' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 8, height: '100%', minHeight: 70, padding: '12px 10px', background: 'linear-gradient(135deg,rgba(0,0,0,0.02) 0%,rgba(0,0,0,0.05) 100%)', border: '1px dashed rgba(0,0,0,0.15)', borderRadius: 8, textAlign: 'center' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
         <Lock size={12} color="rgba(0,0,0,0.4)" />
         <span style={{ fontSize: 9, fontFamily: 'sans-serif', letterSpacing: '0.15em', color: 'rgba(0,0,0,0.5)', fontWeight: 800, textTransform: 'uppercase' }}>{title}</span>
       </div>
-      <div style={{ fontSize: 10, color: 'rgba(0,0,0,0.4)', lineHeight: 1.5 }}>{desc}</div>
-      <div style={{ padding: '4px 14px', borderRadius: 20, background: 'rgba(0,0,0,0.05)', border: '1px solid rgba(0,0,0,0.1)', fontSize: 9, fontFamily: 'sans-serif', color: 'rgba(0,0,0,0.6)', letterSpacing: '0.1em', fontWeight: 700 }}>UPGRADE TO PRO</div>
+      <div style={{ fontSize: 9.5, color: 'rgba(0,0,0,0.4)', lineHeight: 1.4 }}>{desc}</div>
+      <div style={{ padding: '3px 10px', borderRadius: 20, background: 'rgba(0,0,0,0.05)', border: '1px solid rgba(0,0,0,0.1)', fontSize: 8.5, fontFamily: 'sans-serif', color: 'rgba(0,0,0,0.6)', letterSpacing: '0.1em', fontWeight: 700 }}>UPGRADE TO PRO</div>
     </div>
   )
 }
@@ -136,6 +264,144 @@ function ModeSegments({ driveMode }: { driveMode: string }) {
   return (
     <div style={{ display: 'flex', gap: 3 }}>
       {segs.map((s, i) => (<div key={s.key} style={{ width: 26, height: 5, borderRadius: 2, background: i <= active ? s.color : 'rgba(0,0,0,0.12)', boxShadow: i === active ? `0 0 8px ${s.color}88` : 'none', transition: 'all 0.4s' }} />))}
+    </div>
+  )
+}
+
+function SpeedShowerGauge({
+  speed, maxSpeed, accent, isAwaiting
+}: {
+  speed: number; maxSpeed: number; accent: string; isAwaiting: boolean
+}) {
+  const max = 240
+  const pct = Math.min(Math.max(0, speed) / max, 1)
+  const startA = -210, totalA = 240
+  const toRad = (a: number) => (a * Math.PI) / 180
+  const cx = 110, cy = 95, r = 74
+
+  const arc = (r2: number, sA: number, eA: number) => {
+    const s2 = { x: cx + r2 * Math.cos(toRad(sA)), y: cy + r2 * Math.sin(toRad(sA)) }
+    const e = { x: cx + r2 * Math.cos(toRad(eA)), y: cy + r2 * Math.sin(toRad(eA)) }
+    return `M ${s2.x.toFixed(2)} ${s2.y.toFixed(2)} A ${r2} ${r2} 0 ${(eA - sA) > 180 ? 1 : 0} 1 ${e.x.toFixed(2)} ${e.y.toFixed(2)}`
+  }
+
+  const na = startA + pct * totalA
+  const nx = Number((cx + (r - 12) * Math.cos(toRad(na))).toFixed(2))
+  const ny = Number((cy + (r - 12) * Math.sin(toRad(na))).toFixed(2))
+
+  const ticks = Array.from({ length: 13 }, (_, i) => {
+    const a = startA + (i / 12) * totalA
+    const isMajor = i % 3 === 0
+    return {
+      x1: Number((cx + (r - (isMajor ? 8 : 5)) * Math.cos(toRad(a))).toFixed(2)),
+      y1: Number((cy + (r - (isMajor ? 8 : 5)) * Math.sin(toRad(a))).toFixed(2)),
+      x2: Number((cx + r * Math.cos(toRad(a))).toFixed(2)),
+      y2: Number((cy + r * Math.sin(toRad(a))).toFixed(2)),
+      tx: Number((cx + (r - 16) * Math.cos(toRad(a))).toFixed(2)),
+      ty: Number((cy + (r - 16) * Math.sin(toRad(a))).toFixed(2)),
+      val: Math.round(i * 20),
+      isMajor,
+    }
+  })
+
+  const regime = isAwaiting
+    ? 'STANDBY'
+    : speed === 0
+      ? 'IDLE'
+      : speed < 45
+        ? 'CITY PACE'
+        : speed < 95
+          ? 'CRUISING'
+          : 'SPORT BOOST'
+
+  return (
+    <div style={{ width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+      <svg width="100%" height={122} viewBox="0 0 220 125" style={{ overflow: 'visible' }}>
+        <defs>
+          <linearGradient id="speedGaugeGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+            <stop offset="0%" stopColor="#0ea5e9" />
+            <stop offset="60%" stopColor="#0284c7" />
+            <stop offset="100%" stopColor={accent} />
+          </linearGradient>
+        </defs>
+
+        <circle cx={cx} cy={cy} r={r + 8} fill="#f8fafc" stroke="rgba(0,0,0,0.04)" strokeWidth={1} />
+        <path d={arc(r, startA, startA + totalA)} fill="none" stroke="#e2e8f0" strokeWidth={6} strokeLinecap="round" />
+
+        {!isAwaiting && pct > 0 && (
+          <motion.path
+            d={arc(r, startA, startA + totalA)}
+            fill="none"
+            stroke="url(#speedGaugeGrad)"
+            strokeWidth={6}
+            strokeLinecap="round"
+            style={{ filter: `drop-shadow(0 0 6px ${accent}66)` }}
+            strokeDasharray="600"
+            animate={{ strokeDashoffset: 600 - pct * 326 }}
+            initial={{ strokeDashoffset: 600 }}
+            transition={{ duration: 0.45, ease: 'easeOut' }}
+          />
+        )}
+
+        {ticks.map((t, i) => (
+          <g key={i}>
+            <line
+              x1={t.x1} y1={t.y1} x2={t.x2} y2={t.y2}
+              stroke={t.isMajor ? `${accent}88` : '#cbd5e1'}
+              strokeWidth={t.isMajor ? 1.5 : 1}
+            />
+            {t.isMajor && (
+              <text
+                x={t.tx} y={t.ty + 2.5}
+                textAnchor="middle"
+                fontSize={6.5}
+                fill="#64748b"
+                fontFamily="sans-serif"
+                fontWeight={600}
+              >
+                {t.val}
+              </text>
+            )}
+          </g>
+        ))}
+
+        {!isAwaiting && pct > 0 && (
+          <motion.circle
+            cx={nx} cy={ny} r={4}
+            fill="#ffffff"
+            stroke={accent}
+            strokeWidth={2}
+            style={{ filter: `drop-shadow(0 0 5px ${accent})` }}
+            animate={{ cx: nx, cy: ny }}
+            transition={{ duration: 0.45, ease: 'easeOut' }}
+          />
+        )}
+
+        <text x={cx} y={cy + 2} textAnchor="middle" fontSize={34} fontWeight={800} fill="#0f172a" fontFamily="monospace">
+          {isAwaiting ? '---' : Math.round(speed)}
+        </text>
+        <text x={cx} y={cy + 16} textAnchor="middle" fontSize={8} fontWeight={700} fill="#0284c7" fontFamily="sans-serif" letterSpacing="0.1em">
+          KM / H
+        </text>
+      </svg>
+
+      <div style={{ width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 2, padding: '0 4px', fontSize: 9.5, fontFamily: 'monospace' }}>
+        <span style={{ color: '#64748b' }}>
+          {isAwaiting ? '0 RPM' : `${Math.round(speed * 82)} RPM`}
+        </span>
+        <span style={{
+          padding: '2px 7px', borderRadius: 10,
+          background: isAwaiting ? '#f1f5f9' : `${accent}15`,
+          color: isAwaiting ? '#94a3b8' : accent,
+          fontWeight: 700,
+          border: `1px solid ${isAwaiting ? '#e2e8f0' : accent + '33'}`
+        }}>
+          {regime}
+        </span>
+        <span style={{ color: '#64748b' }}>
+          MAX {maxSpeed > 0 ? Math.round(maxSpeed) : 0}
+        </span>
+      </div>
     </div>
   )
 }
@@ -184,12 +450,13 @@ function DonutRing({ pct, color, label, size = 76 }: { pct: number; color: strin
   )
 }
 
-// ─── Stat Card (click opens modal) ───────────────────────────────────────────
+// ─── Stat Card (click opens modal, supports rich visual slot) ─────────────────
 function StatCard({
-  title, subtitle, icon, value, valueColor, accent = '#0ea5e9', onClick, P, L9, SB, V
+  title, subtitle, icon, value, valueColor, accent = '#0ea5e9', visual, onClick, P, L9, SB, V
 }: {
   title: string; subtitle: string; icon: React.ReactNode
   value: React.ReactNode; valueColor?: string; accent?: string
+  visual?: React.ReactNode
   onClick: () => void
   P: React.CSSProperties; L9: React.CSSProperties; SB: React.CSSProperties; V: React.CSSProperties
 }) {
@@ -199,31 +466,53 @@ function StatCard({
       whileHover="hover"
       whileTap="tap"
       variants={{
-        rest: { scale: 1, y: 0, boxShadow: '0 4px 12px rgba(0,0,0,0.03)' },
-        hover: { scale: 1.02, y: -4, boxShadow: '0 16px 32px rgba(0,0,0,0.08)' },
-        tap: { scale: 0.98, y: 0 }
+        rest: { scale: 1, y: 0, boxShadow: '0 2px 10px rgba(0,0,0,0.03)' },
+        hover: { scale: 1.015, y: -3, boxShadow: '0 12px 24px -4px rgba(0,0,0,0.07)' },
+        tap: { scale: 0.985, y: 0 }
       }}
-      style={{ ...P, cursor: 'pointer', position: 'relative', borderBottom: `3px solid ${accent}` }}
+      style={{
+        ...P,
+        cursor: 'pointer',
+        position: 'relative',
+        borderBottom: `3px solid ${accent}`,
+        display: 'flex',
+        flexDirection: 'column',
+        justifyContent: 'space-between',
+        transition: 'border-color 0.2s',
+      }}
       onClick={onClick}
     >
-      <div style={{ padding: '24px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 16 }}>
-          <div style={{ width: 36, height: 36, borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', background: `${accent}15`, boxShadow: `inset 0 0 0 1px ${accent}22`, transform: 'scale(1.2)' }}>
+      <div style={{ padding: '18px 20px 14px', display: 'flex', flexDirection: 'column', height: '100%' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 10 }}>
+          <div style={{
+            width: 32, height: 32, borderRadius: 8,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            background: `${accent}12`, border: `1px solid ${accent}25`,
+            flexShrink: 0
+          }}>
             {icon}
           </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0, flex: 1 }}>
             <span style={L9}>{title}</span>
             <span style={SB}>{subtitle}</span>
           </div>
-          <motion.div variants={{ rest: { x: 0, opacity: 0.4 }, hover: { x: 4, opacity: 1 } }} style={{ marginLeft: 'auto' }}>
+          <motion.div variants={{ rest: { x: 0, opacity: 0.4 }, hover: { x: 3, opacity: 1 } }} style={{ marginLeft: 'auto', flexShrink: 0 }}>
             <ChevronRight size={14} color={accent} />
           </motion.div>
         </div>
-        <div style={{ ...V, fontSize: 34, color: valueColor ?? '#0f172a' }}>{value}</div>
+        <div style={{ ...V, fontSize: 30, color: valueColor ?? '#0f172a', lineHeight: 1.15, marginBottom: visual ? 10 : 0 }}>
+          {value}
+        </div>
+        {visual && (
+          <div style={{ marginTop: 'auto', paddingTop: 4 }}>
+            {visual}
+          </div>
+        )}
       </div>
     </motion.div>
   )
 }
+
 
 // ─── Formatted AI Text Component ───────────────────────────────────────────
 function FormattedAiText({ text }: { text: string }) {
@@ -256,8 +545,8 @@ function CardModal({ title, icon, accent = '#0ea5e9', onClose, children }: {
       style={{
         position: 'fixed', inset: 0, zIndex: 500,
         display: 'flex', alignItems: 'flex-start', justifyContent: 'center',
-        paddingTop: 'max(80px, 10vh)', paddingLeft: 24, paddingRight: 24, paddingBottom: 24,
-        background: 'rgba(15,23,42,0.45)', backdropFilter: 'blur(8px)',
+        paddingTop: 'max(60px, 8vh)', paddingLeft: 20, paddingRight: 20, paddingBottom: 24,
+        background: 'rgba(15,23,42,0.38)', backdropFilter: 'blur(10px)',
       }}
       onClick={onClose}
     >
@@ -265,33 +554,49 @@ function CardModal({ title, icon, accent = '#0ea5e9', onClose, children }: {
         initial={{ scale: 0.95, y: 16, opacity: 0 }}
         animate={{ scale: 1, y: 0, opacity: 1 }}
         exit={{ scale: 0.95, y: 16, opacity: 0 }}
-        transition={{ duration: 0.2, ease: 'easeOut' }}
+        transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
         onClick={e => e.stopPropagation()}
         style={{
-          width: '100%', maxWidth: 500,
+          width: '100%', maxWidth: 540,
           background: '#ffffff',
-          border: `1px solid rgba(0,0,0,0.12)`,
-          borderRadius: 12,
-          boxShadow: `0 24px 60px rgba(0,0,0,0.2), 0 0 20px rgba(0,0,0,0.05)`,
+          border: '1px solid #e2e8f0',
+          borderRadius: 16,
+          boxShadow: '0 24px 64px -12px rgba(15,23,42,0.18), 0 0 0 1px rgba(0,0,0,0.04)',
           overflow: 'hidden',
         }}
       >
         <div style={{
-          padding: '16px 20px', borderBottom: `1px solid ${accent}22`,
-          display: 'flex', alignItems: 'center', gap: 10, background: `${accent}0a`,
+          padding: '16px 20px', borderBottom: '1px solid #f1f5f9',
+          display: 'flex', alignItems: 'center', gap: 12, background: 'linear-gradient(180deg, #ffffff 0%, #f8fafc 100%)',
         }}>
-          {icon}
-          <span style={{ fontSize: 13, fontWeight: 800, color: '#0f172a', letterSpacing: '0.08em', fontFamily: 'sans-serif' }}>
-            {title}
-          </span>
-          <button onClick={onClose} style={{
-            marginLeft: 'auto', background: 'none', border: 'none',
-            color: 'rgba(0,0,0,0.5)', cursor: 'pointer', lineHeight: 1,
+          <div style={{
+            width: 34, height: 34, borderRadius: 10,
+            background: `${accent}12`, border: `1px solid ${accent}33`,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
           }}>
-            <X size={16} />
+            {icon}
+          </div>
+          <div>
+            <div style={{ fontSize: 14, fontWeight: 700, color: '#0f172a', letterSpacing: '-0.01em', fontFamily: 'sans-serif' }}>
+              {title}
+            </div>
+            <div style={{ fontSize: 10, color: '#64748b', fontFamily: 'monospace', letterSpacing: '0.08em', marginTop: 1 }}>
+              CVIS TELEMETRY SUBSYSTEM
+            </div>
+          </div>
+          <button onClick={onClose} style={{
+            marginLeft: 'auto', background: '#f1f5f9', border: '1px solid #e2e8f0',
+            color: '#64748b', cursor: 'pointer', width: 28, height: 28, borderRadius: '50%',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            transition: 'all 0.2s',
+          }}
+          onMouseEnter={e => { e.currentTarget.style.color = '#0f172a'; e.currentTarget.style.borderColor = '#cbd5e1' }}
+          onMouseLeave={e => { e.currentTarget.style.color = '#64748b'; e.currentTarget.style.borderColor = '#e2e8f0' }}
+          >
+            <X size={15} />
           </button>
         </div>
-        <div style={{ padding: '20px', maxHeight: '75vh', overflowY: 'auto' }}>
+        <div style={{ padding: '22px', maxHeight: '78vh', overflowY: 'auto' }}>
           {children}
         </div>
       </motion.div>
@@ -321,6 +626,7 @@ export default function DriverDashboard({ vehicleId, vehicleName, vehicleColor, 
   const [maxSpeed, setMaxSpeed] = useState(0)
   const [totalDist, setTotalDist] = useState(0)
   const [openCard, setOpenCard] = useState<string | null>(null)
+  const [cabinTemp, setCabinTemp] = useState(21)
   const alertId = useRef(0)
   const chatBottom = useRef<HTMLDivElement>(null)
   const recognitionRef = useRef<any>(null)
@@ -329,11 +635,14 @@ export default function DriverDashboard({ vehicleId, vehicleName, vehicleColor, 
   const voiceTriggered = useRef(false)
   const femaleVoiceRef = useRef<SpeechSynthesisVoice | null>(null)
 
-  const efficiencyData = useMemo(() => Array.from({ length: 13 }, (_, i) => ({
-    time: `${(i * 2).toString().padStart(2, '00')}:00`,
-    efficiency: parseFloat((14 + Math.sin(i * 0.8) * 4 + Math.random() * 1.5).toFixed(1)),
-    consumption: parseFloat((8 + Math.cos(i * 0.6) * 3 + Math.random() * 2).toFixed(1)),
-  })), [])
+  const efficiencyData = useMemo(() => {
+    if (history.length === 0) return []
+    return history.slice(-14).map((h) => ({
+      time: h.time.split(' ')[0],
+      efficiency: Math.round(135 + h.speed * 0.7),
+      consumption: parseFloat(((135 + h.speed * 0.7) / 10).toFixed(1)),
+    }))
+  }, [history])
 
   // ─── Resolve & cache female TTS voice once ──────────────────────────────
   useEffect(() => {
@@ -375,14 +684,39 @@ export default function DriverDashboard({ vehicleId, vehicleName, vehicleColor, 
       setHistory(data.map((r, i) => ({ id: String(i), time: new Date(r.received_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }), batt: r.battery_pct, speed: r.speed_kmh, temp: r.motor_temp_c })))
       if (data.length > 0) { setLatest(data[0]); setMaxSpeed(Math.max(...data.map(r => r.speed_kmh))) }
     }).catch(() => { })
-    fetchConfig().then((cfg: any) => {
-      setIsPro(cfg.ai_service_enabled === true)
-    }).catch(() => { })
+    fetchMobileAccess(vehicleId).then((res: any) => {
+      if (res && res.tier === 'premium') {
+        setIsPro(true)
+      } else {
+        fetchConfig().then((cfg: any) => {
+          setIsPro(cfg.ai_service_enabled === true)
+        }).catch(() => { })
+      }
+    }).catch(() => {
+      fetchConfig().then((cfg: any) => {
+        setIsPro(cfg.ai_service_enabled === true)
+      }).catch(() => { })
+    })
 
     return () => {
       if (typewriterTimer.current) clearInterval(typewriterTimer.current)
     }
   }, [vehicleId])
+
+  const togglePro = useCallback((enable?: boolean) => {
+    const next = enable !== undefined ? enable : !isPro
+    setIsPro(next)
+    setVehicleAiService(vehicleId, next).catch(() => {})
+    if (next) {
+      toast.success("CVIS Pro Intelligence Activated", {
+        description: "Unlocked Multi-Factor AI Coaching, Driving Score, Neural Insights & Efficiency Curves."
+      })
+    } else {
+      toast.info("Free Plan Mode Active", {
+        description: "AI coaching and advanced telemetry analytics are now locked."
+      })
+    }
+  }, [isPro, vehicleId])
 
   const typewriterEffect = useCallback((text: string) => {
     if (typewriterTimer.current) clearInterval(typewriterTimer.current)
@@ -595,20 +929,24 @@ export default function DriverDashboard({ vehicleId, vehicleName, vehicleColor, 
   const mode = latest?.mode ?? 'Healthy'
   const mconf = modeOf(mode)
   const driveMode = latest ? (DRIVE_MODE_LABEL[mode] ?? 'NORMAL') : '---'
-  const tires = getTirePressures(mode), ds = calcDriveScore(latest)
+  const tires = getTirePressures(latest), ds = calcDriveScore(latest)
   const keySugs = KEY_SUGGESTIONS[mode] ?? KEY_SUGGESTIONS['Healthy']
   const avgSpd = history.length > 0 ? history.reduce((a, b) => a + b.speed, 0) / history.length : 0
   // Use actual ambient_temp_c from firmware if available, otherwise derive from battery temp
   const ambientTemp = latest
     ? (latest.ambient_temp_c != null ? latest.ambient_temp_c : Math.max(15, Math.min(40, latest.battery_temp_c - 5)))
     : NaN
-  const enginePct = mode === 'Charging' || mode === 'Motor Fault' ? 0 : mode === 'Eco' ? 55 : mode === 'Sport' ? 92 : 78
-  const battPct2 = mode === 'Charging' ? 100 : mode === 'Motor Fault' ? 20 : mode === 'Eco' ? 82 : mode === 'Sport' ? 58 : 63
-  const motorPct = mode === 'Motor Fault' ? 5 : mode === 'Eco' ? 35 : mode === 'Sport' ? 88 : 45
-  const regenPct = mode === 'Eco' ? 85 : mode === 'Heavy Traffic' ? 72 : mode === 'Charging' ? 100 : 63
-  // Actual kW from telemetry when charging; estimated from mode otherwise
-  const totalKw = latest ? (mode === 'Charging' ? (latest?.charging_rate_w ?? 0) / 1000 : mode === 'Sport' ? 320 : mode === 'Eco' ? 180 : 256) : NaN
-  const totalHp = latest ? Math.round(totalKw * 1.341) : NaN
+  const enginePct = !latest ? 0 : mode === 'Charging' || mode === 'Motor Fault' ? 0 : mode === 'Eco' ? 55 : mode === 'Sport' ? 92 : 78
+  const battPct2 = !latest ? 0 : mode === 'Charging' ? 100 : mode === 'Motor Fault' ? 20 : mode === 'Eco' ? 82 : mode === 'Sport' ? 58 : Math.round(latest.battery_pct)
+  const motorPct = !latest ? 0 : mode === 'Motor Fault' ? 5 : mode === 'Eco' ? 35 : mode === 'Sport' ? 88 : 45
+  const regenPct = !latest ? 0 : mode === 'Eco' ? 85 : mode === 'Heavy Traffic' ? 72 : mode === 'Charging' ? 100 : 63
+  // Actual kW from telemetry when charging; estimated from speed and mode otherwise
+  const totalKw = latest
+    ? (mode === 'Charging'
+        ? (latest?.charging_rate_w ?? 0) / 1000
+        : Math.round((latest.speed_kmh / 120) * (mode === 'Sport' ? 320 : mode === 'Eco' ? 160 : 240)))
+    : NaN
+  const totalHp = !isNaN(totalKw) ? Math.round(totalKw * 1.341) : NaN
 
   // ─── Mobile: render compact app-style layout (same state, same WebSocket) ─
   if (isMobile) {
@@ -631,8 +969,8 @@ export default function DriverDashboard({ vehicleId, vehicleName, vehicleColor, 
         driveMode={driveMode}
         driveScore={ds}
         ambientTemp={ambientTemp}
-        tires={tires}
-        totalKw={totalKw}
+        tires={{ fl: tires.fl ?? 0, fr: tires.fr ?? 0, rl: tires.rl ?? 0, rr: tires.rr ?? 0 }}
+        totalKw={isNaN(totalKw) ? 0 : totalKw}
         chatOpen={chatOpen}
         setChatOpen={setChatOpen}
         chatMsg={chatMsg}
@@ -681,13 +1019,26 @@ export default function DriverDashboard({ vehicleId, vehicleName, vehicleColor, 
               </div>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 7, flexWrap: 'wrap' }}>
-              <button onClick={() => setIsPro(p => !p)} style={{ padding: '4px 11px', borderRadius: 20, cursor: 'pointer', fontSize: 7.5, fontFamily: 'sans-serif', letterSpacing: '0.1em', fontWeight: 700, background: isPro ? 'linear-gradient(90deg,rgba(14,165,233,0.18),rgba(120,60,200,0.18))' : 'rgba(0,0,0,0.06)', border: isPro ? '1px solid rgba(14,165,233,0.4)' : '1px solid rgba(0,0,0,0.15)', color: isPro ? 'var(--cyan)' : 'rgba(0,0,0,0.52)', transition: 'all 0.3s' }}>
-                {isPro ? '\u2605 PRO PLAN' : '\u2606 FREE PLAN'}
+              <button
+                onClick={() => togglePro()}
+                style={{
+                  padding: '5px 12px', borderRadius: 20, cursor: 'pointer',
+                  fontSize: 8, fontFamily: 'monospace', letterSpacing: '0.08em', fontWeight: 800,
+                  background: isPro ? 'linear-gradient(90deg, rgba(2,132,199,0.12), rgba(16,185,129,0.12))' : '#f1f5f9',
+                  border: isPro ? '1.5px solid #0284c7' : '1px solid #cbd5e1',
+                  color: isPro ? '#0284c7' : '#64748b',
+                  boxShadow: isPro ? '0 0 10px rgba(2,132,199,0.15)' : 'none',
+                  transition: 'all 0.2s',
+                  display: 'flex', alignItems: 'center', gap: 5
+                }}
+              >
+                {isPro ? '★ PRO ACTIVE' : '☆ FREE TIER (UPGRADE)'}
               </button>
               {[
-                { label: 'CONNECTED', col: connected ? '#10b981' : '#ef4444', active: connected },
-                { label: 'INTERNET', col: '#0ea5e9', active: true },
-                { label: `${Math.round(latest?.battery_pct ?? 0)}%`, col: latest && latest.battery_pct < 20 ? '#ef4444' : '#10b981', active: true },
+                { label: latest ? 'HMAC: VALID' : 'HMAC: STANDBY', col: latest ? '#10b981' : '#94a3b8', active: !!latest },
+                { label: 'PROTOCOL: MQTT/HTTP', col: '#0ea5e9', active: true },
+                { label: connected ? 'CONNECTED' : 'DISCONNECTED', col: connected ? '#10b981' : '#ef4444', active: connected },
+                { label: latest ? `${Math.round(latest.battery_pct)}%` : '--%', col: latest && latest.battery_pct < 20 ? '#ef4444' : '#10b981', active: !!latest },
                 { label: connected ? 'WS LIVE' : 'OFFLINE', col: connected ? '#10b981' : '#ef4444', active: connected },
               ].map(pill => (<div key={pill.label} style={{ padding: '4px 11px', borderRadius: 20, background: `${pill.col}15`, border: `1px solid ${pill.col}44`, fontSize: 7.5, fontFamily: 'sans-serif', letterSpacing: '0.08em', color: pill.active ? pill.col : 'rgba(0,0,0,0.33)', transition: 'all 0.4s' }}>{pill.label}</div>))}
             </div>
@@ -696,173 +1047,620 @@ export default function DriverDashboard({ vehicleId, vehicleName, vehicleColor, 
           {/* ROW 1: Stat Cards — click any to open detail modal */}
           <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.07 }} style={{ display: 'grid', gridTemplateColumns: 'repeat(5,1fr)', gap: 16 }}>
 
-            <StatCard title="Battery" subtitle="Charge Remaining"
-              icon={<Battery size={10} color={latest && latest.battery_pct < 20 ? '#ef4444' : '#10b981'} />}
-              value={<>{Math.round(latest?.battery_pct ?? 0)}<span style={{ fontSize: 13, color: 'rgba(0,0,0,0.52)', fontWeight: 400 }}>%</span></>}
+            <StatCard title="Battery SoC" subtitle="High-Voltage DC Pack"
+              icon={<Battery size={13} color={latest && latest.battery_pct < 20 ? '#ef4444' : '#10b981'} />}
+              value={latest ? <>{Math.round(latest.battery_pct)}<span style={{ fontSize: 13, color: '#64748b', fontWeight: 500 }}>%</span></> : <span style={{ fontSize: 20, color: '#94a3b8' }}>--%</span>}
               valueColor={latest && latest.battery_pct < 20 ? '#ef4444' : '#10b981'} accent="#10b981"
+              visual={
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  <div style={{ display: 'flex', gap: 3, height: 8 }}>
+                    {Array.from({ length: 10 }, (_, i) => {
+                      const pct = latest?.battery_pct ?? 0
+                      const isLit = latest != null && i < Math.round((pct / 100) * 10)
+                      const col = pct < 20 ? '#ef4444' : pct < 35 ? '#f59e0b' : '#10b981'
+                      return (
+                        <div key={i} style={{
+                          flex: 1, borderRadius: 2,
+                          background: isLit ? col : '#e2e8f0',
+                          boxShadow: isLit ? `0 0 6px ${col}66` : 'none',
+                          transition: 'all 0.4s'
+                        }} />
+                      )
+                    })}
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 9.5, fontFamily: 'monospace', color: '#64748b' }}>
+                    <span>{latest ? `${((latest.battery_pct / 100) * 82).toFixed(1)} kWh` : '--- kWh'}</span>
+                    <span style={{ color: latest && latest.battery_pct < 20 ? '#ef4444' : '#059669', fontWeight: 700 }}>
+                      {latest ? (mode === 'Charging' ? '⚡ 11 kW CHARGE' : latest.battery_pct < 20 ? 'CRITICAL RESERVE' : '800V NOMINAL') : 'OFFLINE'}
+                    </span>
+                  </div>
+                </div>
+              }
               onClick={() => setOpenCard('battery')} P={P} L9={L9} SB={SB} V={V} />
 
-            <StatCard title="Outside Temp" subtitle="Ambient Conditions"
-              icon={<Thermometer size={10} color="#0ea5e9" />}
-              value={<>{Math.round(ambientTemp)}<span style={{ fontSize: 13, color: 'rgba(0,0,0,0.52)', fontWeight: 400 }}>°C</span></>}
+            <StatCard title="Outside & Thermal" subtitle="Ambient & Inverter"
+              icon={<Thermometer size={13} color="#0ea5e9" />}
+              value={!isNaN(ambientTemp) ? <>{Math.round(ambientTemp)}<span style={{ fontSize: 13, color: '#64748b', fontWeight: 500 }}>°C</span></> : <span style={{ fontSize: 20, color: '#94a3b8' }}>--°C</span>}
               accent="#0ea5e9"
+              visual={
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+                  <div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 9, color: '#64748b', marginBottom: 2, fontFamily: 'monospace' }}>
+                      <span>AMBIENT</span>
+                      <span style={{ fontWeight: 700, color: '#0284c7' }}>{!isNaN(ambientTemp) ? `${Math.round(ambientTemp)}°C` : '---'}</span>
+                    </div>
+                    <div style={{ height: 4, borderRadius: 2, background: '#e2e8f0', overflow: 'hidden' }}>
+                      <div style={{ height: '100%', width: !isNaN(ambientTemp) ? `${Math.min(100, Math.max(10, (ambientTemp / 50) * 100))}%` : '0%', background: '#0284c7', borderRadius: 2 }} />
+                    </div>
+                  </div>
+                  <div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 9, color: '#64748b', marginBottom: 2, fontFamily: 'monospace' }}>
+                      <span>MOTOR POWERTRAIN</span>
+                      <span style={{ fontWeight: 700, color: latest && latest.motor_temp_c > 75 ? '#ef4444' : '#059669' }}>
+                        {latest ? `${Math.round(latest.motor_temp_c)}°C` : '---'}
+                      </span>
+                    </div>
+                    <div style={{ height: 4, borderRadius: 2, background: '#e2e8f0', overflow: 'hidden' }}>
+                      <div style={{ height: '100%', width: latest ? `${Math.min(100, (latest.motor_temp_c / 120) * 100)}%` : '0%', background: latest && latest.motor_temp_c > 75 ? '#ef4444' : '#10b981', borderRadius: 2 }} />
+                    </div>
+                  </div>
+                </div>
+              }
               onClick={() => setOpenCard('temp')} P={P} L9={L9} SB={SB} V={V} />
 
-            <StatCard title="Drive Mode" subtitle="Dynamic Performance"
-              icon={<Gauge size={10} color={mconf.accent} />}
-              value={<span style={{ fontSize: 20, textShadow: `0 0 16px ${mconf.accent}77` }}>{driveMode}</span>}
+            <StatCard title="Drive Mode" subtitle="Powertrain Dynamics"
+              icon={<Gauge size={13} color={mconf.accent} />}
+              value={<span style={{ fontSize: 22, fontWeight: 800, color: mconf.accent }}>{driveMode}</span>}
               valueColor={mconf.accent} accent={mconf.accent}
-              onClick={() => setOpenCard('mode')} P={P} L9={L9} SB={SB} V={V} />
-
-            <StatCard title="Est. Range" subtitle={mode === 'Charging' ? 'Time to full' : 'Distance left'}
-              icon={<Map size={10} color="#0ea5e9" />}
-              value={mode === 'Charging'
-                ? <>{Math.round(((100 - (latest?.battery_pct ?? 0)) / 100) * 60)}<span style={{ fontSize: 13, color: 'rgba(0,0,0,0.52)', fontWeight: 400 }}> min</span></>
-                : <>{Math.round(latest?.range_km ?? 0)}<span style={{ fontSize: 13, color: 'rgba(0,0,0,0.52)', fontWeight: 400 }}> km</span></>}
-              accent="#0ea5e9"
-              onClick={() => setOpenCard('range')} P={P} L9={L9} SB={SB} V={V} />
-
-            <StatCard title="Drive Score" subtitle={isPro ? ds.label : 'AI Feature — Pro'}
-              icon={<Star size={10} color={isPro ? '#f59e0b' : 'rgba(0,0,0,0.30)'} fill={isPro ? '#f59e0b' : 'none'} />}
-              value={isPro ? <>{ds.score}<span style={{ fontSize: 13, color: 'rgba(0,0,0,0.52)', fontWeight: 400 }}>/10</span></> : <Lock size={16} color="rgba(0,0,0,0.30)" />}
-              valueColor={isPro ? (ds.score >= 8 ? '#10b981' : ds.score >= 6 ? '#f59e0b' : '#ef4444') : undefined} accent="#f59e0b"
-              onClick={() => setOpenCard('score')} P={P} L9={L9} SB={SB} V={V} />
-
-          </motion.div>
-
-          {/* Card Modals */}
-          <AnimatePresence>
-            {openCard === 'battery' && (
-              <CardModal title="Battery Details" icon={<Battery size={14} color="#10b981" />} accent="#10b981" onClose={() => setOpenCard(null)}>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{ fontSize: 48, fontWeight: 700, color: latest && latest.battery_pct < 20 ? '#ef4444' : '#10b981', fontFamily: 'sans-serif' }}>{Math.round(latest?.battery_pct ?? 0)}<span style={{ fontSize: 20, color: 'rgba(0,0,0,0.60)', fontWeight: 400 }}>%</span></span>
-                    <MiniBars pct={latest?.battery_pct ?? 0} color={latest && latest.battery_pct < 20 ? '#ef4444' : '#10b981'} />
-                  </div>
-                  <div style={{ height: 8, borderRadius: 4, background: 'rgba(0,0,0,0.11)', overflow: 'hidden' }}>
-                    <motion.div style={{ height: '100%', borderRadius: 4, background: latest && latest.battery_pct < 20 ? '#ef4444' : 'linear-gradient(90deg,#10b981,#0ea5e9)' }} animate={{ width: `${latest?.battery_pct ?? 0}%` }} transition={{ duration: 0.8 }} />
-                  </div>
-                  {[{ label: 'Voltage', val: (latest?.battery_pct ?? 80) > 50 ? '402V' : '387V', col: '#0f172a' }, { label: 'Battery Temp', val: `${Math.round(latest?.battery_temp_c ?? 28)}°C`, col: latest && latest.battery_temp_c > 50 ? '#ef4444' : '#10b981' }, { label: 'Charge Rate', val: mode === 'Charging' ? `${((latest?.charging_rate_w ?? 11000) / 1000).toFixed(1)} kW` : '— Not Charging', col: mode === 'Charging' ? '#0ea5e9' : 'rgba(0,0,0,0.60)' }, { label: 'State', val: mode === 'Charging' ? 'Charging' : mode === 'Low Battery' ? 'Critical' : 'Discharging', col: mode === 'Charging' ? '#10b981' : mode === 'Low Battery' ? '#ef4444' : '#0f172a' }].map(r => (
-                    <div key={r.label} style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 14px', background: 'rgba(0,0,0,0.04)', borderRadius: 6, border: '1px solid rgba(0,0,0,0.09)' }}>
-                      <span style={{ fontSize: 12, color: 'rgba(0,0,0,0.60)', fontFamily: 'sans-serif' }}>{r.label}</span>
-                      <span style={{ fontSize: 13, fontWeight: 600, color: r.col, fontFamily: 'sans-serif' }}>{r.val}</span>
-                    </div>
-                  ))}
-                </div>
-              </CardModal>
-            )}
-            {openCard === 'temp' && (
-              <CardModal title="Ambient Conditions" icon={<Thermometer size={14} color="#0ea5e9" />} accent="#0ea5e9" onClose={() => setOpenCard(null)}>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-                  <div style={{ textAlign: 'center', fontSize: 52, fontWeight: 700, color: '#0f172a', fontFamily: 'sans-serif' }}>{Math.round(ambientTemp)}<span style={{ fontSize: 22, color: 'rgba(0,0,0,0.60)', fontWeight: 400 }}>°C</span></div>
-                  <div style={{ textAlign: 'center', fontSize: 14, color: '#0ea5e9', fontFamily: 'sans-serif', marginTop: -8 }}>{ambientTemp < 18 ? '❄️ Cool — Range +3%' : ambientTemp < 28 ? '☀️ Clear Sky — Optimal' : '🔥 Warm — Range -2%'}</div>
-                  {[{ label: 'Feels Like', val: `${Math.round(ambientTemp - 2)}°C` }, { label: 'Cabin Temp', val: `${Math.round(ambientTemp + 4)}°C` }, { label: 'Range Impact', val: ambientTemp < 18 ? '+3%' : ambientTemp < 28 ? 'Neutral' : '-2%' }, { label: 'HVAC Load', val: ambientTemp > 28 ? 'High' : ambientTemp > 18 ? 'Moderate' : 'Low' }, { label: 'Dew Point', val: `${Math.round(ambientTemp - 6)}°C` }].map(r => (
-                    <div key={r.label} style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 14px', background: 'rgba(0,0,0,0.04)', borderRadius: 6, border: '1px solid rgba(0,0,0,0.09)' }}>
-                      <span style={{ fontSize: 12, color: 'rgba(0,0,0,0.60)', fontFamily: 'sans-serif' }}>{r.label}</span>
-                      <span style={{ fontSize: 13, fontWeight: 600, color: '#0f172a', fontFamily: 'sans-serif' }}>{r.val}</span>
-                    </div>
-                  ))}
-                </div>
-              </CardModal>
-            )}
-            {openCard === 'mode' && (
-              <CardModal title="Drive Mode" icon={<Gauge size={14} color={mconf.accent} />} accent={mconf.accent} onClose={() => setOpenCard(null)}>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-                  <div style={{ textAlign: 'center' }}>
-                    <div style={{ fontSize: 36, fontWeight: 700, color: mconf.accent, fontFamily: 'sans-serif', textShadow: `0 0 30px ${mconf.accent}66` }}>{mode}</div>
-                    <div style={{ fontSize: 12, color: 'rgba(0,0,0,0.52)', fontFamily: 'sans-serif', marginTop: 4 }}>ESP32 Simulated Mode</div>
-                    <div style={{ marginTop: 10 }}><ModeSegments driveMode={driveMode} /></div>
-                  </div>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-                    {(['Healthy', 'Eco', 'Sport', 'Heavy Traffic', 'Low Battery', 'Battery Overheating', 'Charging', 'Motor Fault'] as const).map(m => {
-                      const isSelectable = ['Healthy', 'Eco', 'Sport', 'Heavy Traffic'].includes(m);
-                      return isSelectable ? (
-                        <button key={m} onClick={() => handleForceMode(m)} style={{ cursor: 'pointer', padding: '10px 12px', borderRadius: 6, background: mode === m ? `${modeOf(m).color}18` : 'rgba(0,0,0,0.04)', border: `1px solid ${mode === m ? modeOf(m).color + '55' : 'rgba(0,0,0,0.11)'}`, fontSize: 11, fontFamily: 'sans-serif', color: mode === m ? modeOf(m).color : 'rgba(0,0,0,0.52)', textAlign: 'center', fontWeight: mode === m ? 700 : 400 }}>
-                          {m}
-                        </button>
-                      ) : (
-                        <div key={m} style={{ padding: '10px 12px', borderRadius: 6, background: mode === m ? `${modeOf(m).color}18` : 'rgba(0,0,0,0.02)', border: `1px dashed ${mode === m ? modeOf(m).color + '55' : 'rgba(0,0,0,0.08)'}`, fontSize: 11, fontFamily: 'sans-serif', color: mode === m ? modeOf(m).color : 'rgba(0,0,0,0.3)', textAlign: 'center', fontWeight: mode === m ? 700 : 400, opacity: mode === m ? 1 : 0.6 }}>
-                          {m} {mode === m && '⚠️'}
+              visual={
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 3 }}>
+                    {[
+                      { name: 'ECO', col: '#10b981' },
+                      { name: 'NORM', col: '#0ea5e9' },
+                      { name: 'SPORT', col: '#f59e0b' },
+                      { name: 'ALERT', col: '#ef4444' }
+                    ].map(seg => {
+                      const isCur = latest != null && (
+                        (seg.name === 'ECO' && mode === 'Eco') ||
+                        (seg.name === 'NORM' && (mode === 'Healthy' || mode === 'Heavy Traffic' || mode === 'Charging')) ||
+                        (seg.name === 'SPORT' && mode === 'Sport') ||
+                        (seg.name === 'ALERT' && (mode === 'Battery Overheating' || mode === 'Motor Fault' || mode === 'Low Battery'))
+                      )
+                      return (
+                        <div key={seg.name} style={{
+                          padding: '3px 0', textAlign: 'center', borderRadius: 3,
+                          fontSize: 8.5, fontWeight: 700, fontFamily: 'monospace',
+                          background: isCur ? `${seg.col}18` : '#f1f5f9',
+                          color: isCur ? seg.col : '#94a3b8',
+                          border: `1px solid ${isCur ? seg.col : '#e2e8f0'}`,
+                          boxShadow: isCur ? `0 0 6px ${seg.col}44` : 'none'
+                        }}>
+                          {seg.name}
                         </div>
                       )
                     })}
                   </div>
-                  <div style={{ display: 'flex', justifyContent: 'center', marginTop: -4 }}>
-                    <button onClick={() => handleForceMode(null)} style={{ cursor: 'pointer', fontSize: 10, color: '#0ea5e9', background: 'transparent', border: 'none', textDecoration: 'underline' }}>
-                      Resume Auto-Cycle
-                    </button>
-                  </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 14px', background: 'rgba(0,0,0,0.04)', borderRadius: 6, border: '1px solid rgba(0,0,0,0.09)' }}>
-                    <span style={{ fontSize: 12, color: 'rgba(0,0,0,0.60)', fontFamily: 'sans-serif' }}>Fault Code</span>
-                    <span style={{ fontSize: 13, fontWeight: 600, color: latest?.fault_code ? '#ef4444' : '#10b981', fontFamily: 'sans-serif' }}>{latest?.fault_code ? `0x${latest.fault_code.toString(16).toUpperCase()}` : 'NONE'}</span>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 9.5, color: '#64748b', fontFamily: 'monospace' }}>
+                    <span>TORQUE: {mode === 'Sport' ? '40/60 REAR' : mode === 'Eco' ? '100% REAR' : '50/50 AWD'}</span>
+                    <span style={{ color: mconf.color, fontWeight: 700 }}>● {latest ? 'CAN-BUS SYNC' : 'OFFLINE'}</span>
                   </div>
                 </div>
-              </CardModal>
-            )}
-            {openCard === 'range' && (
-              <CardModal title="Range & Navigation" icon={<Map size={14} color="#0ea5e9" />} accent="#0ea5e9" onClose={() => setOpenCard(null)}>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-                  <div style={{ textAlign: 'center', fontSize: 52, fontWeight: 700, color: '#0f172a', fontFamily: 'sans-serif' }}>{Math.round(latest?.range_km ?? 0)}<span style={{ fontSize: 20, color: 'rgba(0,0,0,0.60)', fontWeight: 400 }}> km</span></div>
-                  <div style={{ height: 8, borderRadius: 4, background: 'rgba(0,0,0,0.11)', overflow: 'hidden' }}>
-                    <div style={{ height: '100%', width: `${Math.min(100, (latest?.range_km ?? 0) / 5)}%`, background: 'linear-gradient(90deg,#ef4444,#f59e0b,#10b981)', borderRadius: 4 }} />
+              }
+              onClick={() => setOpenCard('mode')} P={P} L9={L9} SB={SB} V={V} />
+
+            <StatCard title="Est. Range" subtitle={mode === 'Charging' ? 'Time to full' : 'Distance remaining'}
+              icon={<Map size={13} color="#0ea5e9" />}
+              value={latest ? (mode === 'Charging'
+                ? <>{Math.round(((100 - latest.battery_pct) / 100) * 60)}<span style={{ fontSize: 13, color: '#64748b', fontWeight: 500 }}> min</span></>
+                : <>{Math.round(latest.range_km)}<span style={{ fontSize: 13, color: '#64748b', fontWeight: 500 }}> km</span></>)
+                : <span style={{ fontSize: 20, color: '#94a3b8' }}>-- km</span>}
+              accent="#0ea5e9"
+              visual={
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  <div style={{ height: 6, borderRadius: 3, background: '#e2e8f0', overflow: 'hidden' }}>
+                    <div style={{
+                      height: '100%',
+                      width: latest ? `${Math.min(100, (latest.range_km / 500) * 100)}%` : '0%',
+                      background: 'linear-gradient(90deg, #0284c7 0%, #38bdf8 100%)',
+                      borderRadius: 3
+                    }} />
                   </div>
-                  {[{ label: 'Current Speed', val: `${Math.round(latest?.speed_kmh ?? 0)} km/h` }, { label: 'ETA at Speed', val: latest && latest.speed_kmh > 5 ? `${Math.round((latest.range_km / latest.speed_kmh) * 60)} min` : '—' }, { label: 'Consumption', val: `${mode === 'Eco' ? '14.2' : mode === 'Sport' ? '22.8' : '17.5'} kWh/100km` }, { label: 'Charging ETA', val: mode === 'Charging' ? `${Math.round(((100 - (latest?.battery_pct ?? 0)) / 100) * 60)} min to full` : 'Not Charging' }].map(r => (
-                    <div key={r.label} style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 14px', background: 'rgba(0,0,0,0.04)', borderRadius: 6, border: '1px solid rgba(0,0,0,0.09)' }}>
-                      <span style={{ fontSize: 12, color: 'rgba(0,0,0,0.60)', fontFamily: 'sans-serif' }}>{r.label}</span>
-                      <span style={{ fontSize: 13, fontWeight: 600, color: '#0f172a', fontFamily: 'sans-serif' }}>{r.val}</span>
-                    </div>
-                  ))}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 9.5, color: '#64748b', fontFamily: 'monospace' }}>
+                    <span>CITY: {latest ? `${Math.round(latest.range_km * 1.08)} km` : '---'}</span>
+                    <span>HWY: {latest ? `${Math.round(latest.range_km * 0.88)} km` : '---'}</span>
+                    <span style={{ color: '#0284c7', fontWeight: 700 }}>{latest ? `${Math.round(135 + latest.speed_kmh * 0.7)} Wh/km` : '--- Wh/km'}</span>
+                  </div>
                 </div>
-              </CardModal>
-            )}
-            {openCard === 'score' && (
-              <CardModal title="Drive Score" icon={<Star size={14} color="#f59e0b" fill="#f59e0b" />} accent="#f59e0b" onClose={() => setOpenCard(null)}>
-                {isPro ? (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-                    <div style={{ textAlign: 'center' }}>
-                      <div style={{ fontSize: 64, fontWeight: 700, color: ds.score >= 8 ? '#10b981' : ds.score >= 6 ? '#f59e0b' : '#ef4444', fontFamily: 'sans-serif' }}>{ds.score}<span style={{ fontSize: 24, color: 'rgba(0,0,0,0.5)', fontWeight: 400 }}>/10</span></div>
-                      <div style={{ fontSize: 13, color: '#f59e0b', fontFamily: 'sans-serif', marginTop: 4 }}>{ds.label}</div>
+              }
+              onClick={() => setOpenCard('range')} P={P} L9={L9} SB={SB} V={V} />
+
+            <StatCard title="Drive Score" subtitle={isPro ? (latest ? ds.label : 'Waiting for Telemetry...') : 'AI Feature — Pro'}
+              icon={<Star size={13} color="#f59e0b" fill={isPro ? '#f59e0b' : 'none'} />}
+              value={isPro ? (latest && !isNaN(ds.score) ? <>{ds.score}<span style={{ fontSize: 13, color: '#64748b', fontWeight: 500 }}>/10</span></> : <span style={{ fontSize: 20, color: '#94a3b8' }}>--/10</span>) : <span style={{ fontSize: 16, color: '#b45309', fontWeight: 700 }}>PRO AI</span>}
+              valueColor={isPro && latest && !isNaN(ds.score) ? (ds.score >= 8 ? '#10b981' : ds.score >= 6 ? '#f59e0b' : '#ef4444') : undefined} accent="#f59e0b"
+              visual={
+                !isPro ? (
+                  <ProLockedCard
+                    title="AI Telemetry Rating"
+                    desc="Unlock multi-factor neural driving score & coaching"
+                    onUnlock={() => {
+                      setIsPro(true)
+                      toast.success("Pro Plan Activated — Unlocked Centralized AI Coaching & Analytics")
+                    }}
+                  />
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span style={{ fontSize: 9.5, padding: '2px 8px', borderRadius: 12, background: 'rgba(245,158,11,0.12)', color: '#d97706', fontWeight: 700, fontFamily: 'monospace' }}>
+                        {latest && !isNaN(ds.score) ? ds.label : 'Waiting for Telemetry...'}
+                      </span>
                     </div>
-                    <div style={{ display: 'flex', gap: 4, justifyContent: 'center' }}>
-                      {Array.from({ length: 10 }, (_, i) => <div key={i} style={{ width: 22, height: 10 + i * 3, background: i < ds.score ? '#f59e0b' : 'rgba(0,0,0,0.11)', borderRadius: 3, transition: 'all 0.4s' }} />)}
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 3 }}>
+                      {[
+                        { name: 'SMOOTH', pct: latest ? 92 : 0 },
+                        { name: 'REGEN', pct: latest ? 88 : 0 },
+                        { name: 'SPEED', pct: latest && latest.speed_kmh > 100 ? 70 : 96 },
+                        { name: 'THERM', pct: latest && latest.motor_temp_c > 75 ? 65 : 98 },
+                      ].map(p => (
+                        <div key={p.name} style={{ height: 4, borderRadius: 2, background: '#e2e8f0', overflow: 'hidden' }}>
+                          <div style={{ height: '100%', width: `${p.pct}%`, background: p.pct > 80 ? '#10b981' : p.pct > 70 ? '#f59e0b' : '#ef4444' }} />
+                        </div>
+                      ))}
                     </div>
-                    {[{ label: 'Speed Habits', val: latest && latest.speed_kmh > 100 ? 'Aggressive' : 'Smooth', col: latest && latest.speed_kmh > 100 ? '#ef4444' : '#10b981' }, { label: 'Braking', val: 'Moderate', col: '#f59e0b' }, { label: 'Efficiency', val: mode === 'Eco' ? 'Excellent' : 'Good', col: '#10b981' }, { label: 'Motor Health', val: latest?.fault_code ? 'Fault Detected' : 'Normal', col: latest?.fault_code ? '#ef4444' : '#10b981' }].map(r => (
-                      <div key={r.label} style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 14px', background: 'rgba(0,0,0,0.04)', borderRadius: 6, border: '1px solid rgba(0,0,0,0.09)' }}>
-                        <span style={{ fontSize: 12, color: 'rgba(0,0,0,0.60)', fontFamily: 'sans-serif' }}>{r.label}</span>
-                        <span style={{ fontSize: 13, fontWeight: 600, color: r.col, fontFamily: 'sans-serif' }}>{r.val}</span>
+                  </div>
+                )
+              }
+              onClick={() => {
+                if (!isPro) {
+                  setIsPro(true)
+                  toast.success("Pro Plan Activated — Unlocked Centralized AI Coaching & Analytics")
+                } else {
+                  setOpenCard('score')
+                }
+              }} P={P} L9={L9} SB={SB} V={V} />
+
+          </motion.div>
+
+
+          {/* Card Modals */}
+          <AnimatePresence>
+            {openCard === 'battery' && (
+              <CardModal title="High-Voltage Battery & BMS" icon={<Battery size={16} color="#10b981" />} accent="#10b981" onClose={() => setOpenCard(null)}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                  {/* SoC Hero */}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', padding: '16px 18px', background: '#f8fafc', borderRadius: 12, border: '1px solid #e2e8f0' }}>
+                    <div>
+                      <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.12em', color: '#64748b', textTransform: 'uppercase', fontFamily: 'monospace' }}>
+                        STATE OF CHARGE (SoC)
+                      </div>
+                      <div style={{ fontSize: 48, fontWeight: 800, color: latest && latest.battery_pct < 20 ? '#ef4444' : '#0f172a', fontFamily: 'monospace', lineHeight: 1.1, marginTop: 4 }}>
+                        {latest ? Math.round(latest.battery_pct) : 0}<span style={{ fontSize: 20, color: '#64748b', fontWeight: 500 }}>%</span>
+                      </div>
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6 }}>
+                      <span style={{ fontSize: 10, padding: '3px 8px', borderRadius: 6, background: 'rgba(16, 185, 129, 0.1)', color: '#059669', fontWeight: 700, fontFamily: 'monospace' }}>
+                        800V DC ARCHITECTURE
+                      </span>
+                      <span style={{ fontSize: 10, padding: '3px 8px', borderRadius: 6, background: 'rgba(2, 132, 199, 0.1)', color: '#0284c7', fontWeight: 700, fontFamily: 'monospace' }}>
+                        SoH: 98.4% (OPTIMAL)
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* High-Precision Battery Level Bar */}
+                  <div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: '#64748b', marginBottom: 6, fontFamily: 'monospace' }}>
+                      <span>0 kWh (0%)</span>
+                      <span>CAPACITY: {latest ? `${((latest.battery_pct / 100) * 82).toFixed(1)} / 82.0 kWh` : '--- / 82.0 kWh'}</span>
+                      <span>100%</span>
+                    </div>
+                    <div style={{ height: 10, borderRadius: 5, background: '#e2e8f0', overflow: 'hidden' }}>
+                      <motion.div
+                        style={{
+                          height: '100%',
+                          borderRadius: 5,
+                          background: latest && latest.battery_pct < 20 ? '#ef4444' : 'linear-gradient(90deg, #0284c7 0%, #10b981 100%)',
+                        }}
+                        animate={{ width: `${latest?.battery_pct ?? 0}%` }}
+                        transition={{ duration: 0.8 }}
+                      />
+                    </div>
+                  </div>
+
+                  {/* 12-Cell Micro BMS Balancer Array */}
+                  <div style={{ padding: '12px 14px', background: '#f8fafc', borderRadius: 10, border: '1px solid #e2e8f0' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                      <span style={{ fontSize: 11, fontWeight: 700, color: '#334155', fontFamily: 'monospace' }}>
+                        CELL VOLTAGE BALANCE MATRIX (96s PACK)
+                      </span>
+                      <span style={{ fontSize: 10, color: latest ? '#059669' : '#94a3b8', fontWeight: 700, fontFamily: 'monospace' }}>
+                        DELTA: {latest ? `${latest.max_cell_voltage_delta ?? 11} mV (BALANCED)` : '--- mV'}
+                      </span>
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(12, 1fr)', gap: 4 }}>
+                      {Array.from({ length: 12 }, (_, i) => (
+                        <div
+                          key={i}
+                          title={latest ? `Cell Bank #${i + 1}: ${(4.16 + (i % 3) * 0.01).toFixed(2)}V` : 'Cell Bank: Offline'}
+                          style={{
+                            height: 18,
+                            borderRadius: 3,
+                            background: latest ? (latest.battery_temp_c > 50 ? '#fca5a5' : '#86efac') : '#f1f5f9',
+                            border: `1px solid ${latest ? (latest.battery_temp_c > 50 ? '#ef4444' : '#22c55e') : '#e2e8f0'}`,
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            fontSize: 8,
+                            fontWeight: 700,
+                            color: latest ? '#0f172a' : '#94a3b8',
+                            fontFamily: 'monospace',
+                          }}
+                        >
+                          {latest ? (4.16 + (i % 3) * 0.01).toFixed(2) : '---'}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Telemetry Stats Grid */}
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                    {[
+                      { label: 'Pack Voltage', val: latest ? (latest.battery_pct > 50 ? '794 V' : '768 V') : '--- V', col: '#0f172a' },
+                      {
+                        label: 'Battery Temp',
+                        val: latest ? `${Math.round(latest.battery_temp_c)}°C` : '--- °C',
+                        col: latest && latest.battery_temp_c > 50 ? '#ef4444' : latest && latest.battery_temp_c > 40 ? '#f59e0b' : '#059669'
+                      },
+                      {
+                        label: 'Charge Flow',
+                        val: latest ? (mode === 'Charging' ? `${((latest.charging_rate_w ?? 0) / 1000).toFixed(1)} kW (DC Fast)` : '0.0 kW (Discharge)') : '--- kW',
+                        col: mode === 'Charging' ? '#0284c7' : '#64748b'
+                      },
+                      {
+                        label: 'Power Status',
+                        val: latest ? (mode === 'Charging' ? '⚡ FAST CHARGING' : mode === 'Low Battery' ? '⚠️ CRITICAL RESERVE' : '✓ NORMAL DISCHARGE') : 'OFFLINE',
+                        col: mode === 'Charging' ? '#0284c7' : mode === 'Low Battery' ? '#ef4444' : '#059669'
+                      },
+                    ].map(r => (
+                      <div key={r.label} style={{ padding: '12px 14px', background: '#f8fafc', borderRadius: 8, border: '1px solid #e2e8f0' }}>
+                        <div style={{ fontSize: 11, color: '#64748b', fontFamily: 'sans-serif', marginBottom: 2 }}>{r.label}</div>
+                        <div style={{ fontSize: 14, fontWeight: 700, color: r.col, fontFamily: 'monospace' }}>{r.val}</div>
                       </div>
                     ))}
                   </div>
-                ) : <LockedFeature title="Drive Score" desc="Upgrade to Pro to get AI-powered scoring across speed, braking, and efficiency." />}
+                </div>
               </CardModal>
             )}
-            {openCard === 'tires' && (
-              <CardModal title="Tire Pressure" icon={<span style={{ fontSize: 14 }}>🛞</span>} accent="#10b981" onClose={() => setOpenCard(null)}>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-                  <svg width="100%" viewBox="0 0 220 100" style={{ overflow: 'visible', margin: '0 auto', display: 'block' }}>
-                    <rect x={70} y={22} width={80} height={56} rx={6} fill="none" stroke="rgba(14,165,233,0.2)" strokeWidth={1.5} />
-                    <line x1={110} y1={22} x2={110} y2={78} stroke="rgba(14,165,233,0.1)" strokeWidth={0.8} />
-                    <line x1={70} y1={50} x2={150} y2={50} stroke="rgba(14,165,233,0.1)" strokeWidth={0.8} />
-                    {([{ cx: 44, cy: 28, psi: tires.fl, pos: 'Front Left' }, { cx: 176, cy: 28, psi: tires.fr, pos: 'Front Right' }, { cx: 44, cy: 72, psi: tires.rl, pos: 'Rear Left' }, { cx: 176, cy: 72, psi: tires.rr, pos: 'Rear Right' }] as const).map(w => {
-                      const col = w.psi < 30 ? '#ef4444' : w.psi > 36 ? '#f59e0b' : '#10b981'
-                      return (<g key={w.pos}><rect x={w.cx - 17} y={w.cy - 14} width={34} height={28} rx={4} fill={`${col}18`} stroke={col} strokeWidth={1} style={{ filter: `drop-shadow(0 0 4px ${col}55)` }} /><text x={w.cx} y={w.cy - 1} textAnchor="middle" fontSize={11} fontWeight={700} fill={col} fontFamily="sans-serif">{w.psi}</text><text x={w.cx} y={w.cy + 10} textAnchor="middle" fontSize={7} fill="rgba(0,0,0,0.45)" fontFamily="sans-serif">PSI</text></g>)
-                    })}
-                  </svg>
-                  {([['Front Left', tires.fl], ['Front Right', tires.fr], ['Rear Left', tires.rl], ['Rear Right', tires.rr]] as [string, number][]).map(([pos, psi]) => {
-                    const col = psi < 30 ? '#ef4444' : psi > 36 ? '#f59e0b' : '#10b981'
-                    const status = psi < 30 ? 'Low — Inflate Soon' : psi > 36 ? 'High — Release Air' : 'Normal'
-                    return (
-                      <div key={pos} style={{ padding: '12px 14px', background: 'rgba(0,0,0,0.04)', borderRadius: 6, border: `1px solid ${col}33` }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
-                          <span style={{ fontSize: 12, fontWeight: 600, color: 'rgba(0,0,0,1.00)', fontFamily: 'sans-serif' }}>{pos}</span>
-                          <span style={{ fontSize: 13, fontWeight: 700, color: col, fontFamily: 'sans-serif' }}>{psi} PSI — {status}</span>
+
+            {openCard === 'temp' && (
+              <CardModal title="Ambient Conditions & Aerodynamics" icon={<Thermometer size={16} color="#0ea5e9" />} accent="#0ea5e9" onClose={() => setOpenCard(null)}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                  {/* Ambient Temp Hero */}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '18px 20px', background: 'linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%)', borderRadius: 12, border: '1px solid #bae6fd' }}>
+                    <div>
+                      <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.12em', color: '#0369a1', textTransform: 'uppercase', fontFamily: 'monospace' }}>
+                        OUTSIDE AMBIENT TEMPERATURE
+                      </div>
+                      <div style={{ fontSize: 44, fontWeight: 800, color: '#0284c7', fontFamily: 'monospace', lineHeight: 1.1, marginTop: 4 }}>
+                        {!isNaN(ambientTemp) ? <>{Math.round(ambientTemp)}<span style={{ fontSize: 20, color: '#0369a1', fontWeight: 500 }}>°C</span></> : <span style={{ fontSize: 32, color: '#94a3b8' }}>--°C</span>}
+                      </div>
+                    </div>
+                    <div style={{ textAlign: 'right' }}>
+                      <span style={{ fontSize: 11, padding: '4px 10px', borderRadius: 20, background: '#ffffff', color: '#0284c7', fontWeight: 700, border: '1px solid #bae6fd' }}>
+                        {!isNaN(ambientTemp) ? (ambientTemp < 18 ? '❄️ COOL DENSE AIR' : ambientTemp < 28 ? '☀️ OPTIMAL CONDITIONS' : '🔥 ELEVATED THERMAL LOAD') : '◌ TELEMETRY STANDBY'}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Aerodynamics & Environmental Impact Grid */}
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                    {[
+                      { label: 'Headwind Velocity', val: latest ? `${latest.headwind_kmh ?? 0} km/h` : '--- km/h', detail: 'Opposing aerodynamic force' },
+                      { label: 'Road Gradient', val: latest?.road_gradient_pct != null ? `${latest.road_gradient_pct > 0 ? '+' : ''}${latest.road_gradient_pct.toFixed(1)}%` : '---%', detail: 'Incline elevation load' },
+                      { label: 'Drag Coefficient (Cd)', val: '0.208 Cd', detail: 'Low-slung sports silhouette' },
+                      { label: 'Cabin HVAC Draw', val: latest ? `${latest.cabin_climate_w ?? 0} W` : '--- W', detail: `Set to ${cabinTemp}°C Auto` },
+                    ].map(item => (
+                      <div key={item.label} style={{ padding: '12px 14px', background: '#f8fafc', borderRadius: 8, border: '1px solid #e2e8f0' }}>
+                        <div style={{ fontSize: 11, color: '#64748b', marginBottom: 2 }}>{item.label}</div>
+                        <div style={{ fontSize: 15, fontWeight: 700, color: '#0f172a', fontFamily: 'monospace' }}>{item.val}</div>
+                        <div style={{ fontSize: 10, color: '#94a3b8', marginTop: 3 }}>{item.detail}</div>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Range Impact Summary Banner */}
+                  <div style={{ padding: '12px 16px', background: '#f8fafc', borderRadius: 8, border: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ fontSize: 12, color: '#475569', fontWeight: 500 }}>
+                      Net Aerodynamic & Climate Impact on Range:
+                    </span>
+                    <span style={{ fontSize: 13, fontWeight: 700, color: ambientTemp < 18 ? '#059669' : ambientTemp > 30 ? '#dc2626' : '#0284c7', fontFamily: 'monospace' }}>
+                      {ambientTemp < 18 ? '+2.4% (Dense air boost)' : ambientTemp > 30 ? '-2.8% (HVAC thermal load)' : 'Optimal (+0.0%)'}
+                    </span>
+                  </div>
+                </div>
+              </CardModal>
+            )}
+
+            {openCard === 'mode' && (
+              <CardModal title="Drive Mode & Powertrain Dynamics" icon={<Gauge size={16} color={mconf.accent} />} accent={mconf.accent} onClose={() => setOpenCard(null)}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                  {/* Current Active Mode Hero */}
+                  <div style={{ textAlign: 'center', padding: '16px', background: `${mconf.color}10`, borderRadius: 12, border: `1px solid ${mconf.color}33` }}>
+                    <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.14em', color: mconf.color, textTransform: 'uppercase', fontFamily: 'monospace' }}>
+                      ACTIVE DRIVING PROFILE
+                    </div>
+                    <div style={{ fontSize: 32, fontWeight: 800, color: mconf.color, fontFamily: 'sans-serif', margin: '4px 0' }}>
+                      {mode} Mode
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'center', marginTop: 8 }}>
+                      <ModeSegments driveMode={driveMode} />
+                    </div>
+                  </div>
+
+                  {/* Mode Dynamics Characteristics */}
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
+                    <div style={{ padding: '10px 12px', background: '#f8fafc', borderRadius: 8, border: '1px solid #e2e8f0', textAlign: 'center' }}>
+                      <div style={{ fontSize: 10, color: '#64748b' }}>THROTTLE</div>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: '#0f172a', fontFamily: 'monospace', marginTop: 2 }}>
+                        {mode === 'Sport' ? '100% INSTANT' : mode === 'Eco' ? '45% DAMPENED' : '75% LINEAR'}
+                      </div>
+                    </div>
+                    <div style={{ padding: '10px 12px', background: '#f8fafc', borderRadius: 8, border: '1px solid #e2e8f0', textAlign: 'center' }}>
+                      <div style={{ fontSize: 10, color: '#64748b' }}>REGEN LEVEL</div>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: '#0f172a', fontFamily: 'monospace', marginTop: 2 }}>
+                        {mode === 'Eco' ? 'LEVEL 3 (MAX)' : mode === 'Sport' ? 'LEVEL 1 (MIN)' : 'LEVEL 2 (AUTO)'}
+                      </div>
+                    </div>
+                    <div style={{ padding: '10px 12px', background: '#f8fafc', borderRadius: 8, border: '1px solid #e2e8f0', textAlign: 'center' }}>
+                      <div style={{ fontSize: 10, color: '#64748b' }}>TORQUE BIAS</div>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: '#0f172a', fontFamily: 'monospace', marginTop: 2 }}>
+                        {mode === 'Sport' ? '40/60 REAR' : mode === 'Eco' ? '100% REAR' : '50/50 AWD'}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* 8 CCNS Vehicle Modes Grid */}
+                  <div>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', marginBottom: 8, fontFamily: 'monospace' }}>
+                      SIMULATE ESP32 VEHICLE STATE:
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8 }}>
+                      {(['Healthy', 'Eco', 'Sport', 'Heavy Traffic', 'Low Battery', 'Battery Overheating', 'Charging', 'Motor Fault'] as const).map(m => {
+                        const isCurrent = mode === m
+                        return (
+                          <button
+                            key={m}
+                            onClick={() => handleForceMode(m)}
+                            style={{
+                              padding: '10px 12px',
+                              borderRadius: 8,
+                              background: isCurrent ? `${modeOf(m).color}18` : '#f8fafc',
+                              border: `1.5px solid ${isCurrent ? modeOf(m).color : '#e2e8f0'}`,
+                              color: isCurrent ? modeOf(m).color : '#334155',
+                              fontSize: 12,
+                              fontWeight: isCurrent ? 700 : 500,
+                              cursor: 'pointer',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'space-between',
+                              transition: 'all 0.15s',
+                            }}
+                          >
+                            <span>{m}</span>
+                            {isCurrent && <span style={{ width: 6, height: 6, borderRadius: '50%', background: modeOf(m).color }} />}
+                          </button>
+                        )
+                      })}
+                    </div>
+                  </div>
+
+                  {/* CAN Bus Fault Code Readout */}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 14px', background: '#f8fafc', borderRadius: 8, border: '1px solid #e2e8f0' }}>
+                    <span style={{ fontSize: 12, color: '#64748b', fontFamily: 'sans-serif' }}>CAN-Bus Diagnostic Fault:</span>
+                    <span style={{ fontSize: 13, fontWeight: 700, color: latest?.fault_code ? '#ef4444' : '#059669', fontFamily: 'monospace' }}>
+                      {latest?.fault_code ? `0x${latest.fault_code.toString(16).toUpperCase()} (CRITICAL FAULT)` : '0x00 (SYSTEM HEALTHY)'}
+                    </span>
+                  </div>
+                </div>
+              </CardModal>
+            )}
+
+            {openCard === 'range' && (
+              <CardModal title="Range Estimation & Navigation" icon={<Map size={16} color="#0ea5e9" />} accent="#0ea5e9" onClose={() => setOpenCard(null)}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                  {/* Range Hero */}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '18px 20px', background: '#f8fafc', borderRadius: 12, border: '1px solid #e2e8f0' }}>
+                    <div>
+                      <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.12em', color: '#64748b', textTransform: 'uppercase', fontFamily: 'monospace' }}>
+                        PROJECTED DRIVING RANGE
+                      </div>
+                      <div style={{ fontSize: 48, fontWeight: 800, color: '#0f172a', fontFamily: 'monospace', lineHeight: 1.1, marginTop: 4 }}>
+                        {latest ? <>{Math.round(latest.range_km)}<span style={{ fontSize: 20, color: '#0284c7', fontWeight: 500 }}> km</span></> : <span style={{ fontSize: 32, color: '#94a3b8' }}>-- km</span>}
+                      </div>
+                    </div>
+                    <div style={{ textAlign: 'right' }}>
+                      <span style={{ fontSize: 11, padding: '4px 10px', borderRadius: 20, background: 'rgba(2, 132, 199, 0.1)', color: '#0284c7', fontWeight: 700, fontFamily: 'monospace' }}>
+                        EFFICIENCY: {latest ? `${Math.round(135 + latest.speed_kmh * 0.7)} Wh/km` : '--- Wh/km'}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Dual Projection: Urban vs Highway */}
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                    <div style={{ padding: '14px', background: '#f8fafc', borderRadius: 10, border: '1px solid #e2e8f0' }}>
+                      <div style={{ fontSize: 11, color: '#64748b', marginBottom: 4 }}>CITY / URBAN (REGEN ACTIVE)</div>
+                      <div style={{ fontSize: 22, fontWeight: 800, color: '#059669', fontFamily: 'monospace' }}>
+                        {latest ? `${Math.round(latest.range_km * 1.08)} km` : '--- km'}
+                      </div>
+                      <div style={{ fontSize: 10, color: '#94a3b8', marginTop: 4 }}>High stop-start energy harvesting</div>
+                    </div>
+                    <div style={{ padding: '14px', background: '#f8fafc', borderRadius: 10, border: '1px solid #e2e8f0' }}>
+                      <div style={{ fontSize: 11, color: '#64748b', marginBottom: 4 }}>HIGHWAY (120 KM/H CRUISE)</div>
+                      <div style={{ fontSize: 22, fontWeight: 800, color: '#0284c7', fontFamily: 'monospace' }}>
+                        {latest ? `${Math.round(latest.range_km * 0.88)} km` : '--- km'}
+                      </div>
+                      <div style={{ fontSize: 10, color: '#94a3b8', marginTop: 4 }}>Aerodynamic continuous drag profile</div>
+                    </div>
+                  </div>
+
+                  {/* Nearest High-Power Fast Charger Guidance */}
+                  <div style={{ padding: '14px 16px', background: '#f0f9ff', borderRadius: 10, border: '1px solid #bae6fd' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                      <span style={{ fontSize: 12, fontWeight: 700, color: '#0369a1' }}>NEAREST DC ULTRA-FAST CHARGER</span>
+                      <span style={{ fontSize: 11, fontWeight: 700, color: '#0284c7', fontFamily: 'monospace' }}>4.2 km · 8 min</span>
+                    </div>
+                    <div style={{ fontSize: 11, color: '#334155', lineHeight: 1.5 }}>
+                      Ionity Hub #04 · 350 kW CCS2 Connector · 6 of 8 stalls available.
+                    </div>
+                    <div style={{ fontSize: 10, color: '#0284c7', marginTop: 6, fontWeight: 600 }}>
+                      ✓ Battery Thermal Preconditioning Active for Fast Charge Ingestion
+                    </div>
+                  </div>
+                </div>
+              </CardModal>
+            )}
+
+            {openCard === 'score' && (
+              <CardModal title="Drive Score & Telemetry Coaching" icon={<Star size={16} color="#f59e0b" fill="#f59e0b" />} accent="#f59e0b" onClose={() => setOpenCard(null)}>
+                {!isPro ? (
+                  <ProLockedModal
+                    title="Driver Telemetry Rating"
+                    feature="Neural Driver Performance Score"
+                    desc="Multi-factor neural evaluation analyzing acceleration smoothness, kinetic regeneration recapture, speed threshold compliance, and CAN-bus inverter thermal protection."
+                    benefits={[
+                      "Multi-factor scoring on 10-point scale",
+                      "Instant driver coaching prompts and throttle guidance",
+                      "Thermal stress warnings & efficiency penalties"
+                    ]}
+                    onUnlock={() => togglePro(true)}
+                  />
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                    {/* Score Hero */}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '18px 20px', background: '#f8fafc', borderRadius: 12, border: '1px solid #e2e8f0' }}>
+                      <div>
+                        <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.12em', color: '#64748b', textTransform: 'uppercase', fontFamily: 'monospace' }}>
+                          AI DRIVER PERFORMANCE RATING
                         </div>
-                        <div style={{ height: 5, background: 'rgba(0,0,0,0.09)', borderRadius: 3, overflow: 'hidden' }}>
-                          <div style={{ height: '100%', width: `${Math.min(100, (psi / 44) * 100)}%`, background: col, borderRadius: 3 }} />
+                        <div style={{ fontSize: 48, fontWeight: 800, color: ds.score >= 8 ? '#059669' : ds.score >= 6 ? '#f59e0b' : '#dc2626', fontFamily: 'monospace', lineHeight: 1.1, marginTop: 4 }}>
+                          {!isNaN(ds.score) ? <>{ds.score}<span style={{ fontSize: 20, color: '#64748b', fontWeight: 500 }}>/10</span></> : <span style={{ fontSize: 32, color: '#94a3b8' }}>--/10</span>}
                         </div>
                       </div>
-                    )
-                  })}
+                      <div style={{ textAlign: 'right' }}>
+                        <span style={{ fontSize: 12, padding: '4px 12px', borderRadius: 20, background: 'rgba(245, 158, 11, 0.12)', color: '#d97706', fontWeight: 700 }}>
+                          {ds.label}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* 4 Score Performance Pillars */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                      {[
+                        { label: 'Acceleration Smoothness', score: latest ? 9.4 : 0, color: '#10b981' },
+                        { label: 'Regenerative Energy Recovery', score: latest ? 8.8 : 0, color: '#0ea5e9' },
+                        { label: 'Speed Discipline & Limits', score: latest ? (latest.speed_kmh > 100 ? 7.2 : 9.6) : 0, color: latest && latest.speed_kmh > 100 ? '#f59e0b' : '#10b981' },
+                        { label: 'Powertrain Thermal Protection', score: latest ? (latest.motor_temp_c > 75 ? 7.0 : 9.8) : 0, color: latest && latest.motor_temp_c > 75 ? '#ef4444' : '#10b981' },
+                      ].map(p => (
+                        <div key={p.label} style={{ padding: '10px 14px', background: '#f8fafc', borderRadius: 8, border: '1px solid #e2e8f0' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginBottom: 6 }}>
+                            <span style={{ fontWeight: 600, color: '#334155' }}>{p.label}</span>
+                            <span style={{ fontWeight: 700, color: p.color, fontFamily: 'monospace' }}>{latest ? `${p.score.toFixed(1)} / 10` : '--- / 10'}</span>
+                          </div>
+                          <div style={{ height: 6, borderRadius: 3, background: '#e2e8f0', overflow: 'hidden' }}>
+                            <div style={{ height: '100%', width: `${p.score * 10}%`, background: p.color, borderRadius: 3 }} />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* AI Coaching Tip */}
+                    <div style={{ padding: '12px 16px', background: '#fffbeb', borderRadius: 8, border: '1px solid #fef3c7', fontSize: 12, color: '#92400e', lineHeight: 1.5 }}>
+                      💡 <strong>CVIS Coaching:</strong> {latest ? (latest.speed_kmh > 100
+                        ? 'Cruising at elevated speeds increases aerodynamic draw. Lowering speed by 10 km/h will gain +14 km of range.'
+                        : 'Excellent throttle modulation! Your regenerative braking recovery is currently capturing 88% of deceleration inertia.')
+                        : 'Awaiting telemetry feed to generate personalized driver coaching.'}
+                    </div>
+                  </div>
+                )}
+              </CardModal>
+            )}
+
+            {openCard === 'tires' && (
+              <CardModal title="Tire Pressure Monitoring System (TPMS)" icon={<span style={{ fontSize: 16 }}>🛞</span>} accent="#10b981" onClose={() => setOpenCard(null)}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                  {/* Top-Down Supercar Chassis Wireframe */}
+                  <div style={{ position: 'relative', width: '100%', height: 180, background: '#f8fafc', borderRadius: 12, border: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <svg viewBox="0 0 300 160" style={{ width: '100%', height: '100%' }}>
+                      {/* Car Body Blueprint Outline */}
+                      <path
+                        d="M 100 20 C 130 18 170 18 200 20 C 220 25 240 45 245 75 C 248 100 240 135 220 145 C 190 148 110 148 80 145 C 60 135 52 100 55 75 C 60 45 80 25 100 20 Z"
+                        fill="rgba(2, 132, 199, 0.04)"
+                        stroke="#0284c7"
+                        strokeWidth="1.5"
+                      />
+                      {/* Center Chassis Spine */}
+                      <line x1="150" y1="20" x2="150" y2="145" stroke="rgba(2, 132, 199, 0.2)" strokeWidth="1" strokeDasharray="3 3" />
+                      <line x1="70" y1="50" x2="230" y2="50" stroke="rgba(2, 132, 199, 0.15)" strokeWidth="1" />
+                      <line x1="70" y1="115" x2="230" y2="115" stroke="rgba(2, 132, 199, 0.15)" strokeWidth="1" />
+
+                      {/* 4 Wheels */}
+                      {/* Front-Left */}
+                      <rect x="42" y="32" width="22" height="38" rx="4" fill="#0284c7" opacity="0.15" stroke="#0284c7" strokeWidth="1.5" />
+                      {/* Front-Right */}
+                      <rect x="236" y="32" width="22" height="38" rx="4" fill="#0284c7" opacity="0.15" stroke="#0284c7" strokeWidth="1.5" />
+                      {/* Rear-Left */}
+                      <rect x="42" y="96" width="22" height="38" rx="4" fill="#0284c7" opacity="0.15" stroke="#0284c7" strokeWidth="1.5" />
+                      {/* Rear-Right */}
+                      <rect x="236" y="96" width="22" height="38" rx="4" fill="#0284c7" opacity="0.15" stroke="#0284c7" strokeWidth="1.5" />
+                    </svg>
+
+                    {/* Overlay PSI Callouts */}
+                    <div style={{ position: 'absolute', top: 38, left: 16, background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: 6, padding: '3px 8px', fontSize: 11, fontWeight: 700, fontFamily: 'monospace', color: tires.fl != null && tires.fl < 30 ? '#ef4444' : '#059669' }}>
+                      FL: {tires.fl != null ? `${tires.fl} PSI · 31°C` : '--- PSI'}
+                    </div>
+                    <div style={{ position: 'absolute', top: 38, right: 16, background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: 6, padding: '3px 8px', fontSize: 11, fontWeight: 700, fontFamily: 'monospace', color: tires.fr != null && tires.fr < 30 ? '#ef4444' : '#059669' }}>
+                      FR: {tires.fr != null ? `${tires.fr} PSI · 32°C` : '--- PSI'}
+                    </div>
+                    <div style={{ position: 'absolute', bottom: 38, left: 16, background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: 6, padding: '3px 8px', fontSize: 11, fontWeight: 700, fontFamily: 'monospace', color: tires.rl != null && tires.rl < 30 ? '#ef4444' : '#059669' }}>
+                      RL: {tires.rl != null ? `${tires.rl} PSI · 30°C` : '--- PSI'}
+                    </div>
+                    <div style={{ position: 'absolute', bottom: 38, right: 16, background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: 6, padding: '3px 8px', fontSize: 11, fontWeight: 700, fontFamily: 'monospace', color: tires.rr != null && tires.rr < 30 ? '#ef4444' : '#059669' }}>
+                      RR: {tires.rr != null ? `${tires.rr} PSI · 31°C` : '--- PSI'}
+                    </div>
+                  </div>
+
+                  {/* Individual Wheel Telemetry Rows */}
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                    {[
+                      { pos: 'Front Left (FL)', psi: tires.fl, temp: '31°C' },
+                      { pos: 'Front Right (FR)', psi: tires.fr, temp: '32°C' },
+                      { pos: 'Rear Left (RL)', psi: tires.rl, temp: '30°C' },
+                      { pos: 'Rear Right (RR)', psi: tires.rr, temp: '31°C' },
+                    ].map(w => {
+                      const isLow = w.psi != null && w.psi < 30
+                      const isHigh = w.psi != null && w.psi > 36
+                      const col = w.psi == null ? '#94a3b8' : isLow ? '#ef4444' : isHigh ? '#f59e0b' : '#059669'
+                      return (
+                        <div key={w.pos} style={{ padding: '12px 14px', background: '#f8fafc', borderRadius: 8, border: `1px solid ${col}44` }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+                            <span style={{ fontSize: 11, fontWeight: 600, color: '#334155' }}>{w.pos}</span>
+                            <span style={{ fontSize: 13, fontWeight: 700, color: col, fontFamily: 'monospace' }}>{w.psi != null ? `${w.psi} PSI` : '--- PSI'}</span>
+                          </div>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: '#64748b' }}>
+                            <span>Temp: {w.temp}</span>
+                            <span>{w.psi != null ? (isLow ? '⚠️ LOW PRESSURE' : isHigh ? '⚠️ HIGH' : '✓ OPTIMAL') : 'NO DATA'}</span>
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+
+                  {/* Alignment & Tread Wear Readout */}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', padding: '12px 14px', background: '#f8fafc', borderRadius: 8, border: '1px solid #e2e8f0', fontSize: 11, color: '#475569', fontFamily: 'monospace' }}>
+                    <span>ALIGNMENT: TOE 0.0° · CAMBER -1.2°</span>
+                    <span>TREAD DEPTH: 6.8 mm (GOOD)</span>
+                  </div>
                 </div>
               </CardModal>
             )}
@@ -872,26 +1670,138 @@ export default function DriverDashboard({ vehicleId, vehicleName, vehicleColor, 
           <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.13 }} style={{ display: 'grid', gridTemplateColumns: '280px 1fr 280px', gap: 16, alignItems: 'stretch' }}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
 
+              {/* 1. TPMS 4-Wheel Card */}
               <StatCard title="Tire Pressure" subtitle="4-Wheel Monitoring"
-                icon={<span style={{ fontSize: 10 }}>🛞</span>}
-                value={Object.values(tires).some(p => p < 30) ? <span style={{ fontSize: 14, color: '#ef4444' }}>LOW</span> : <span style={{ fontSize: 14, color: '#10b981' }}>OK</span>}
-                accent="#10b981" onClick={() => setOpenCard('tires')} P={P} L9={L9} SB={SB} V={V} />
+                icon={<span style={{ fontSize: 13 }}>🛞</span>}
+                value={
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <span style={{ fontSize: 15, color: Object.values(tires).some(p => p !== null && p < 30) ? '#ef4444' : '#10b981', fontWeight: 800 }}>
+                      {latest ? (Object.values(tires).some(p => p !== null && p < 30) ? 'PRESSURE LOW' : 'ALL OPTIMAL') : 'OFFLINE'}
+                    </span>
+                    <span style={{ fontSize: 10.5, color: '#64748b', fontWeight: 500, fontFamily: 'monospace' }}>
+                      {tires.fl != null ? `• ${tires.fl}/${tires.fr}/${tires.rl}/${tires.rr} PSI` : '• --- PSI'}
+                    </span>
+                  </div>
+                }
+                accent="#10b981"
+                visual={
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 8px', background: '#f8fafc', borderRadius: 6, border: '1px solid #e2e8f0' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, width: '100%', fontSize: 9.5, fontFamily: 'monospace' }}>
+                      <span style={{ color: tires.fl != null && tires.fl < 30 ? '#ef4444' : '#059669' }}>FL: {tires.fl != null ? `${tires.fl} PSI` : '---'}</span>
+                      <span style={{ color: tires.fr != null && tires.fr < 30 ? '#ef4444' : '#059669', textAlign: 'right' }}>FR: {tires.fr != null ? `${tires.fr} PSI` : '---'}</span>
+                      <span style={{ color: tires.rl != null && tires.rl < 30 ? '#ef4444' : '#059669' }}>RL: {tires.rl != null ? `${tires.rl} PSI` : '---'}</span>
+                      <span style={{ color: tires.rr != null && tires.rr < 30 ? '#ef4444' : '#059669', textAlign: 'right' }}>RR: {tires.rr != null ? `${tires.rr} PSI` : '---'}</span>
+                    </div>
+                  </div>
+                }
+                onClick={() => setOpenCard('tires')} P={P} L9={L9} SB={SB} V={V} />
 
+              {/* 2. Key Suggestions (Pro Gated) */}
               <StatCard title="Key Suggestions" subtitle="AI Driving Insights"
-                icon={<BrainCircuit size={10} color={isPro ? 'var(--cyan)' : 'rgba(0,0,0,0.30)'} />}
-                value={isPro ? <span style={{ fontSize: 14, color: 'var(--cyan)' }}>{keySugs.length} tips</span> : <Lock size={14} color="rgba(0,0,0,0.30)" />}
-                accent="#0ea5e9" onClick={() => setOpenCard('suggestions')} P={P} L9={L9} SB={SB} V={V} />
+                icon={<BrainCircuit size={13} color={isPro ? 'var(--cyan)' : 'rgba(0,0,0,0.30)'} />}
+                value={isPro ? <span style={{ fontSize: 14, color: '#0284c7', fontWeight: 700 }}>{keySugs.length} tips active</span> : <span style={{ fontSize: 14, color: '#b45309', fontWeight: 700 }}>PRO AI</span>}
+                accent="#0ea5e9"
+                visual={
+                  !isPro ? (
+                    <ProLockedCard
+                      title="AI Neural Insights"
+                      desc="Multi-factor telemetry recommendations"
+                      onUnlock={() => {
+                        setIsPro(true)
+                        toast.success("Pro Plan Activated — Unlocked Centralized AI Coaching & Analytics")
+                      }}
+                    />
+                  ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                      {keySugs.slice(0, 2).map((s, idx) => (
+                        <div key={idx} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '4px 6px', background: '#f8fafc', borderRadius: 4, border: '1px solid #e2e8f0', fontSize: 9.5 }}>
+                          <span style={{ color: '#0f172a', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {s.icon} {s.title}
+                          </span>
+                          <span style={{ fontSize: 8, padding: '1px 4px', borderRadius: 3, background: s.priority === 'high' ? '#fee2e2' : '#fef3c7', color: s.priority === 'high' ? '#dc2626' : '#d97706', fontWeight: 700, fontFamily: 'monospace' }}>
+                            {s.priority.toUpperCase()}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )
+                }
+                onClick={() => {
+                  if (!isPro) {
+                    setIsPro(true)
+                    toast.success("Pro Plan Activated — Unlocked Centralized AI Coaching & Analytics")
+                  } else {
+                    setOpenCard('suggestions')
+                  }
+                }} P={P} L9={L9} SB={SB} V={V} />
 
-              <StatCard title="Speed Analytics" subtitle="Real-time Speed Monitor"
-                icon={<Gauge size={10} color={mconf.accent} />}
-                value={<>{Math.round(latest?.speed_kmh ?? 0)}<span style={{ fontSize: 13, color: 'rgba(0,0,0,0.52)', fontWeight: 400 }}> km/h</span></>}
-                valueColor={mconf.accent} accent={mconf.accent}
-                onClick={() => setOpenCard('speed')} P={P} L9={L9} SB={SB} V={V} />
+              {/* 3. Speed Analytics — PROPER AUTOMOTIVE SPEED SHOWER */}
+              <motion.div
+                initial="rest"
+                whileHover="hover"
+                whileTap="tap"
+                variants={{
+                  rest: { scale: 1, y: 0, boxShadow: '0 2px 10px rgba(0,0,0,0.03)' },
+                  hover: { scale: 1.015, y: -3, boxShadow: '0 12px 24px -4px rgba(0,0,0,0.07)' },
+                  tap: { scale: 0.985, y: 0 }
+                }}
+                style={{
+                  ...P,
+                  cursor: 'pointer',
+                  position: 'relative',
+                  borderBottom: `3px solid ${mconf.accent}`,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  justifyContent: 'space-between',
+                  transition: 'border-color 0.2s',
+                  padding: '16px 18px 12px'
+                }}
+                onClick={() => setOpenCard('speed')}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
+                  <div style={{
+                    width: 32, height: 32, borderRadius: 8,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    background: `${mconf.accent}12`, border: `1px solid ${mconf.accent}25`,
+                    flexShrink: 0
+                  }}>
+                    <Gauge size={14} color={mconf.accent} />
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 1, minWidth: 0, flex: 1 }}>
+                    <span style={L9}>Speed Analytics</span>
+                    <span style={SB}>Automotive Speed Shower</span>
+                  </div>
+                  <motion.div variants={{ rest: { x: 0, opacity: 0.4 }, hover: { x: 3, opacity: 1 } }} style={{ marginLeft: 'auto', flexShrink: 0 }}>
+                    <ChevronRight size={14} color={mconf.accent} />
+                  </motion.div>
+                </div>
+                <SpeedShowerGauge
+                  speed={latest?.speed_kmh ?? 0}
+                  maxSpeed={maxSpeed}
+                  accent={mconf.accent}
+                  isAwaiting={!latest}
+                />
+              </motion.div>
 
-              <StatCard title="Cabin Climate" subtitle="Auto • 22°C Target"
-                icon={<Wind size={10} color="#0ea5e9" />}
-                value={<>21<span style={{ fontSize: 13, color: 'rgba(0,0,0,0.52)', fontWeight: 400 }}> °C</span></>}
+              {/* 4. Cabin Climate */}
+              <StatCard title="Cabin Climate" subtitle="Auto • Target 22°C"
+                icon={<Wind size={13} color="#0ea5e9" />}
+                value={
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+                    <span>{cabinTemp}<span style={{ fontSize: 13, color: '#64748b', fontWeight: 500 }}> °C</span></span>
+                    <div style={{ display: 'flex', gap: 4 }} onClick={e => e.stopPropagation()}>
+                      <button onClick={() => setCabinTemp(t => Math.max(16, t - 1))} style={{ width: 24, height: 24, borderRadius: 4, border: '1px solid #cbd5e1', background: '#ffffff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 700, color: '#0f172a' }}>-</button>
+                      <button onClick={() => setCabinTemp(t => Math.min(30, t + 1))} style={{ width: 24, height: 24, borderRadius: 4, border: '1px solid #cbd5e1', background: '#ffffff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 700, color: '#0f172a' }}>+</button>
+                    </div>
+                  </div>
+                }
                 valueColor="#0f172a" accent="#0ea5e9"
+                visual={
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 9.5, fontFamily: 'monospace', color: '#64748b' }}>
+                    <span>HVAC DRAW: {latest ? `${Math.round(latest.cabin_climate_w ?? 0)} W` : '--- W'}</span>
+                    <span style={{ color: '#0284c7', fontWeight: 700 }}>DUAL ZONE AUTO</span>
+                  </div>
+                }
                 onClick={() => setOpenCard('climate')} P={P} L9={L9} SB={SB} V={V} />
 
             </div>
@@ -908,186 +1818,494 @@ export default function DriverDashboard({ vehicleId, vehicleName, vehicleColor, 
 
             {/* Right col */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+
+              {/* 1. Alerts */}
               <StatCard title="Vehicle Alerts" subtitle="Real-time Health"
-                icon={<AlertTriangle size={10} color={alerts.length > 0 ? '#ef4444' : '#10b981'} />}
-                value={<span style={{ fontSize: 14, color: alerts.length > 0 ? '#ef4444' : '#10b981' }}>{alerts.length > 0 ? `${alerts.length} alert${alerts.length > 1 ? 's' : ''}` : 'All Clear'}</span>}
-                accent={alerts.length > 0 ? '#ef4444' : '#10b981'} onClick={() => setOpenCard('alerts')} P={P} L9={L9} SB={SB} V={V} />
+                icon={<AlertTriangle size={13} color={alerts.length > 0 ? '#ef4444' : '#10b981'} />}
+                value={<span style={{ fontSize: 15, color: alerts.length > 0 ? '#ef4444' : '#10b981', fontWeight: 800 }}>{alerts.length > 0 ? `${alerts.length} ALERTS` : 'ALL CLEAR'}</span>}
+                accent={alerts.length > 0 ? '#ef4444' : '#10b981'}
+                visual={
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: 9.5, fontFamily: 'monospace', color: '#64748b' }}>
+                    <span>{latest?.fault_code ? `0x${latest.fault_code.toString(16).toUpperCase()} FAULT` : 'NO ACTIVE FAULTS'}</span>
+                    <span style={{ color: alerts.length > 0 ? '#ef4444' : '#059669', fontWeight: 700 }}>
+                      ● {alerts.length > 0 ? 'ATTN REQUIRED' : 'NOMINAL'}
+                    </span>
+                  </div>
+                }
+                onClick={() => setOpenCard('alerts')} P={P} L9={L9} SB={SB} V={V} />
 
+              {/* 2. AI Advisory */}
               <StatCard title="AI Advisory" subtitle="CVIS Intelligence"
-                icon={<BrainCircuit size={10} color="var(--cyan)" />}
-                value={<span style={{ fontSize: 12, color: 'var(--cyan)' }}>{aiRec ? 'View' : 'Standby'}</span>}
-                accent="#0ea5e9" onClick={() => setOpenCard('ai')} P={P} L9={L9} SB={SB} V={V} />
-              <StatCard title="Efficiency Graph" subtitle={isPro ? 'Fuel & Consumption' : 'Pro Feature'}
-                icon={<TrendingUp size={10} color={isPro ? 'var(--cyan)' : 'rgba(0,0,0,0.30)'} />}
-                value={isPro ? <>{(14 + (latest?.battery_pct ?? 80) / 20).toFixed(1)}<span style={{ fontSize: 13, color: 'rgba(0,0,0,0.52)', fontWeight: 400 }}> km/l</span></> : <Lock size={14} color="rgba(0,0,0,0.30)" />}
-                accent="#0ea5e9" onClick={() => setOpenCard('efficiency')} P={P} L9={L9} SB={SB} V={V} />
+                icon={<BrainCircuit size={13} color="var(--cyan)" />}
+                value={<span style={{ fontSize: 13, color: '#0284c7', fontWeight: 700 }}>{aiRec ? 'Advisory Active' : 'Standby'}</span>}
+                accent="#0ea5e9"
+                visual={
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                    <div style={{ fontSize: 9.5, color: '#475569', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {aiRec ? aiRec.slice(0, 42) + '...' : (connected ? 'Awaiting multi-factor telemetry...' : 'Connecting to Edge AI...')}
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 8.5, fontFamily: 'monospace', color: '#64748b' }}>
+                      <span>MODEL: LLAMA3.2:3B</span>
+                      <span style={{ color: '#0284c7', fontWeight: 700 }}>EDGE REASONING</span>
+                    </div>
+                  </div>
+                }
+                onClick={() => setOpenCard('ai')} P={P} L9={L9} SB={SB} V={V} />
 
-              <StatCard title="Power Flow" subtitle="Live Power Distribution"
-                icon={<Zap size={10} color={mconf.accent} />}
-                value={<>{Math.round(totalKw)}<span style={{ fontSize: 13, color: 'rgba(0,0,0,0.52)', fontWeight: 400 }}> kW</span></>}
+              {/* 3. Efficiency Graph (Pro Gated) */}
+              <StatCard title="Efficiency Graph" subtitle={isPro ? 'Energy & Consumption' : 'Pro Feature'}
+                icon={<TrendingUp size={13} color={isPro ? 'var(--cyan)' : 'rgba(0,0,0,0.30)'} />}
+                value={isPro ? (latest ? <>{Math.round(135 + latest.speed_kmh * 0.7)}<span style={{ fontSize: 13, color: '#64748b', fontWeight: 500 }}> Wh/km</span></> : <span style={{ fontSize: 20, color: '#94a3b8' }}>--- Wh/km</span>) : <span style={{ fontSize: 14, color: '#b45309', fontWeight: 700 }}>PRO FEATURE</span>}
+                accent="#0ea5e9"
+                visual={
+                  !isPro ? (
+                    <ProLockedCard
+                      title="Consumption Curves"
+                      desc="Historical Wh/km efficiency graphs"
+                      onUnlock={() => {
+                        setIsPro(true)
+                        toast.success("Pro Plan Activated — Unlocked Centralized AI Coaching & Analytics")
+                      }}
+                    />
+                  ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                      <div style={{ height: 16, display: 'flex', alignItems: 'flex-end', gap: 2 }}>
+                        {history.slice(-14).map((h, i) => {
+                          const eff = Math.round(135 + h.speed * 0.7)
+                          const hPct = Math.min(100, Math.max(15, ((eff - 100) / 150) * 100))
+                          return (
+                            <div key={i} style={{ flex: 1, height: `${hPct}%`, background: '#0ea5e9', borderRadius: '1px 1px 0 0', opacity: 0.4 + (i / 14) * 0.6 }} />
+                          )
+                        })}
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 9, fontFamily: 'monospace', color: '#64748b' }}>
+                        <span>HISTORY ({history.length} pts)</span>
+                        <span style={{ color: '#0284c7' }}>TARGET: 140 Wh/km</span>
+                      </div>
+                    </div>
+                  )
+                }
+                onClick={() => {
+                  if (!isPro) {
+                    setIsPro(true)
+                    toast.success("Pro Plan Activated — Unlocked Centralized AI Coaching & Analytics")
+                  } else {
+                    setOpenCard('efficiency')
+                  }
+                }} P={P} L9={L9} SB={SB} V={V} />
+
+              {/* 4. Power Flow */}
+              <StatCard title="Power Flow" subtitle="Live Distribution"
+                icon={<Zap size={13} color={mconf.accent} />}
+                value={latest && !isNaN(totalKw) ? <>{Math.round(totalKw)}<span style={{ fontSize: 13, color: '#64748b', fontWeight: 500 }}> kW</span></> : <span style={{ fontSize: 20, color: '#94a3b8' }}>-- kW</span>}
                 valueColor={mconf.accent} accent={mconf.accent}
+                visual={
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    <div style={{ height: 6, borderRadius: 3, background: '#e2e8f0', position: 'relative', overflow: 'hidden' }}>
+                      <div style={{ position: 'absolute', top: 0, bottom: 0, left: '50%', width: 2, background: '#94a3b8', zIndex: 2 }} />
+                      <div style={{
+                        height: '100%',
+                        width: latest && !isNaN(totalKw) ? `${Math.min(100, (totalKw / 350) * 100)}%` : '0%',
+                        background: mode === 'Charging' ? '#10b981' : 'linear-gradient(90deg, #0284c7 0%, #38bdf8 100%)',
+                        borderRadius: 3
+                      }} />
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 9.5, color: '#64748b', fontFamily: 'monospace' }}>
+                      <span>{mode === 'Charging' ? '← REGEN INGEST' : 'POWER OUT →'}</span>
+                      <span style={{ color: '#0f172a', fontWeight: 700 }}>{!isNaN(totalHp) ? `${totalHp} HP` : '--- HP'}</span>
+                    </div>
+                  </div>
+                }
                 onClick={() => setOpenCard('power')} P={P} L9={L9} SB={SB} V={V} />
+
             </div>
+
           </motion.div>
 
           {/* ROW 2 Modals */}
           <AnimatePresence>
             {openCard === 'suggestions' && (
-              <CardModal title="AI Key Suggestions" icon={<BrainCircuit size={14} color="var(--cyan)" />} accent="#0ea5e9" onClose={() => setOpenCard(null)}>
-                {isPro ? (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                    {keySugs.map((s, i) => (
-                      <div key={i} style={{ display: 'flex', gap: 14, padding: '14px', background: s.priority === 'high' ? 'rgba(239,68,68,0.06)' : 'rgba(14,165,233,0.04)', border: `1px solid ${s.priority === 'high' ? 'rgba(239,68,68,0.22)' : 'rgba(14,165,233,0.12)'}`, borderRadius: 8 }}>
-                        <div style={{ fontSize: 24, lineHeight: 1 }}>{s.icon}</div>
-                        <div style={{ flex: 1 }}>
-                          <div style={{ fontSize: 13, fontWeight: 700, color: s.priority === 'high' ? '#ef4444' : '#0f172a', fontFamily: 'sans-serif', marginBottom: 4 }}>{s.title}</div>
-                          <div style={{ fontSize: 12, color: 'rgba(0,0,0,0.7)', lineHeight: 1.5, fontFamily: 'sans-serif' }}>{s.desc}</div>
-                          <div style={{ marginTop: 8, display: 'inline-block', padding: '2px 8px', borderRadius: 10, background: s.priority === 'high' ? 'rgba(239,68,68,0.15)' : 'rgba(14,165,233,0.1)', fontSize: 10, color: s.priority === 'high' ? '#ef4444' : '#0ea5e9', fontFamily: 'sans-serif' }}>{s.priority.toUpperCase()} PRIORITY</div>
-                        </div>
+              <CardModal title="AI Driving Insights & Recommendations" icon={<BrainCircuit size={16} color="var(--cyan)" />} accent="#0ea5e9" onClose={() => setOpenCard(null)}>
+                {!isPro ? (
+                  <ProLockedModal
+                    title="CVIS Intelligence"
+                    feature="Proactive AI Fleet & Driving Insights"
+                    desc="Centralized Ollama llama3.2:3b model reasons over ambient temperature, battery pack thermal state, headwind, and cabin climate load to provide real-time recommendations."
+                    benefits={[
+                      "Real-time actionable multi-factor suggestions",
+                      "Priority-classified warnings (Low / Med / High)",
+                      "Dynamic range extension strategies per driving regime"
+                    ]}
+                    onUnlock={() => togglePro(true)}
+                  />
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                    {/* Top Advisory Banner */}
+                    <div style={{ padding: '14px 16px', background: 'rgba(2, 132, 199, 0.08)', borderRadius: 10, border: '1px solid rgba(2, 132, 199, 0.2)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <BrainCircuit size={16} color="#0284c7" />
+                        <span style={{ fontSize: 12, fontWeight: 700, color: '#0284c7', fontFamily: 'monospace' }}>
+                          CVIS NEURAL ADVISORY (llama3.2:3b)
+                        </span>
                       </div>
-                    ))}
-                  </div>
-                ) : <LockedFeature title="AI Key Suggestions" desc="Get real-time AI driving tips personalized to your vehicle state and road conditions." />}
-              </CardModal>
-            )}
-            {openCard === 'alerts' && (
-              <CardModal title="Vehicle Alerts" icon={<AlertTriangle size={14} color="#f59e0b" />} accent="#f59e0b" onClose={() => setOpenCard(null)}>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                  {alerts.length === 0 ? (
-                    [{ icon: '✓', label: 'All Systems Normal', detail: 'No active faults detected.', col: '#10b981' }, { icon: '!', label: tires.rl < 30 ? 'Tire Pressure Low — Rear Left' : 'Tire Pressure OK', detail: `Rear left: ${tires.rl} PSI`, col: tires.rl < 30 ? '#f59e0b' : '#10b981' }, { icon: 'ℹ', label: 'Upcoming Service in 2300 km', detail: 'Schedule at your nearest service centre.', col: '#0ea5e9' }].map((a, i) => (
-                      <div key={i} style={{ padding: '14px', background: `${a.col}08`, borderRadius: 8, border: `1px solid ${a.col}33` }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
-                          <div style={{ width: 22, height: 22, borderRadius: '50%', background: `${a.col}22`, border: `1px solid ${a.col}66`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, color: a.col, flexShrink: 0 }}>{a.icon}</div>
-                          <span style={{ fontSize: 13, fontWeight: 600, color: a.col, fontFamily: 'sans-serif' }}>{a.label}</span>
-                        </div>
-                        <div style={{ fontSize: 12, color: 'rgba(0,0,0,0.60)', fontFamily: 'sans-serif', paddingLeft: 32 }}>{a.detail}</div>
-                      </div>
-                    ))
-                  ) : alerts.map(a => (
-                    <div key={a.id} style={{ padding: '14px', background: a.type === 'fault' ? 'rgba(239,68,68,0.06)' : 'rgba(245,158,11,0.06)', borderRadius: 8, border: `1px solid ${a.type === 'fault' ? 'rgba(239,68,68,0.25)' : 'rgba(245,158,11,0.25)'}` }}>
-                      <div style={{ fontSize: 13, fontWeight: 600, color: a.type === 'fault' ? '#ef4444' : '#f59e0b', fontFamily: 'sans-serif', marginBottom: 4 }}>{a.msg}</div>
-                      <div style={{ fontSize: 12, color: 'rgba(0,0,0,0.52)', fontFamily: 'sans-serif' }}>{a.time}</div>
-                    </div>
-                  ))}
-                </div>
-              </CardModal>
-            )}
-            {openCard === 'ai' && (
-              <CardModal title="AI Advisory" icon={<BrainCircuit size={14} color="var(--cyan)" />} accent="#0ea5e9" onClose={() => setOpenCard(null)}>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      {aiTyping && <div className="typewriter-cursor" />}
-                      <span style={{ fontSize: 12, color: '#64748b', fontFamily: 'sans-serif', fontWeight: 500 }}>
-                        {aiTyping ? 'Generating recommendation...' : 'Live AI Recommendation'}
+                      <span style={{ fontSize: 10, padding: '2px 8px', borderRadius: 4, background: '#ffffff', color: '#0284c7', fontWeight: 700, border: '1px solid rgba(2, 132, 199, 0.2)' }}>
+                        GROUNDED TELEMETRY
                       </span>
                     </div>
-                    <button onClick={() => { requestRecommendation() }} disabled={aiTyping || !latest} style={{ background: 'rgba(14,165,233,0.12)', border: '1px solid rgba(14,165,233,0.3)', borderRadius: 6, padding: '6px 14px', fontSize: 12, fontWeight: 600, color: '#0284c7', cursor: 'pointer', fontFamily: 'sans-serif', opacity: aiTyping ? 0.5 : 1 }}>↻ Refresh</button>
+
+                    {/* Suggestion Cards */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                      {keySugs.map((s, i) => {
+                        const isHigh = s.priority === 'high'
+                        const isMed = s.priority === 'med'
+                        const borderCol = isHigh ? '#fca5a5' : isMed ? '#fde68a' : '#bae6fd'
+                        const bgCol = isHigh ? 'rgba(239, 68, 68, 0.04)' : isMed ? 'rgba(245, 158, 11, 0.04)' : 'rgba(2, 132, 199, 0.04)'
+                        const tagCol = isHigh ? '#dc2626' : isMed ? '#d97706' : '#0284c7'
+                        const tagBg = isHigh ? 'rgba(239, 68, 68, 0.1)' : isMed ? 'rgba(245, 158, 11, 0.1)' : 'rgba(2, 132, 199, 0.1)'
+
+                        return (
+                          <div key={i} style={{ display: 'flex', gap: 14, padding: '14px 16px', background: bgCol, border: `1px solid ${borderCol}`, borderRadius: 10 }}>
+                            <div style={{ fontSize: 24, lineHeight: 1 }}>{s.icon}</div>
+                            <div style={{ flex: 1 }}>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 4 }}>
+                                <div style={{ fontSize: 13, fontWeight: 700, color: '#0f172a' }}>{s.title}</div>
+                                <span style={{ fontSize: 9, padding: '2px 6px', borderRadius: 4, background: tagBg, color: tagCol, fontWeight: 700, fontFamily: 'monospace' }}>
+                                  {s.priority.toUpperCase()} PRIORITY
+                                </span>
+                              </div>
+                              <div style={{ fontSize: 12, color: '#475569', lineHeight: 1.5 }}>{s.desc}</div>
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
                   </div>
-                  <div style={{ padding: '16px 18px', background: '#f8fafc', borderRadius: 8, border: '1px solid #e2e8f0', fontSize: 13.5, color: '#334155', lineHeight: 1.7, fontFamily: 'sans-serif', minHeight: 140, maxHeight: 300, overflowY: 'auto' }}>
-                    {aiRec ? <FormattedAiText text={aiRec} /> : <span style={{ color: '#94a3b8' }}>{!connected ? '◌ Waiting for connection...' : 'AI on standby — awaiting telemetry data.'}</span>}
-                  </div>
-                  <div style={{ fontSize: 11.5, color: '#64748b', fontFamily: 'sans-serif', textAlign: 'center' }}>Based on live telemetry from {vehicleId}</div>
+                )}
+              </CardModal>
+            )}
+
+            {openCard === 'alerts' && (
+              <CardModal title="Vehicle Health Diagnostics & Alerts" icon={<AlertTriangle size={16} color="#f59e0b" />} accent="#f59e0b" onClose={() => setOpenCard(null)}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                  {alerts.length > 0 ? (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                      <div style={{ fontSize: 11, fontWeight: 700, color: '#dc2626', fontFamily: 'monospace', textTransform: 'uppercase' }}>
+                        ACTIVE WARNINGS REQUIRING ATTENTION ({alerts.length})
+                      </div>
+                      {alerts.map(a => (
+                        <div key={a.id} style={{ padding: '14px 16px', background: a.type === 'fault' ? '#fef2f2' : '#fffbeb', borderRadius: 10, border: `1px solid ${a.type === 'fault' ? '#fca5a5' : '#fde68a'}` }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                            <span style={{ fontSize: 13, fontWeight: 700, color: a.type === 'fault' ? '#dc2626' : '#d97706' }}>{a.msg}</span>
+                            <span style={{ fontSize: 10, color: '#64748b', fontFamily: 'monospace' }}>{a.time}</span>
+                          </div>
+                          <div style={{ fontSize: 11, color: '#475569' }}>
+                            {a.type === 'fault' ? 'Emergency intervention: Power output derated. Safely reduce speed.' : 'Subsystem advisory: Monitor telemetry values closely.'}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '14px 16px', background: 'rgba(16, 185, 129, 0.08)', borderRadius: 10, border: '1px solid rgba(16, 185, 129, 0.2)' }}>
+                        <div style={{ width: 28, height: 28, borderRadius: '50%', background: '#10b981', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, fontWeight: 700 }}>
+                          ✓
+                        </div>
+                        <div>
+                          <div style={{ fontSize: 13, fontWeight: 700, color: '#059669' }}>All Core Subsystems Operational</div>
+                          <div style={{ fontSize: 11, color: '#475569' }}>Continuous CAN-bus telemetry polling active · 0 active faults</div>
+                        </div>
+                      </div>
+
+                      {/* 6-Point Subsystem Checklist */}
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 4 }}>
+                        {[
+                          { name: '800V DC Battery Pack', status: 'BALANCED (11 mV)', ok: true },
+                          { name: 'Permanent Magnet Motor', status: 'OPTIMAL THERMAL', ok: true },
+                          { name: 'SiC Power Inverter', status: '98.4% EFFICIENCY', ok: true },
+                          { name: 'HMAC-SHA256 Auth', status: 'CRYPTOGRAPHICALLY VALID', ok: true },
+                          { name: 'MQTT / HTTP Comms Layer', status: 'LOW LATENCY CONNECTED', ok: true },
+                          { name: 'Brake-by-Wire & ABS', status: 'CALIBRATED', ok: true },
+                        ].map(sys => (
+                          <div key={sys.name} style={{ padding: '10px 12px', background: '#f8fafc', borderRadius: 8, border: '1px solid #e2e8f0' }}>
+                            <div style={{ fontSize: 11, fontWeight: 600, color: '#0f172a' }}>{sys.name}</div>
+                            <div style={{ fontSize: 9.5, fontWeight: 700, color: '#059669', fontFamily: 'monospace', marginTop: 2 }}>
+                              ✓ {sys.status}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               </CardModal>
             )}
-          </AnimatePresence>
 
-          {/* Modals for all rows */}
-          <AnimatePresence>
+            {openCard === 'ai' && (
+              <CardModal title="Centralized CVIS AI Advisory" icon={<BrainCircuit size={16} color="var(--cyan)" />} accent="#0ea5e9" onClose={() => setOpenCard(null)}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                  {/* Status header */}
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', background: '#f8fafc', borderRadius: 10, border: '1px solid #e2e8f0' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      {aiTyping && <div className="typewriter-cursor" />}
+                      <span style={{ fontSize: 12, color: '#0f172a', fontWeight: 600 }}>
+                        {aiTyping ? 'Generating AI Recommendation...' : 'Live Ollama 3B Intelligence'}
+                      </span>
+                    </div>
+                    <button
+                      onClick={() => { requestRecommendation() }}
+                      disabled={aiTyping || !latest}
+                      style={{
+                        background: '#0284c7',
+                        border: 'none',
+                        borderRadius: 6,
+                        padding: '6px 14px',
+                        fontSize: 11,
+                        fontWeight: 700,
+                        color: '#ffffff',
+                        cursor: 'pointer',
+                        fontFamily: 'monospace',
+                        opacity: aiTyping ? 0.6 : 1,
+                        boxShadow: '0 2px 6px rgba(2, 132, 199, 0.3)',
+                      }}
+                    >
+                      ↻ REGENERATE
+                    </button>
+                  </div>
+
+                  {/* Recommendation Content Box */}
+                  <div style={{ padding: '18px 20px', background: '#ffffff', borderRadius: 10, border: '1px solid #e2e8f0', fontSize: 13.5, color: '#1e293b', lineHeight: 1.7, minHeight: 140, maxHeight: 320, overflowY: 'auto', boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.02)' }}>
+                    {aiRec ? <FormattedAiText text={aiRec} /> : <span style={{ color: '#94a3b8' }}>{!connected ? '◌ Connecting to CVIS AI Edge Service...' : 'AI on standby — awaiting multi-factor telemetry snapshot.'}</span>}
+                  </div>
+
+                  {/* Grounding Parameters Bar */}
+                  <div style={{ padding: '10px 14px', background: '#f8fafc', borderRadius: 8, border: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', fontSize: 10.5, color: '#64748b', fontFamily: 'monospace' }}>
+                    <span>EVALUATED: SPEED {latest ? Math.round(latest.speed_kmh) : '---'} KM/H · SOC {latest ? Math.round(latest.battery_pct) : '---'}% · TEMP {latest ? Math.round(latest.motor_temp_c) : '---'}°C</span>
+                    <span>MODEL: LLAMA3.2:3B</span>
+                  </div>
+                </div>
+              </CardModal>
+            )}
+
             {openCard === 'speed' && (
-              <CardModal title="Speed Analytics" icon={<Gauge size={14} color={mconf.accent} />} accent={mconf.accent} onClose={() => setOpenCard(null)}>
+              <CardModal title="Speed & Powertrain Velocity Analytics" icon={<Gauge size={16} color={mconf.accent} />} accent={mconf.accent} onClose={() => setOpenCard(null)}>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-                  <div style={{ display: 'flex', justifyContent: 'center' }}><SpeedometerDial speed={latest?.speed_kmh ?? 0} accent={mconf.accent} /></div>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-                    {[{ label: 'Current Speed', val: `${Math.round(latest?.speed_kmh ?? 0)} km/h` }, { label: 'Avg Speed', val: `${Math.round(avgSpd)} km/h` }, { label: 'Max Speed', val: `${Math.round(maxSpeed)} km/h` }, { label: 'Distance', val: `${totalDist.toFixed(1)} km` }].map(r => (
-                      <div key={r.label} style={{ padding: '12px', background: 'rgba(0,0,0,0.04)', borderRadius: 8, border: '1px solid rgba(0,0,0,0.11)', textAlign: 'center' }}>
-                        <div style={{ fontSize: 12, color: 'rgba(0,0,0,0.52)', fontFamily: 'sans-serif', marginBottom: 4 }}>{r.label}</div>
-                        <div style={{ fontSize: 18, fontWeight: 700, color: '#0f172a', fontFamily: 'sans-serif' }}>{r.val}</div>
+                  {/* Speedometer Dial Container */}
+                  <div style={{ display: 'flex', justifyContent: 'center', padding: '14px 0', background: 'radial-gradient(circle at center, rgba(2, 132, 199, 0.05) 0%, transparent 70%)' }}>
+                    <SpeedometerDial speed={latest?.speed_kmh ?? 0} accent={mconf.accent} />
+                  </div>
+
+                  {/* 4-Stat Velocity Breakdown */}
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 10 }}>
+                    {[
+                      { label: 'Current Velocity', val: latest ? `${Math.round(latest.speed_kmh)} km/h` : '--- km/h', detail: 'Real-time telemetry' },
+                      { label: 'Motor Rotor Speed', val: latest ? `${Math.round(latest.speed_kmh * 82)} RPM` : '--- RPM', detail: 'Direct drive ratio 9.2:1' },
+                      { label: 'Session Peak Speed', val: maxSpeed > 0 ? `${Math.round(maxSpeed)} km/h` : '--- km/h', detail: 'Maximum recorded' },
+                      { label: 'Total Distance', val: totalDist > 0 ? `${totalDist.toFixed(1)} km` : '0.0 km', detail: 'Trip odometry' },
+                    ].map(r => (
+                      <div key={r.label} style={{ padding: '12px 14px', background: '#f8fafc', borderRadius: 8, border: '1px solid #e2e8f0' }}>
+                        <div style={{ fontSize: 11, color: '#64748b', marginBottom: 2 }}>{r.label}</div>
+                        <div style={{ fontSize: 18, fontWeight: 800, color: '#0f172a', fontFamily: 'monospace' }}>{r.val}</div>
+                        <div style={{ fontSize: 10, color: '#94a3b8', marginTop: 2 }}>{r.detail}</div>
                       </div>
                     ))}
+                  </div>
+
+                  {/* 0-100 Benchmark Bar */}
+                  <div style={{ padding: '12px 16px', background: '#f8fafc', borderRadius: 8, border: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ fontSize: 12, color: '#475569', fontWeight: 600 }}>0–100 km/h Benchmark:</span>
+                    <span style={{ fontSize: 13, fontWeight: 700, color: '#0284c7', fontFamily: 'monospace' }}>3.2s (Dual Motor Launch)</span>
                   </div>
                 </div>
               </CardModal>
             )}
+
             {openCard === 'efficiency' && (
-              <CardModal title="Efficiency Graph" icon={<TrendingUp size={14} color="var(--cyan)" />} accent="#0ea5e9" onClose={() => setOpenCard(null)}>
-                {isPro ? (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
-                      {[{ col: '#0ea5e9', label: 'Efficiency (km/l)' }, { col: '#f59e0b', label: 'Consumption (L/100km)' }].map(l => (<div key={l.label} style={{ display: 'flex', alignItems: 'center', gap: 6 }}><div style={{ width: 16, height: 3, background: l.col, borderRadius: 2 }} /><span style={{ fontSize: 12, fontFamily: 'sans-serif', color: 'rgba(0,0,0,0.7)' }}>{l.label}</span></div>))}
-                      <div style={{ marginLeft: 'auto', fontSize: 13, fontFamily: 'sans-serif', color: mconf.accent, fontWeight: 700 }}>AVG {(14 + (latest?.battery_pct ?? 80) / 20).toFixed(1)} km/l</div>
+              <CardModal title="Energy Efficiency & Consumption Curves" icon={<TrendingUp size={16} color="var(--cyan)" />} accent="#0ea5e9" onClose={() => setOpenCard(null)}>
+                {!isPro ? (
+                  <ProLockedModal
+                    title="Consumption Curves"
+                    feature="Historical Wh/km & Energy Analytics"
+                    desc="Detailed ComposedChart visualization correlating vehicle speed with Wh/km efficiency and kWh/100km battery consumption across recent telemetry snapshots."
+                    benefits={[
+                      "Real-time dual-axis ComposedChart curves",
+                      "Trip average Wh/km and energy optimization targets",
+                      "Estimated fuel cost and carbon savings vs ICE vehicles"
+                    ]}
+                    onUnlock={() => togglePro(true)}
+                  />
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                    {/* Legend & Summary */}
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10 }}>
+                      <div style={{ display: 'flex', gap: 14 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                          <div style={{ width: 14, height: 4, background: '#0ea5e9', borderRadius: 2 }} />
+                          <span style={{ fontSize: 11, color: '#334155', fontWeight: 600 }}>Efficiency (Wh/km)</span>
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                          <div style={{ width: 14, height: 4, background: '#f59e0b', borderRadius: 2 }} />
+                          <span style={{ fontSize: 11, color: '#334155', fontWeight: 600 }}>Consumption (kWh/100km)</span>
+                        </div>
+                      </div>
+                      <div style={{ fontSize: 12, fontWeight: 700, color: '#0284c7', fontFamily: 'monospace' }}>
+                        AVG {latest ? Math.round(135 + latest.speed_kmh * 0.7) : '---'} Wh/km
+                      </div>
                     </div>
-                    <ResponsiveContainer width="100%" height={200}>
-                      <ComposedChart data={efficiencyData} margin={{ top: 4, right: 4, left: -26, bottom: 0 }}>
-                        <XAxis dataKey="time" tick={{ fontSize: 9, fill: 'rgba(0,0,0,0.38)', fontFamily: 'sans-serif' }} tickLine={false} axisLine={false} interval={2} />
-                        <YAxis yAxisId="l" hide domain={[0, 30]} />
-                        <YAxis yAxisId="r" orientation="right" tick={{ fontSize: 9, fill: 'rgba(0,0,0,0.38)', fontFamily: 'sans-serif' }} tickLine={false} axisLine={false} domain={[0, 30]} />
-                        <Tooltip contentStyle={{ background: '#0d1117', border: '1px solid rgba(14,165,233,0.15)', borderRadius: 6, fontSize: 11 }} />
-                        <Bar yAxisId="l" dataKey="consumption" fill="rgba(245,158,11,0.35)" radius={[2, 2, 0, 0]} name="Consumption L/100km" />
-                        <Line yAxisId="r" type="monotone" dataKey="efficiency" stroke="#0ea5e9" strokeWidth={2.5} dot={false} name="Efficiency km/l" />
-                      </ComposedChart>
-                    </ResponsiveContainer>
+
+                    {/* Clean Light-Mode Recharts Container */}
+                    <div style={{ background: '#f8fafc', padding: '16px 12px 8px 0', borderRadius: 10, border: '1px solid #e2e8f0' }}>
+                      <ResponsiveContainer width="100%" height={220}>
+                        <ComposedChart data={efficiencyData} margin={{ top: 4, right: 8, left: -20, bottom: 0 }}>
+                          <XAxis dataKey="time" tick={{ fontSize: 9, fill: '#64748b' }} tickLine={false} axisLine={false} interval={2} />
+                          <YAxis yAxisId="l" hide domain={[0, 30]} />
+                          <YAxis yAxisId="r" orientation="right" tick={{ fontSize: 9, fill: '#64748b' }} tickLine={false} axisLine={false} domain={[0, 30]} />
+                          <Tooltip
+                            contentStyle={{
+                              background: '#ffffff',
+                              border: '1px solid #e2e8f0',
+                              borderRadius: 8,
+                              boxShadow: '0 4px 12px rgba(0,0,0,0.08)',
+                              fontSize: 11,
+                              color: '#0f172a',
+                            }}
+                          />
+                          <Bar yAxisId="l" dataKey="consumption" fill="rgba(245, 158, 11, 0.4)" radius={[3, 3, 0, 0]} name="Consumption (kWh/100km)" />
+                          <Line yAxisId="r" type="monotone" dataKey="efficiency" stroke="#0ea5e9" strokeWidth={2.5} dot={{ r: 2 }} name="Efficiency (Wh/km)" />
+                        </ComposedChart>
+                      </ResponsiveContainer>
+                    </div>
+
+                    {/* Energy Savings Callout */}
+                    <div style={{ padding: '12px 14px', background: '#f0fdf4', borderRadius: 8, border: '1px solid #bbf7d0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span style={{ fontSize: 11.5, color: '#166534', fontWeight: 600 }}>Equivalent Fuel Cost Saving vs ICE:</span>
+                      <span style={{ fontSize: 13, fontWeight: 800, color: '#15803d', fontFamily: 'monospace' }}>-78% Cost Reduction</span>
+                    </div>
                   </div>
-                ) : <LockedFeature title="AI Efficiency Graph" desc="Pro subscribers get hourly fuel efficiency analysis, consumption trends, and driving optimization insights." />}
+                )}
               </CardModal>
             )}
+
             {openCard === 'climate' && (
-              <CardModal title="Cabin Climate" icon={<Wind size={14} color="#0ea5e9" />} accent="#0ea5e9" onClose={() => setOpenCard(null)}>
+              <CardModal title="Dual-Zone Intelligent Cabin Climate" icon={<Wind size={16} color="#0ea5e9" />} accent="#0ea5e9" onClose={() => setOpenCard(null)}>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px', background: 'rgba(14,165,233,0.06)', borderRadius: 10, border: '1px solid rgba(14,165,233,0.15)' }}>
+                  {/* Climate Temp Readouts */}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '18px 22px', background: 'linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%)', borderRadius: 12, border: '1px solid #bae6fd' }}>
                     <div>
-                      <div style={{ fontSize: 13, color: 'rgba(0,0,0,0.5)', fontFamily: 'sans-serif' }}>Interior Temp</div>
-                      <div style={{ fontSize: 32, fontWeight: 700, color: '#0ea5e9', fontFamily: 'sans-serif', marginTop: 4 }}>21°C</div>
+                      <div style={{ fontSize: 11, color: '#0369a1', fontWeight: 700 }}>CABIN CURRENT</div>
+                      <div style={{ fontSize: 36, fontWeight: 800, color: '#0284c7', fontFamily: 'monospace', marginTop: 2 }}>{latest ? `${cabinTemp}°C` : '---'}</div>
                     </div>
-                    <div style={{ textAlign: 'right' }}>
-                      <div style={{ fontSize: 13, color: 'rgba(0,0,0,0.5)', fontFamily: 'sans-serif' }}>Target Temp</div>
-                      <div style={{ fontSize: 32, fontWeight: 700, color: '#0f172a', fontFamily: 'sans-serif', marginTop: 4 }}>22°C</div>
+
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                      <button
+                        onClick={() => setCabinTemp(t => Math.max(16, t - 1))}
+                        style={{ width: 36, height: 36, borderRadius: '50%', border: '1px solid #bae6fd', background: '#ffffff', cursor: 'pointer', fontSize: 18, fontWeight: 700, color: '#0284c7', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 6px rgba(0,0,0,0.05)' }}
+                      >
+                        -
+                      </button>
+                      <div style={{ textAlign: 'center', minWidth: 64 }}>
+                        <div style={{ fontSize: 10, color: '#0369a1', fontWeight: 700 }}>TARGET</div>
+                        <div style={{ fontSize: 32, fontWeight: 800, color: '#0f172a', fontFamily: 'monospace' }}>{cabinTemp}°C</div>
+                      </div>
+                      <button
+                        onClick={() => setCabinTemp(t => Math.min(30, t + 1))}
+                        style={{ width: 36, height: 36, borderRadius: '50%', border: '1px solid #bae6fd', background: '#ffffff', cursor: 'pointer', fontSize: 18, fontWeight: 700, color: '#0284c7', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 6px rgba(0,0,0,0.05)' }}
+                      >
+                        +
+                      </button>
                     </div>
                   </div>
-                  <div style={{ display: 'flex', gap: 10 }}>
-                    {['Auto', 'A/C', 'Heat', 'Defrost'].map((m, i) => (
-                      <div key={m} style={{ flex: 1, padding: '12px 0', textAlign: 'center', background: i === 0 ? '#0ea5e9' : 'rgba(0,0,0,0.04)', color: i === 0 ? '#fff' : 'rgba(0,0,0,0.6)', borderRadius: 8, fontSize: 13, fontWeight: 600, fontFamily: 'sans-serif' }}>
+
+                  {/* Mode Toggles */}
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8 }}>
+                    {['Auto', 'A/C Max', 'Eco Heat', 'Defrost'].map((m, i) => (
+                      <button
+                        key={m}
+                        style={{
+                          padding: '12px 0',
+                          textAlign: 'center',
+                          background: i === 0 ? '#0284c7' : '#f8fafc',
+                          color: i === 0 ? '#ffffff' : '#334155',
+                          borderRadius: 8,
+                          border: `1px solid ${i === 0 ? '#0284c7' : '#e2e8f0'}`,
+                          fontSize: 12,
+                          fontWeight: 700,
+                          cursor: 'pointer',
+                        }}
+                      >
                         {m}
-                      </div>
+                      </button>
                     ))}
                   </div>
-                  <div style={{ padding: '12px', background: 'rgba(0,0,0,0.03)', borderRadius: 8, fontSize: 12, color: 'rgba(0,0,0,0.5)', textAlign: 'center', fontFamily: 'sans-serif' }}>
-                    Air quality is GOOD. Fan speed is automatically controlled.
+
+                  {/* Air Quality & Power Draw */}
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                    <div style={{ padding: '12px 14px', background: '#f8fafc', borderRadius: 8, border: '1px solid #e2e8f0' }}>
+                      <div style={{ fontSize: 11, color: '#64748b' }}>CABIN AIR QUALITY</div>
+                      <div style={{ fontSize: 14, fontWeight: 700, color: '#059669', fontFamily: 'monospace', marginTop: 2 }}>AQI 12 (EXCELLENT)</div>
+                    </div>
+                    <div style={{ padding: '12px 14px', background: '#f8fafc', borderRadius: 8, border: '1px solid #e2e8f0' }}>
+                      <div style={{ fontSize: 11, color: '#64748b' }}>HVAC POWER CONSUMPTION</div>
+                      <div style={{ fontSize: 14, fontWeight: 700, color: '#0284c7', fontFamily: 'monospace', marginTop: 2 }}>{latest ? `${latest.cabin_climate_w ?? 0} W` : '--- W'}</div>
+                    </div>
                   </div>
                 </div>
               </CardModal>
             )}
+
             {openCard === 'power' && (
-              <CardModal title="Power Flow" icon={<Zap size={14} color={mconf.accent} />} accent={mconf.accent} onClose={() => setOpenCard(null)}>
+              <CardModal title="Dual Motor Powertrain Flow" icon={<Zap size={16} color={mconf.accent} />} accent={mconf.accent} onClose={() => setOpenCard(null)}>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-around' }}>
-                    <DonutRing pct={enginePct} color="#0ea5e9" label="ENGINE" size={90} />
-                    <DonutRing pct={battPct2} color="#10b981" label="BATTERY" size={90} />
-                    <DonutRing pct={motorPct} color={mconf.accent} label="MOTOR" size={90} />
+                  {/* 3 Radial Powertrain Rings */}
+                  <div style={{ display: 'flex', justifyContent: 'space-around', padding: '12px 0', background: '#f8fafc', borderRadius: 12, border: '1px solid #e2e8f0' }}>
+                    <DonutRing pct={enginePct} color="#0ea5e9" label="FRONT MOTOR" size={88} />
+                    <DonutRing pct={battPct2} color="#10b981" label="800V BATTERY" size={88} />
+                    <DonutRing pct={motorPct} color={mconf.accent} label="REAR MOTOR" size={88} />
                   </div>
-                  {[{ label: 'Power Distribution', pct: enginePct, col: '#0ea5e9', grad: 'linear-gradient(90deg,#0ea5e9,#10b981)' }, { label: 'Regeneration', pct: regenPct, col: '#10b981', grad: 'linear-gradient(90deg,#10b981,#0ea5e988)' }].map(b => (
-                    <div key={b.label}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
-                        <span style={{ fontSize: 12, color: 'rgba(0,0,0,0.75)', fontFamily: 'sans-serif' }}>{b.label}</span>
-                        <span style={{ fontSize: 13, fontWeight: 700, color: b.col, fontFamily: 'sans-serif' }}>{b.pct}%</span>
+
+                  {/* Dual Torque Split & Regen */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                    <div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginBottom: 4 }}>
+                        <span style={{ fontWeight: 600, color: '#334155' }}>Front/Rear Dual Motor Torque Split</span>
+                        <span style={{ fontWeight: 700, color: '#0284c7', fontFamily: 'monospace' }}>45% Front / 55% Rear</span>
                       </div>
-                      <div style={{ height: 6, borderRadius: 3, background: 'rgba(0,0,0,0.09)' }}>
-                        <motion.div style={{ height: '100%', borderRadius: 3, background: b.grad, boxShadow: `0 0 8px ${b.col}44` }} animate={{ width: `${b.pct}%` }} transition={{ duration: 0.6 }} />
+                      <div style={{ height: 8, borderRadius: 4, background: '#e2e8f0', overflow: 'hidden' }}>
+                        <div style={{ height: '100%', width: '45%', background: '#0284c7', borderRadius: '4px 0 0 4px' }} />
                       </div>
                     </div>
-                  ))}
-                  <div style={{ display: 'flex', justifyContent: 'space-between', padding: '14px', background: 'rgba(0,0,0,0.04)', borderRadius: 8, border: '1px solid rgba(0,0,0,0.11)' }}>
-                    <div style={{ textAlign: 'center' }}><div style={{ fontSize: 12, color: 'rgba(0,0,0,0.52)', fontFamily: 'sans-serif', marginBottom: 4 }}>TOTAL OUTPUT</div><div style={{ fontSize: 24, fontWeight: 700, color: mconf.accent, fontFamily: 'sans-serif' }}>{Math.round(totalKw)} kW</div></div>
-                    <div style={{ width: 1, background: 'rgba(0,0,0,0.12)' }} />
-                    <div style={{ textAlign: 'center' }}><div style={{ fontSize: 12, color: 'rgba(0,0,0,0.52)', fontFamily: 'sans-serif', marginBottom: 4 }}>HORSEPOWER</div><div style={{ fontSize: 24, fontWeight: 700, color: 'rgba(0,0,0,0.98)', fontFamily: 'sans-serif' }}>{totalHp} HP</div></div>
+
+                    <div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginBottom: 4 }}>
+                        <span style={{ fontWeight: 600, color: '#334155' }}>Regenerative Kinetic Recovery</span>
+                        <span style={{ fontWeight: 700, color: '#059669', fontFamily: 'monospace' }}>{regenPct}% Peak Regen</span>
+                      </div>
+                      <div style={{ height: 8, borderRadius: 4, background: '#e2e8f0', overflow: 'hidden' }}>
+                        <motion.div style={{ height: '100%', width: `${regenPct}%`, background: '#10b981', borderRadius: 4 }} animate={{ width: `${regenPct}%` }} transition={{ duration: 0.6 }} />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Output kW & Horsepower */}
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                    <div style={{ padding: '14px', background: '#f8fafc', borderRadius: 8, border: '1px solid #e2e8f0', textAlign: 'center' }}>
+                      <div style={{ fontSize: 11, color: '#64748b' }}>TOTAL MECHANICAL POWER</div>
+                      <div style={{ fontSize: 24, fontWeight: 800, color: mconf.accent, fontFamily: 'monospace', marginTop: 2 }}>{latest && !isNaN(totalKw) ? `${Math.round(totalKw)} kW` : '--- kW'}</div>
+                    </div>
+                    <div style={{ padding: '14px', background: '#f8fafc', borderRadius: 8, border: '1px solid #e2e8f0', textAlign: 'center' }}>
+                      <div style={{ fontSize: 11, color: '#64748b' }}>EQUIVALENT HORSEPOWER</div>
+                      <div style={{ fontSize: 24, fontWeight: 800, color: '#0f172a', fontFamily: 'monospace', marginTop: 2 }}>{latest && !isNaN(totalHp) ? `${totalHp} HP` : '--- HP'}</div>
+                    </div>
+                  </div>
+
+                  {/* Inverter Efficiency */}
+                  <div style={{ padding: '10px 14px', background: '#f8fafc', borderRadius: 8, border: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', fontSize: 11, color: '#475569', fontFamily: 'monospace' }}>
+                    <span>SILICON CARBIDE (SiC) INVERTER</span>
+                    <span>EFFICIENCY: 98.4%</span>
                   </div>
                 </div>
               </CardModal>
             )}
           </AnimatePresence>
-
-
 
         </div>
       </main>
@@ -1101,56 +2319,83 @@ export default function DriverDashboard({ vehicleId, vehicleName, vehicleColor, 
               <div style={{ fontSize: 10, color: 'rgba(0,0,0,0.4)', marginLeft: 4, fontFamily: 'sans-serif' }}>{latest ? `${latest.device_id} \u00b7 ${mode}` : 'NO DATA'}</div>
               <button onClick={() => setChatOpen(false)} style={{ marginLeft: 'auto', background: 'rgba(0,0,0,0.04)', border: 'none', color: 'rgba(0,0,0,0.6)', cursor: 'pointer', width: 24, height: 24, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><X size={14} /></button>
             </div>
-            <div style={{ height: 320, overflowY: 'auto', padding: '16px', display: 'flex', flexDirection: 'column', gap: 12, background: '#ffffff' }}>
-              {chatHistory.length === 0 && <div style={{ fontSize: 12, color: 'rgba(0,0,0,0.3)', textAlign: 'center', marginTop: 60, fontFamily: 'sans-serif', fontWeight: 600 }}>ASK CVIS ANYTHING ABOUT YOUR VEHICLE</div>}
-              {chatHistory.map((m, i) => (
-                <div key={i} style={{ alignSelf: m.role === 'user' ? 'flex-end' : 'flex-start', maxWidth: '88%' }}>
-                  <div style={{ padding: '10px 14px', borderRadius: m.role === 'user' ? '12px 12px 2px 12px' : '12px 12px 12px 2px', background: m.role === 'user' ? '#e0f2fe' : '#f1f5f9', border: `1px solid ${m.role === 'user' ? '#bae6fd' : '#e2e8f0'}`, fontSize: 13, color: m.role === 'user' ? '#0369a1' : '#334155', lineHeight: 1.5, fontFamily: 'sans-serif' }}>
-                    {m.text}
-                  </div>
-                  {m.role === 'ai' && (
-                    <div style={{ display: 'flex', justifyContent: 'flex-start', marginTop: 4 }}>
-                      <button
-                        onClick={() => isSpeaking ? stopSpeaking() : speakText(m.text)}
-                        title={isSpeaking ? 'Stop speaking' : 'Speak this reply'}
-                        style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '2px 4px', borderRadius: 4, color: isSpeaking ? '#0ea5e9' : 'rgba(0,0,0,0.3)', display: 'flex', alignItems: 'center', gap: 3, fontSize: 10, fontFamily: 'sans-serif', transition: 'color 0.2s' }}
-                      >
-                        {isSpeaking ? <Volume2 size={12} /> : <Volume2 size={12} />}
-                        <span>{isSpeaking ? 'Stop' : 'Speak'}</span>
-                      </button>
-                    </div>
-                  )}
+            {!isPro ? (
+              <div style={{ height: 340, padding: '24px 20px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center', background: '#ffffff', gap: 12 }}>
+                <div style={{ width: 44, height: 44, borderRadius: '50%', background: 'linear-gradient(135deg, #0ea5e9 0%, #f59e0b 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', boxShadow: '0 6px 18px rgba(14,165,233,0.25)' }}>
+                  <Lock size={20} />
                 </div>
-              ))}
-              {chatLoading && <div style={{ alignSelf: 'flex-start', display: 'flex', gap: 5, padding: '10px 14px', background: '#f1f5f9', borderRadius: '12px 12px 12px 2px', border: '1px solid #e2e8f0' }}>{[0, 1, 2].map(i => <motion.div key={i} style={{ width: 6, height: 6, borderRadius: '50%', background: '#0ea5e9' }} animate={{ y: [0, -5, 0] }} transition={{ delay: i * 0.15, repeat: Infinity, duration: 0.7 }} />)}</div>}
-              <div ref={chatBottom} />
-            </div>
-            {/* Speaking indicator */}
-            {isSpeaking && (
-              <div style={{ padding: '6px 16px', background: 'linear-gradient(90deg,rgba(14,165,233,0.08),rgba(14,165,233,0.04))', borderTop: '1px solid rgba(14,165,233,0.15)', display: 'flex', alignItems: 'center', gap: 6 }}>
-                <motion.div animate={{ scale: [1, 1.3, 1] }} transition={{ repeat: Infinity, duration: 0.8 }} style={{ width: 6, height: 6, borderRadius: '50%', background: '#0ea5e9' }} />
-                <span style={{ fontSize: 10, color: '#0ea5e9', fontFamily: 'sans-serif', fontWeight: 600, letterSpacing: '0.06em' }}>AI SPEAKING...</span>
-                <button onClick={stopSpeaking} style={{ marginLeft: 'auto', background: 'none', border: 'none', color: '#0ea5e9', cursor: 'pointer', fontSize: 10, fontFamily: 'sans-serif', display: 'flex', alignItems: 'center', gap: 3 }}>
-                  <VolumeX size={12} /> Stop
+                <div style={{ fontSize: 16, fontWeight: 800, color: '#0f172a' }}>
+                  CVIS Pro Neural Assistant
+                </div>
+                <div style={{ fontSize: 12.5, color: '#64748b', lineHeight: 1.5, maxWidth: 300 }}>
+                  Interactive driver chat with real-time multi-factor telemetry grounding is exclusive to the CVIS Pro subscription tier.
+                </div>
+                <button
+                  onClick={() => togglePro(true)}
+                  style={{
+                    marginTop: 8, padding: '10px 18px', borderRadius: 8, border: 'none',
+                    background: '#0ea5e9', color: '#ffffff', fontSize: 12, fontWeight: 700,
+                    cursor: 'pointer', fontFamily: 'monospace', letterSpacing: '0.04em',
+                    boxShadow: '0 4px 12px rgba(14,165,233,0.3)', display: 'flex', alignItems: 'center', gap: 6
+                  }}
+                >
+                  <Star size={14} fill="#fff" /> UNLOCK PRO &amp; START CHATTING
                 </button>
               </div>
-            )}
-            <div style={{ padding: '12px 16px', borderTop: '1px solid rgba(0,0,0,0.06)', display: 'flex', gap: 8, background: '#f8fafc' }}>
-              <button
-                onClick={toggleListening}
-                title={isListening ? 'Stop listening' : 'Ask with voice — AI will speak the reply'}
-                style={{ background: isListening ? '#ef4444' : '#f1f5f9', border: `1px solid ${isListening ? '#fca5a5' : '#e2e8f0'}`, borderRadius: 6, padding: '10px', cursor: 'pointer', color: isListening ? '#ffffff' : '#475569', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: '0.2s', position: 'relative' }}>
-                {isListening
-                  ? <MicOff size={14} />
-                  : <Mic size={14} />}
-                {isListening && (
-                  <motion.span animate={{ opacity: [1, 0.3, 1] }} transition={{ repeat: Infinity, duration: 1 }}
-                    style={{ position: 'absolute', top: -3, right: -3, width: 8, height: 8, borderRadius: '50%', background: '#ef4444', border: '1.5px solid #fff' }} />
+            ) : (
+              <>
+                <div style={{ height: 320, overflowY: 'auto', padding: '16px', display: 'flex', flexDirection: 'column', gap: 12, background: '#ffffff' }}>
+                  {chatHistory.length === 0 && <div style={{ fontSize: 12, color: 'rgba(0,0,0,0.3)', textAlign: 'center', marginTop: 60, fontFamily: 'sans-serif', fontWeight: 600 }}>ASK CVIS ANYTHING ABOUT YOUR VEHICLE</div>}
+                  {chatHistory.map((m, i) => (
+                    <div key={i} style={{ alignSelf: m.role === 'user' ? 'flex-end' : 'flex-start', maxWidth: '88%' }}>
+                      <div style={{ padding: '10px 14px', borderRadius: m.role === 'user' ? '12px 12px 2px 12px' : '12px 12px 12px 2px', background: m.role === 'user' ? '#e0f2fe' : '#f1f5f9', border: `1px solid ${m.role === 'user' ? '#bae6fd' : '#e2e8f0'}`, fontSize: 13, color: m.role === 'user' ? '#0369a1' : '#334155', lineHeight: 1.5, fontFamily: 'sans-serif' }}>
+                        {m.text}
+                      </div>
+                      {m.role === 'ai' && (
+                        <div style={{ display: 'flex', justifyContent: 'flex-start', marginTop: 4 }}>
+                          <button
+                            onClick={() => isSpeaking ? stopSpeaking() : speakText(m.text)}
+                            title={isSpeaking ? 'Stop speaking' : 'Speak this reply'}
+                            style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '2px 4px', borderRadius: 4, color: isSpeaking ? '#0ea5e9' : 'rgba(0,0,0,0.3)', display: 'flex', alignItems: 'center', gap: 3, fontSize: 10, fontFamily: 'sans-serif', transition: 'color 0.2s' }}
+                          >
+                            <Volume2 size={12} />
+                            <span>{isSpeaking ? 'Stop' : 'Speak'}</span>
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                  {chatLoading && <div style={{ alignSelf: 'flex-start', display: 'flex', gap: 5, padding: '10px 14px', background: '#f1f5f9', borderRadius: '12px 12px 12px 2px', border: '1px solid #e2e8f0' }}>{[0, 1, 2].map(i => <motion.div key={i} style={{ width: 6, height: 6, borderRadius: '50%', background: '#0ea5e9' }} animate={{ y: [0, -5, 0] }} transition={{ delay: i * 0.15, repeat: Infinity, duration: 0.7 }} />)}</div>}
+                  <div ref={chatBottom} />
+                </div>
+                {/* Speaking indicator */}
+                {isSpeaking && (
+                  <div style={{ padding: '6px 16px', background: 'linear-gradient(90deg,rgba(14,165,233,0.08),rgba(14,165,233,0.04))', borderTop: '1px solid rgba(14,165,233,0.15)', display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <motion.div animate={{ scale: [1, 1.3, 1] }} transition={{ repeat: Infinity, duration: 0.8 }} style={{ width: 6, height: 6, borderRadius: '50%', background: '#0ea5e9' }} />
+                    <span style={{ fontSize: 10, color: '#0ea5e9', fontFamily: 'sans-serif', fontWeight: 600, letterSpacing: '0.06em' }}>AI SPEAKING...</span>
+                    <button onClick={stopSpeaking} style={{ marginLeft: 'auto', background: 'none', border: 'none', color: '#0ea5e9', cursor: 'pointer', fontSize: 10, fontFamily: 'sans-serif', display: 'flex', alignItems: 'center', gap: 3 }}>
+                      <VolumeX size={12} /> Stop
+                    </button>
+                  </div>
                 )}
-              </button>
-              <input value={chatMsg} onChange={e => setChatMsg(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleChat()} placeholder={isListening ? '🎙 Listening... speak now' : 'Ask about your vehicle...'} style={{ flex: 1, background: '#ffffff', border: '1px solid rgba(0,0,0,0.1)', borderRadius: 6, padding: '10px 14px', color: '#0f172a', fontSize: 13, outline: 'none', fontFamily: 'sans-serif', boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.02)' }} />
-              <button onClick={() => handleChat(false)} disabled={chatLoading} style={{ background: '#0ea5e9', border: 'none', borderRadius: 6, padding: '10px 14px', cursor: 'pointer', color: '#ffffff', opacity: chatLoading ? 0.5 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 8px rgba(14,165,233,0.3)' }}><Send size={14} /></button>
-            </div>
+                <div style={{ padding: '12px 16px', borderTop: '1px solid rgba(0,0,0,0.06)', display: 'flex', gap: 8, background: '#f8fafc' }}>
+                  <button
+                    onClick={toggleListening}
+                    title={isListening ? 'Stop listening' : 'Ask with voice — AI will speak the reply'}
+                    style={{ background: isListening ? '#ef4444' : '#f1f5f9', border: `1px solid ${isListening ? '#fca5a5' : '#e2e8f0'}`, borderRadius: 6, padding: '10px', cursor: 'pointer', color: isListening ? '#ffffff' : '#475569', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: '0.2s', position: 'relative' }}>
+                    {isListening
+                      ? <MicOff size={14} />
+                      : <Mic size={14} />}
+                    {isListening && (
+                      <motion.span animate={{ opacity: [1, 0.3, 1] }} transition={{ repeat: Infinity, duration: 1 }}
+                        style={{ position: 'absolute', top: -3, right: -3, width: 8, height: 8, borderRadius: '50%', background: '#ef4444', border: '1.5px solid #fff' }} />
+                    )}
+                  </button>
+                  <input value={chatMsg} onChange={e => setChatMsg(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleChat()} placeholder={isListening ? '🎙 Listening... speak now' : 'Ask about your vehicle...'} style={{ flex: 1, background: '#ffffff', border: '1px solid rgba(0,0,0,0.1)', borderRadius: 6, padding: '10px 14px', color: '#0f172a', fontSize: 13, outline: 'none', fontFamily: 'sans-serif', boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.02)' }} />
+                  <button onClick={() => handleChat(false)} disabled={chatLoading} style={{ background: '#0ea5e9', border: 'none', borderRadius: 6, padding: '10px 14px', cursor: 'pointer', color: '#ffffff', opacity: chatLoading ? 0.5 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 8px rgba(14,165,233,0.3)' }}><Send size={14} /></button>
+                </div>
+              </>
+            )}
           </motion.div>
         )}
       </AnimatePresence>

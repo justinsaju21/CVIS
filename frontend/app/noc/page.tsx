@@ -112,7 +112,7 @@ function PacketInspector({ packet, onClose }: { packet: PacketRow; onClose: () =
       style={{
         position: 'fixed', inset: 0, zIndex: 300,
         display: 'flex', alignItems: 'center', justifyContent: 'center',
-        background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(10px)',
+        background: 'rgba(15,23,42,0.4)', backdropFilter: 'blur(8px)',
         padding: 24,
       }}
       onClick={onClose}
@@ -124,11 +124,11 @@ function PacketInspector({ packet, onClose }: { packet: PacketRow; onClose: () =
         onClick={(e) => e.stopPropagation()}
         style={{
           background: '#ffffff',
-          border: '1px solid rgba(0,0,0,0.06)',
-          borderRadius: 8, padding: 28,
+          border: '1px solid #e2e8f0',
+          borderRadius: 12, padding: 28,
           width: '100%', maxWidth: 580, maxHeight: '82vh',
           overflowY: 'auto',
-          boxShadow: '0 24px 80px rgba(0,0,0,0.8), 0 0 0 1px rgba(0,0,0,0.06)',
+          boxShadow: '0 24px 60px rgba(15,23,42,0.14), 0 0 0 1px rgba(0,0,0,0.04)',
           position: 'relative',
         }}
       >

@@ -1,19 +1,24 @@
-export const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
-export const WS_URL   = process.env.NEXT_PUBLIC_WS_URL  || 'ws://localhost:8000/ws'
+export const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'https://api-cvis.justinsaju.me'
+export const WS_URL   = process.env.NEXT_PUBLIC_WS_URL  || 'wss://api-cvis.justinsaju.me/ws'
 
 // ─── Generic fetch helper ────────────────────────────────────────────────
 async function req<T>(method: string, path: string, body?: unknown): Promise<T> {
-  const res = await fetch(`${API_BASE}${path}`, {
-    method,
-    headers: { 'Content-Type': 'application/json' },
-    body: body ? JSON.stringify(body) : undefined,
-    cache: 'no-store',
-  })
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({ detail: res.statusText }))
-    throw new Error(err.detail || res.statusText)
+  try {
+    const res = await fetch(`${API_BASE}${path}`, {
+      method,
+      headers: { 'Content-Type': 'application/json' },
+      body: body ? JSON.stringify(body) : undefined,
+      cache: 'no-store',
+    })
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ detail: res.statusText }))
+      throw new Error(err.detail || res.statusText)
+    }
+    return res.json()
+  } catch (err) {
+    console.warn(`[CVIS API] ${method} ${path} failed:`, err)
+    throw err
   }
-  return res.json()
 }
 
 export const api = {

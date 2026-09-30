@@ -26,12 +26,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         {children}
         <Toaster
           position="bottom-right"
-          theme="dark"
+          theme="light"
           toastOptions={{
             style: {
-              background: 'var(--bg-card)',
-              border: '1px solid var(--border)',
-              color: 'var(--text-primary)',
+              background: '#ffffff',
+              border: '1px solid #e2e8f0',
+              color: '#0f172a',
               fontFamily: 'Inter, sans-serif',
               fontSize: 13,
             },
