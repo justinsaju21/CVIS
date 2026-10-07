@@ -362,38 +362,38 @@ export default function LiveMap({ speed_kmh }: { speed_kmh: number }) {
   }, [currentPos, bearing])
 
   return (
-    <div style={{ width: '100%', height: '100%', position: 'relative', zIndex: 1, fontFamily: 'sans-serif' }}>
+    <div style={{ width: '100%', height: '100%', position: 'relative', zIndex: 1, fontFamily: "'Inter', sans-serif" }}>
       <div ref={containerRef} style={{ width: '100%', height: '100%' }} />
 
       {/* Floating Speed Limit Sign */}
-      <div style={{ position: 'absolute', bottom: 90, left: 16, zIndex: 1000 }}>
-        <div style={{ background: '#ffffff', borderRadius: 4, border: '3px solid #ef4444', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', width: 42, height: 42, boxShadow: '0 4px 12px rgba(0,0,0,0.15)' }}>
-          <span style={{ fontSize: 9, fontWeight: 800, color: '#000', lineHeight: 1, marginTop: 2 }}>MAX</span>
-          <span style={{ fontSize: 18, fontWeight: 800, color: '#000', lineHeight: 1, marginTop: 1 }}>60</span>
+      <div style={{ position: 'absolute', bottom: 86, left: 16, zIndex: 1000 }}>
+        <div style={{ background: '#ffffff', borderRadius: 6, border: '3px solid #ef4444', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', width: 44, height: 44, boxShadow: '0 4px 14px rgba(15,23,42,0.15)' }}>
+          <span style={{ fontSize: 9, fontWeight: 900, color: '#0f172a', lineHeight: 1, marginTop: 2, fontFamily: "'Inter', sans-serif" }}>MAX</span>
+          <span style={{ fontSize: 19, fontWeight: 900, color: '#0f172a', lineHeight: 1, marginTop: 1, fontFamily: "'Inter', sans-serif" }}>60</span>
         </div>
       </div>
 
       {/* Unified Google Maps style bottom panel */}
       <div style={{ 
         position: 'absolute', bottom: 12, left: 12, right: 12, 
-        background: '#ffffff', padding: '14px 16px', borderRadius: 16, 
-        boxShadow: '0 8px 24px rgba(0,0,0,0.12)', zIndex: 1000, 
+        background: '#ffffff', padding: '14px 18px', borderRadius: 14, 
+        boxShadow: '0 8px 24px rgba(15,23,42,0.12)', border: '1px solid #e2e8f0', zIndex: 1000, 
         display: 'flex', alignItems: 'center', justifyContent: 'space-between' 
       }}>
         <div style={{ display: 'flex', flexDirection: 'column' }}>
           <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
-            <span style={{ fontSize: 24, fontWeight: 700, color: '#16a34a', letterSpacing: '-0.02em' }}>
+            <span style={{ fontSize: 24, fontWeight: 800, color: '#15803d', letterSpacing: '-0.02em', fontFamily: "'Inter', sans-serif" }}>
               {etaMinutes > 0 ? `${Math.ceil(etaMinutes)} min` : 'Arrived'}
             </span>
           </div>
-          <div style={{ fontSize: 13, color: 'rgba(0,0,0,0.5)', fontWeight: 500, marginTop: 2 }}>
+          <div style={{ fontSize: 13, color: '#334155', fontWeight: 600, marginTop: 2, fontFamily: "'Inter', sans-serif" }}>
             {remainingKm.toFixed(1)} km • {etaTime}
           </div>
         </div>
         
         {speed_kmh === 0 && (
-          <div style={{ padding: '6px 12px', background: 'rgba(239,68,68,0.1)', borderRadius: 20, border: '1px solid rgba(239,68,68,0.2)' }}>
-            <span style={{ fontSize: 11, fontWeight: 700, color: '#ef4444', letterSpacing: '0.05em' }}>STOPPED</span>
+          <div style={{ padding: '6px 14px', background: '#fee2e2', borderRadius: 20, border: '1px solid #fca5a5' }}>
+            <span style={{ fontSize: 11, fontWeight: 800, color: '#b91c1c', letterSpacing: '0.05em', fontFamily: "'Inter', sans-serif" }}>STOPPED</span>
           </div>
         )}
       </div>
