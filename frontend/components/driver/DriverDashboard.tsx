@@ -624,6 +624,8 @@ export default function DriverDashboard({ vehicleId, vehicleName, vehicleColor, 
   const [totalDist, setTotalDist] = useState(0)
   const [openCard, setOpenCard] = useState<string | null>(null)
   const [cabinTemp, setCabinTemp] = useState(21)
+  const [forcedMode, setForcedMode] = useState<string | null>(null)
+  const [climateMode, setClimateMode] = useState<'Auto' | 'A/C Max' | 'Eco Heat' | 'Defrost'>('Auto')
   const alertId = useRef(0)
   const chatBottom = useRef<HTMLDivElement>(null)
   const recognitionRef = useRef<any>(null)
@@ -686,11 +688,13 @@ export default function DriverDashboard({ vehicleId, vehicleName, vehicleColor, 
         setIsPro(true)
       } else {
         fetchConfig().then((cfg: any) => {
+          if (cfg.force_mode) setForcedMode(cfg.force_mode)
           setIsPro(cfg.ai_service_enabled === true)
         }).catch(() => { })
       }
     }).catch(() => {
       fetchConfig().then((cfg: any) => {
+        if (cfg.force_mode) setForcedMode(cfg.force_mode)
         setIsPro(cfg.ai_service_enabled === true)
       }).catch(() => { })
     })
@@ -784,6 +788,7 @@ export default function DriverDashboard({ vehicleId, vehicleName, vehicleColor, 
     if (ev.event === 'ai_recommendation' && ev.device_id === vehicleId && ev.recommendation) typewriterEffect(ev.recommendation)
     if (ev.event === 'vehicle_ai_status' && ev.device_id === vehicleId) setIsPro(ev.enabled)
     if (ev.event === 'ai_service_status') setIsPro(ev.enabled as boolean)
+    if (ev.event === 'config_changed' && 'force_mode' in ev) setForcedMode((ev as any).force_mode ?? null)
   }, [vehicleId, typewriterEffect])
 
   const { connected } = useWebSocket(handleWs)
@@ -922,8 +927,8 @@ export default function DriverDashboard({ vehicleId, vehicleName, vehicleColor, 
     }
   }
 
-  // When there's no telemetry yet, use null mode so we don't falsely show 'Healthy'
-  const mode = latest?.mode ?? 'Healthy'
+  // When forcedMode is set, honor user manual selection; otherwise track live telemetry
+  const mode = forcedMode ?? (latest?.mode ?? 'Healthy')
   const mconf = modeOf(mode)
   const driveMode = latest ? (DRIVE_MODE_LABEL[mode] ?? 'NORMAL') : '---'
   const tires = getTirePressures(latest), ds = calcDriveScore(latest)
@@ -1012,9 +1017,21 @@ export default function DriverDashboard({ vehicleId, vehicleName, vehicleColor, 
   }
 
   const handleForceMode = async (m: string | null) => {
+    setForcedMode(m)
     try {
       await api.post('/api/v1/config/mode', { mode: m })
-    } catch (e) { }
+      if (m) {
+        toast.success(`Drive Mode: ${m.toUpperCase()}`, {
+          description: `Powertrain dynamics and simulated vehicle state updated to ${m}.`
+        })
+      } else {
+        toast.info('Auto Telemetry Mode', {
+          description: 'Vehicle dynamics tracking live CAN-bus stream.'
+        })
+      }
+    } catch (e) {
+      toast.error("Failed to sync mode to backend server")
+    }
   };
 
   return (
@@ -1138,30 +1155,40 @@ export default function DriverDashboard({ vehicleId, vehicleName, vehicleColor, 
               valueColor={mconf.accent} accent={mconf.accent}
               visual={
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 3 }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 3 }} onClick={e => e.stopPropagation()}>
                     {[
-                      { name: 'ECO', col: '#10b981' },
-                      { name: 'NORM', col: '#0ea5e9' },
-                      { name: 'SPORT', col: '#f59e0b' },
-                      { name: 'ALERT', col: '#ef4444' }
+                      { name: 'ECO', modeVal: 'Eco', col: '#10b981' },
+                      { name: 'NORM', modeVal: 'Healthy', col: '#0ea5e9' },
+                      { name: 'SPORT', modeVal: 'Sport', col: '#f59e0b' },
+                      { name: 'ALERT', modeVal: 'Battery Overheating', col: '#ef4444' }
                     ].map(seg => {
-                      const isCur = latest != null && (
+                      const isCur = (
                         (seg.name === 'ECO' && mode === 'Eco') ||
                         (seg.name === 'NORM' && (mode === 'Healthy' || mode === 'Heavy Traffic' || mode === 'Charging')) ||
                         (seg.name === 'SPORT' && mode === 'Sport') ||
                         (seg.name === 'ALERT' && (mode === 'Battery Overheating' || mode === 'Motor Fault' || mode === 'Low Battery'))
                       )
                       return (
-                        <div key={seg.name} style={{
-                          padding: '3px 0', textAlign: 'center', borderRadius: 4,
-                          fontSize: 8.5, fontWeight: 800, fontFamily: "'JetBrains Mono', monospace",
-                          background: isCur ? `${seg.col}18` : '#f8fafc',
-                          color: isCur ? seg.col : '#64748b',
-                          border: `1px solid ${isCur ? seg.col : '#e2e8f0'}`,
-                          boxShadow: isCur ? `0 0 6px ${seg.col}44` : 'none'
-                        }}>
+                        <button
+                          key={seg.name}
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            handleForceMode(seg.modeVal)
+                          }}
+                          style={{
+                            padding: '3px 0', textAlign: 'center', borderRadius: 4,
+                            fontSize: 8.5, fontWeight: 800, fontFamily: "'JetBrains Mono', monospace",
+                            background: isCur ? `${seg.col}22` : '#f8fafc',
+                            color: isCur ? seg.col : '#64748b',
+                            border: `1.5px solid ${isCur ? seg.col : '#e2e8f0'}`,
+                            boxShadow: isCur ? `0 0 6px ${seg.col}44` : 'none',
+                            cursor: 'pointer',
+                            transition: 'all 0.15s ease'
+                          }}
+                        >
                           {seg.name}
-                        </div>
+                        </button>
                       )
                     })}
                   </div>
@@ -1208,10 +1235,7 @@ export default function DriverDashboard({ vehicleId, vehicleName, vehicleColor, 
                   <ProLockedCard
                     title="AI Telemetry Rating"
                     desc="Unlock multi-factor neural driving score & coaching"
-                    onUnlock={() => {
-                      setIsPro(true)
-                      toast.success("Pro Plan Activated — Unlocked Centralized AI Coaching & Analytics")
-                    }}
+                    onUnlock={() => togglePro(true)}
                   />
                 ) : (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
@@ -1237,8 +1261,7 @@ export default function DriverDashboard({ vehicleId, vehicleName, vehicleColor, 
               }
               onClick={() => {
                 if (!isPro) {
-                  setIsPro(true)
-                  toast.success("Pro Plan Activated — Unlocked Centralized AI Coaching & Analytics")
+                  togglePro(true)
                 } else {
                   setOpenCard('score')
                 }
@@ -1358,6 +1381,37 @@ export default function DriverDashboard({ vehicleId, vehicleName, vehicleColor, 
                       </div>
                     ))}
                   </div>
+
+                  {/* Interactive Quick Charging Actions */}
+                  <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
+                    <button
+                      type="button"
+                      onClick={() => handleForceMode(mode === 'Charging' ? 'Healthy' : 'Charging')}
+                      style={{
+                        flex: 1, padding: '10px 14px', borderRadius: 8,
+                        background: mode === 'Charging' ? '#fef2f2' : '#f0fdf4',
+                        border: `1px solid ${mode === 'Charging' ? '#fca5a5' : '#86efac'}`,
+                        color: mode === 'Charging' ? '#dc2626' : '#15803d',
+                        fontSize: 12, fontWeight: 700, cursor: 'pointer',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                        fontFamily: 'monospace'
+                      }}
+                    >
+                      {mode === 'Charging' ? '⏹ STOP FAST CHARGE' : '⚡ SIMULATE 350kW DC FAST CHARGE'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => toast.success("Battery Pack Thermal Conditioning Engaged", { description: "Active coolant loops regulating pack to optimal 28°C." })}
+                      style={{
+                        padding: '10px 14px', borderRadius: 8,
+                        background: '#f8fafc', border: '1px solid #cbd5e1',
+                        color: '#0369a1', fontSize: 12, fontWeight: 700, cursor: 'pointer',
+                        fontFamily: 'monospace'
+                      }}
+                    >
+                      ❄️ THERMAL PRECONDITION
+                    </button>
+                  </div>
                 </div>
               </CardModal>
             )}
@@ -1451,8 +1505,24 @@ export default function DriverDashboard({ vehicleId, vehicleName, vehicleColor, 
 
                   {/* 8 CCNS Vehicle Modes Grid */}
                   <div>
-                    <div style={{ fontSize: 11, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', marginBottom: 8, fontFamily: 'monospace' }}>
-                      SIMULATE ESP32 VEHICLE STATE:
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                      <div style={{ fontSize: 11, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', fontFamily: 'monospace' }}>
+                        SIMULATE ESP32 VEHICLE STATE:
+                      </div>
+                      {forcedMode && (
+                        <button
+                          type="button"
+                          onClick={() => handleForceMode(null)}
+                          style={{
+                            fontSize: 10, padding: '3px 8px', borderRadius: 4,
+                            background: '#f1f5f9', border: '1px solid #cbd5e1',
+                            color: '#475569', fontWeight: 700, cursor: 'pointer',
+                            fontFamily: 'monospace'
+                          }}
+                        >
+                          ↺ RESET TO LIVE TELEMETRY
+                        </button>
+                      )}
                     </div>
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8 }}>
                       {(['Healthy', 'Eco', 'Sport', 'Heavy Traffic', 'Low Battery', 'Battery Overheating', 'Charging', 'Motor Fault'] as const).map(m => {
@@ -1460,6 +1530,7 @@ export default function DriverDashboard({ vehicleId, vehicleName, vehicleColor, 
                         return (
                           <button
                             key={m}
+                            type="button"
                             onClick={() => handleForceMode(m)}
                             style={{
                               padding: '10px 12px',
@@ -1474,10 +1545,11 @@ export default function DriverDashboard({ vehicleId, vehicleName, vehicleColor, 
                               alignItems: 'center',
                               justifyContent: 'space-between',
                               transition: 'all 0.15s',
+                              boxShadow: isCurrent ? `0 2px 8px ${modeOf(m).color}33` : 'none'
                             }}
                           >
                             <span>{m}</span>
-                            {isCurrent && <span style={{ width: 6, height: 6, borderRadius: '50%', background: modeOf(m).color }} />}
+                            {isCurrent && <span style={{ width: 8, height: 8, borderRadius: '50%', background: modeOf(m).color }} />}
                           </button>
                         )
                       })}
@@ -1748,10 +1820,7 @@ export default function DriverDashboard({ vehicleId, vehicleName, vehicleColor, 
                     <ProLockedCard
                       title="AI Neural Insights"
                       desc="Multi-factor telemetry recommendations"
-                      onUnlock={() => {
-                        setIsPro(true)
-                        toast.success("Pro Plan Activated — Unlocked Centralized AI Coaching & Analytics")
-                      }}
+                      onUnlock={() => togglePro(true)}
                     />
                   ) : (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
@@ -1770,8 +1839,7 @@ export default function DriverDashboard({ vehicleId, vehicleName, vehicleColor, 
                 }
                 onClick={() => {
                   if (!isPro) {
-                    setIsPro(true)
-                    toast.success("Pro Plan Activated — Unlocked Centralized AI Coaching & Analytics")
+                    togglePro(true)
                   } else {
                     setOpenCard('suggestions')
                   }
@@ -1828,14 +1896,28 @@ export default function DriverDashboard({ vehicleId, vehicleName, vehicleColor, 
               </motion.div>
 
               {/* 4. Cabin Climate */}
-              <StatCard title="Cabin Climate" subtitle="Auto • Target 22°C"
+              <StatCard title="Cabin Climate" subtitle={`${climateMode} • Target ${cabinTemp}°C`}
                 icon={<Wind size={15} color="#0ea5e9" />}
                 value={
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
                     <span>{cabinTemp}<span style={{ fontSize: 14, color: '#475569', fontWeight: 600 }}> °C</span></span>
                     <div style={{ display: 'flex', gap: 4 }} onClick={e => e.stopPropagation()}>
-                      <button onClick={() => setCabinTemp(t => Math.max(16, t - 1))} style={{ width: 26, height: 26, borderRadius: 6, border: '1px solid #cbd5e1', background: '#f8fafc', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, fontWeight: 800, color: '#0f172a' }}>-</button>
-                      <button onClick={() => setCabinTemp(t => Math.min(30, t + 1))} style={{ width: 26, height: 26, borderRadius: 6, border: '1px solid #cbd5e1', background: '#f8fafc', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, fontWeight: 800, color: '#0f172a' }}>+</button>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          setCabinTemp(t => Math.max(16, t - 1))
+                        }}
+                        style={{ width: 26, height: 26, borderRadius: 6, border: '1px solid #cbd5e1', background: '#f8fafc', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, fontWeight: 800, color: '#0f172a' }}
+                      >-</button>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          setCabinTemp(t => Math.min(30, t + 1))
+                        }}
+                        style={{ width: 26, height: 26, borderRadius: 6, border: '1px solid #cbd5e1', background: '#f8fafc', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, fontWeight: 800, color: '#0f172a' }}
+                      >+</button>
                     </div>
                   </div>
                 }
@@ -1843,7 +1925,7 @@ export default function DriverDashboard({ vehicleId, vehicleName, vehicleColor, 
                 visual={
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 10, fontFamily: "'JetBrains Mono', monospace", fontWeight: 700, color: '#334155' }}>
                     <span>HVAC DRAW: {latest ? `${Math.round(latest.cabin_climate_w ?? 0)} W` : '--- W'}</span>
-                    <span style={{ color: '#0284c7', fontWeight: 800, background: '#e0f2fe', padding: '2px 6px', borderRadius: 4 }}>DUAL ZONE AUTO</span>
+                    <span style={{ color: '#0284c7', fontWeight: 800, background: '#e0f2fe', padding: '2px 6px', borderRadius: 4 }}>{climateMode.toUpperCase()}</span>
                   </div>
                 }
                 onClick={() => setOpenCard('climate')} P={P} L9={L9} SB={SB} V={V} />
@@ -1908,10 +1990,7 @@ export default function DriverDashboard({ vehicleId, vehicleName, vehicleColor, 
                     <ProLockedCard
                       title="Consumption Curves"
                       desc="Historical Wh/km efficiency graphs"
-                      onUnlock={() => {
-                        setIsPro(true)
-                        toast.success("Pro Plan Activated — Unlocked Centralized AI Coaching & Analytics")
-                      }}
+                      onUnlock={() => togglePro(true)}
                     />
                   ) : (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
@@ -1933,8 +2012,7 @@ export default function DriverDashboard({ vehicleId, vehicleName, vehicleColor, 
                 }
                 onClick={() => {
                   if (!isPro) {
-                    setIsPro(true)
-                    toast.success("Pro Plan Activated — Unlocked Centralized AI Coaching & Analytics")
+                    togglePro(true)
                   } else {
                     setOpenCard('efficiency')
                   }
@@ -2082,6 +2160,46 @@ export default function DriverDashboard({ vehicleId, vehicleName, vehicleColor, 
                       </div>
                     </div>
                   )}
+
+                  {/* Interactive Alert Actions */}
+                  <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
+                    {alerts.length > 0 || mode === 'Motor Fault' || mode === 'Battery Overheating' ? (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setAlerts([])
+                          handleForceMode('Healthy')
+                          toast.success("All Diagnostic DTC Codes Cleared", { description: "Subsystems restored to normal CAN-bus operational parameters." })
+                        }}
+                        style={{
+                          flex: 1, padding: '10px 14px', borderRadius: 8,
+                          background: '#f0fdf4', border: '1px solid #86efac',
+                          color: '#15803d', fontSize: 12, fontWeight: 700, cursor: 'pointer',
+                          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                          fontFamily: 'monospace'
+                        }}
+                      >
+                        ✓ CLEAR DTC FAULTS & RESTORE HEALTHY
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          handleForceMode('Motor Fault')
+                          toast.warning("Simulated CAN-Bus Motor Inverter Fault Triggered")
+                        }}
+                        style={{
+                          flex: 1, padding: '10px 14px', borderRadius: 8,
+                          background: '#fef2f2', border: '1px solid #fca5a5',
+                          color: '#dc2626', fontSize: 12, fontWeight: 700, cursor: 'pointer',
+                          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                          fontFamily: 'monospace'
+                        }}
+                      >
+                        ⚠️ TEST INVERTER FAULT (DTC 0x07)
+                      </button>
+                    )}
+                  </div>
                 </div>
               </CardModal>
             )}
@@ -2263,24 +2381,34 @@ export default function DriverDashboard({ vehicleId, vehicleName, vehicleColor, 
 
                   {/* Mode Toggles */}
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8 }}>
-                    {['Auto', 'A/C Max', 'Eco Heat', 'Defrost'].map((m, i) => (
-                      <button
-                        key={m}
-                        style={{
-                          padding: '12px 0',
-                          textAlign: 'center',
-                          background: i === 0 ? '#0284c7' : '#f8fafc',
-                          color: i === 0 ? '#ffffff' : '#334155',
-                          borderRadius: 8,
-                          border: `1px solid ${i === 0 ? '#0284c7' : '#e2e8f0'}`,
-                          fontSize: 12,
-                          fontWeight: 700,
-                          cursor: 'pointer',
-                        }}
-                      >
-                        {m}
-                      </button>
-                    ))}
+                    {(['Auto', 'A/C Max', 'Eco Heat', 'Defrost'] as const).map((m) => {
+                      const isActive = climateMode === m
+                      return (
+                        <button
+                          key={m}
+                          type="button"
+                          onClick={() => {
+                            setClimateMode(m)
+                            toast.success(`Climate Mode Set: ${m}`)
+                          }}
+                          style={{
+                            padding: '12px 0',
+                            textAlign: 'center',
+                            background: isActive ? '#0284c7' : '#f8fafc',
+                            color: isActive ? '#ffffff' : '#334155',
+                            borderRadius: 8,
+                            border: `1px solid ${isActive ? '#0284c7' : '#e2e8f0'}`,
+                            fontSize: 12,
+                            fontWeight: 700,
+                            cursor: 'pointer',
+                            boxShadow: isActive ? '0 2px 8px rgba(2, 132, 199, 0.3)' : 'none',
+                            transition: 'all 0.15s ease',
+                          }}
+                        >
+                          {m}
+                        </button>
+                      )
+                    })}
                   </div>
 
                   {/* Air Quality & Power Draw */}
