@@ -320,8 +320,23 @@ export default function LiveMap({ speed_kmh }: { speed_kmh: number }) {
       maxZoom: 19
     }).addTo(map)
 
-    // Sleek automotive navigation cyan-blue route line
-    L.polyline(ROUTE as [number, number][], { color: '#0284c7', weight: 6, opacity: 0.95 }).addTo(map)
+    // High-contrast dual casing: base white outline ensures route pops over map tiles
+    L.polyline(ROUTE as [number, number][], {
+      color: '#ffffff',
+      weight: 10,
+      opacity: 0.95,
+      lineCap: 'round',
+      lineJoin: 'round'
+    }).addTo(map)
+
+    // Vivid automotive navigation cyan-blue route line
+    L.polyline(ROUTE as [number, number][], {
+      color: '#0284c7',
+      weight: 6,
+      opacity: 1.0,
+      lineCap: 'round',
+      lineJoin: 'round'
+    }).addTo(map)
     L.marker(endPos, { icon: destIcon }).addTo(map)
 
     mapRef.current = map
@@ -365,6 +380,66 @@ export default function LiveMap({ speed_kmh }: { speed_kmh: number }) {
     <div style={{ width: '100%', height: '100%', position: 'relative', zIndex: 1, fontFamily: "'Inter', sans-serif" }}>
       <div ref={containerRef} style={{ width: '100%', height: '100%' }} />
 
+      {/* Turn-by-Turn Navigation HUD Overlay */}
+      <div style={{
+        position: 'absolute',
+        top: 14,
+        left: 14,
+        zIndex: 1000,
+        background: 'rgba(15, 23, 42, 0.94)',
+        backdropFilter: 'blur(12px)',
+        WebkitBackdropFilter: 'blur(12px)',
+        padding: '12px 18px',
+        borderRadius: 14,
+        boxShadow: '0 8px 24px rgba(15,23,42,0.22)',
+        border: '1px solid rgba(255, 255, 255, 0.12)',
+        display: 'flex',
+        alignItems: 'center',
+        gap: 14,
+        maxWidth: 340,
+      }}>
+        <div style={{
+          width: 44,
+          height: 44,
+          borderRadius: 12,
+          background: 'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          boxShadow: '0 4px 12px rgba(2, 132, 199, 0.45)',
+          flexShrink: 0
+        }}>
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#ffffff" strokeWidth="2.8" strokeLinecap="round" strokeLinejoin="round">
+            <line x1="12" y1="19" x2="12" y2="5"></line>
+            <polyline points="5 12 12 5 19 12"></polyline>
+          </svg>
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+          <div style={{
+            fontSize: 16,
+            fontWeight: 800,
+            color: '#f8fafc',
+            letterSpacing: '-0.01em',
+            fontFamily: "'Inter', sans-serif",
+            lineHeight: 1.2
+          }}>
+            Continue for 850 m
+          </div>
+          <div style={{
+            fontSize: 13,
+            fontWeight: 600,
+            color: '#94a3b8',
+            marginTop: 2,
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap',
+            fontFamily: "'Inter', sans-serif"
+          }}>
+            Vijayanagar Main Road
+          </div>
+        </div>
+      </div>
+
       {/* Floating Speed Limit Sign */}
       <div style={{ position: 'absolute', bottom: 86, left: 16, zIndex: 1000 }}>
         <div style={{ background: '#ffffff', borderRadius: 6, border: '3px solid #ef4444', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', width: 44, height: 44, boxShadow: '0 4px 14px rgba(15,23,42,0.15)' }}>
@@ -383,17 +458,17 @@ export default function LiveMap({ speed_kmh }: { speed_kmh: number }) {
         <div style={{ display: 'flex', flexDirection: 'column' }}>
           <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
             <span style={{ fontSize: 24, fontWeight: 800, color: progress >= 0.98 ? '#15803d' : speed_kmh > 0 ? '#0284c7' : '#64748b', letterSpacing: '-0.02em', fontFamily: "'Inter', sans-serif" }}>
-              {progress >= 0.98 ? 'Arrived' : speed_kmh > 0 ? `${Math.ceil(etaMinutes)} min` : 'Standby'}
+              {progress >= 0.98 ? 'Arrived' : speed_kmh > 0 ? `${Math.ceil(etaMinutes)} min` : 'STANDBY'}
             </span>
           </div>
           <div style={{ fontSize: 13, color: '#334155', fontWeight: 600, marginTop: 2, fontFamily: "'Inter', sans-serif" }}>
-            {remainingKm.toFixed(1)} km remaining • {speed_kmh > 0 ? etaTime : 'Stationary'}
+            {remainingKm.toFixed(1)} km remaining • {speed_kmh > 0 ? etaTime : 'STANDBY'}
           </div>
         </div>
         
         {speed_kmh === 0 && (
-          <div style={{ padding: '6px 14px', background: '#fee2e2', borderRadius: 20, border: '1px solid #fca5a5' }}>
-            <span style={{ fontSize: 11, fontWeight: 800, color: '#b91c1c', letterSpacing: '0.05em', fontFamily: "'Inter', sans-serif" }}>STOPPED</span>
+          <div style={{ padding: '6px 14px', background: '#fef3c7', borderRadius: 20, border: '1px solid #fde68a' }}>
+            <span style={{ fontSize: 11, fontWeight: 800, color: '#b45309', letterSpacing: '0.05em', fontFamily: "'Inter', sans-serif" }}>STANDBY</span>
           </div>
         )}
       </div>

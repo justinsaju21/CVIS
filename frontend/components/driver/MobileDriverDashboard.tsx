@@ -367,9 +367,9 @@ export default function MobileDriverDashboard(props: MobileDriverProps) {
             {/* ── ALERTS ────────────────────────────────── */}
             <MCard style={{ border: `1px solid ${hasAlert ? 'rgba(239,68,68,0.2)' : 'rgba(0,0,0,0.07)'}` }}>
               <div style={{ padding: '14px 16px', display: 'flex', alignItems: 'center', gap: 8 }}>
-                <AlertTriangle size={14} color={hasAlert ? '#ef4444' : '#10b981'} />
-                <div style={{ fontSize: 13, fontWeight: 700, color: hasAlert ? '#ef4444' : '#10b981' }}>
-                  {hasAlert ? `${alertCount} Active Alert${alertCount > 1 ? 's' : ''}` : 'All Clear'}
+                <AlertTriangle size={14} color={!connected ? '#ef4444' : hasAlert ? '#ef4444' : '#10b981'} />
+                <div style={{ fontSize: 13, fontWeight: 700, color: !connected ? '#ef4444' : hasAlert ? '#ef4444' : '#10b981' }}>
+                  {!connected ? 'OFFLINE' : !latest ? 'STANDBY' : hasAlert ? `${alertCount} Active Alert${alertCount > 1 ? 's' : ''}` : 'LIVE'}
                 </div>
                 {hasAlert && (
                   <ChevronRight size={14} color="rgba(0,0,0,0.3)" style={{ marginLeft: 'auto' }} />
@@ -396,7 +396,7 @@ export default function MobileDriverDashboard(props: MobileDriverProps) {
               <div style={{ padding: '14px 16px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
                   <BrainCircuit size={14} color="#0ea5e9" />
-                  <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.12em', color: '#0ea5e9' }}>CVIS INTELLIGENCE</div>
+                  <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: '0.08em', color: '#0ea5e9' }}>AI DRIVING ADVISOR</div>
                   {aiTyping && (
                     <div style={{ display: 'flex', gap: 3, marginLeft: 4 }}>
                       {[0, 1, 2].map(i => (
@@ -412,10 +412,10 @@ export default function MobileDriverDashboard(props: MobileDriverProps) {
                 </div>
 
                 <div style={{
-                  fontSize: 13, lineHeight: 1.65, color: aiRec ? '#1e293b' : 'rgba(0,0,0,0.35)',
+                  fontSize: 13, lineHeight: 1.65, color: aiRec ? '#1e293b' : 'rgba(0,0,0,0.45)',
                   minHeight: 48,
                 }}>
-                  {aiRec || (connected ? 'AI on standby — awaiting telemetry…' : 'Waiting for connection…')}
+                  {aiRec || (!connected ? 'Communication unavailable' : !latest ? 'Waiting for vehicle telemetry' : 'Optimal throttle profile maintained.')}
                 </div>
 
                 <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>

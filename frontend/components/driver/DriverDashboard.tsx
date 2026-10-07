@@ -268,41 +268,11 @@ function SpeedShowerGauge({
 }: {
   speed: number; maxSpeed: number; accent: string; isAwaiting: boolean
 }) {
-  const max = 240
-  const pct = Math.min(Math.max(0, speed) / max, 1)
-  const startA = -210, totalA = 240
-  const toRad = (a: number) => (a * Math.PI) / 180
-  const cx = 110, cy = 60, r = 48
-
-  const arc = (r2: number, sA: number, eA: number) => {
-    const s2 = { x: cx + r2 * Math.cos(toRad(sA)), y: cy + r2 * Math.sin(toRad(sA)) }
-    const e = { x: cx + r2 * Math.cos(toRad(eA)), y: cy + r2 * Math.sin(toRad(eA)) }
-    return `M ${s2.x.toFixed(2)} ${s2.y.toFixed(2)} A ${r2} ${r2} 0 ${(eA - sA) > 180 ? 1 : 0} 1 ${e.x.toFixed(2)} ${e.y.toFixed(2)}`
-  }
-
-  const na = startA + pct * totalA
-  const nx = Number((cx + (r - 9) * Math.cos(toRad(na))).toFixed(2))
-  const ny = Number((cy + (r - 9) * Math.sin(toRad(na))).toFixed(2))
-
-  const ticks = Array.from({ length: 9 }, (_, i) => {
-    const a = startA + (i / 8) * totalA
-    const isMajor = i % 2 === 0
-    return {
-      x1: Number((cx + (r - (isMajor ? 6 : 4)) * Math.cos(toRad(a))).toFixed(2)),
-      y1: Number((cy + (r - (isMajor ? 6 : 4)) * Math.sin(toRad(a))).toFixed(2)),
-      x2: Number((cx + r * Math.cos(toRad(a))).toFixed(2)),
-      y2: Number((cy + r * Math.sin(toRad(a))).toFixed(2)),
-      tx: Number((cx + (r - 13) * Math.cos(toRad(a))).toFixed(2)),
-      ty: Number((cy + (r - 13) * Math.sin(toRad(a))).toFixed(2)),
-      val: Math.round(i * 30),
-      isMajor,
-    }
-  })
-
+  const isZero = speed === 0
   const regime = isAwaiting
     ? 'STANDBY'
-    : speed === 0
-      ? 'IDLE'
+    : isZero
+      ? 'STANDBY'
       : speed < 45
         ? 'CITY PACE'
         : speed < 95
@@ -310,91 +280,75 @@ function SpeedShowerGauge({
           : 'SPORT BOOST'
 
   return (
-    <div style={{ width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-end' }}>
-      <svg width="100%" height={68} viewBox="0 0 220 86" style={{ overflow: 'visible' }}>
-        <defs>
-          <linearGradient id="speedGaugeGrad" x1="0%" y1="0%" x2="100%" y2="0%">
-            <stop offset="0%" stopColor="#0ea5e9" />
-            <stop offset="60%" stopColor="#0284c7" />
-            <stop offset="100%" stopColor={accent} />
-          </linearGradient>
-        </defs>
+    <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: 8, paddingBottom: 2 }}>
+      {/* Dominant Large Digital Speed Readout */}
+      <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', width: '100%' }}>
+        <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
+          <span style={{
+            fontSize: 36,
+            fontWeight: 900,
+            color: isAwaiting ? '#94a3b8' : '#0f172a',
+            fontFamily: "'JetBrains Mono', monospace",
+            letterSpacing: '-0.03em',
+            lineHeight: 1
+          }}>
+            {isAwaiting ? '0' : Math.round(speed)}
+          </span>
+          <span style={{
+            fontSize: 14,
+            fontWeight: 800,
+            color: accent,
+            fontFamily: "'Inter', sans-serif",
+            letterSpacing: '0.04em',
+            textTransform: 'uppercase'
+          }}>
+            km/h
+          </span>
+        </div>
 
-        <circle cx={cx} cy={cy} r={r + 6} fill="#f8fafc" stroke="rgba(0,0,0,0.04)" strokeWidth={1} />
-        <path d={arc(r, startA, startA + totalA)} fill="none" stroke="#e2e8f0" strokeWidth={5} strokeLinecap="round" />
-
-        {!isAwaiting && pct > 0 && (
-          <motion.path
-            d={arc(r, startA, startA + totalA)}
-            fill="none"
-            stroke="url(#speedGaugeGrad)"
-            strokeWidth={5}
-            strokeLinecap="round"
-            style={{ filter: `drop-shadow(0 0 6px ${accent}66)` }}
-            strokeDasharray="400"
-            animate={{ strokeDashoffset: 400 - pct * 201 }}
-            initial={{ strokeDashoffset: 400 }}
-            transition={{ duration: 0.45, ease: 'easeOut' }}
-          />
-        )}
-
-        {ticks.map((t, i) => (
-          <g key={i}>
-            <line
-              x1={t.x1} y1={t.y1} x2={t.x2} y2={t.y2}
-              stroke={t.isMajor ? `${accent}aa` : '#94a3b8'}
-              strokeWidth={t.isMajor ? 1.5 : 1}
-            />
-            {t.isMajor && (
-              <text
-                x={t.tx} y={t.ty + 2}
-                textAnchor="middle"
-                fontSize={7}
-                fill="#334155"
-                fontFamily="'Inter', sans-serif"
-                fontWeight={700}
-              >
-                {t.val}
-              </text>
-            )}
-          </g>
-        ))}
-
-        {!isAwaiting && pct > 0 && (
-          <motion.circle
-            cx={nx} cy={ny} r={3.5}
-            fill="#ffffff"
-            stroke={accent}
-            strokeWidth={2}
-            style={{ filter: `drop-shadow(0 0 5px ${accent})` }}
-            animate={{ cx: nx, cy: ny }}
-            transition={{ duration: 0.45, ease: 'easeOut' }}
-          />
-        )}
-
-        <text x={cx} y={cy + 4} textAnchor="middle" fontSize={26} fontWeight={800} fill="#0f172a" fontFamily="'JetBrains Mono', 'Fira Code', monospace">
-          {isAwaiting ? '---' : Math.round(speed)}
-        </text>
-        <text x={cx} y={cy + 16} textAnchor="middle" fontSize={8} fontWeight={800} fill="#0284c7" fontFamily="'Inter', sans-serif" letterSpacing="0.08em">
-          KM / H
-        </text>
-      </svg>
-
-      <div style={{ width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 4, padding: '0 4px', fontSize: 9.5, fontFamily: "'JetBrains Mono', monospace", fontWeight: 700 }}>
-        <span style={{ color: '#334155' }}>
-          {isAwaiting ? '0 RPM' : `${Math.round(speed * 82)} RPM`}
-        </span>
         <span style={{
-          padding: '2px 7px', borderRadius: 8,
-          background: isAwaiting ? '#f1f5f9' : `${accent}18`,
-          color: isAwaiting ? '#64748b' : accent,
+          padding: '2px 8px',
+          borderRadius: 10,
+          background: isAwaiting ? '#f1f5f9' : isZero ? '#fef3c7' : `${accent}18`,
+          color: isAwaiting ? '#64748b' : isZero ? '#b45309' : accent,
+          fontSize: 11,
+          fontFamily: "'JetBrains Mono', monospace",
           fontWeight: 800,
-          border: `1px solid ${isAwaiting ? '#e2e8f0' : accent + '44'}`
+          border: `1px solid ${isAwaiting ? '#e2e8f0' : isZero ? '#fde68a' : accent + '33'}`
         }}>
           {regime}
         </span>
-        <span style={{ color: '#334155' }}>
-          MAX {maxSpeed > 0 ? Math.round(maxSpeed) : 0}
+      </div>
+
+      {/* Linear Velocity & Power Bar (0 to 200 km/h) */}
+      <div>
+        <div style={{ height: 6, borderRadius: 3, background: '#e2e8f0', overflow: 'hidden', position: 'relative' }}>
+          <motion.div
+            style={{
+              height: '100%',
+              background: `linear-gradient(90deg, #0284c7 0%, ${accent} 100%)`,
+              borderRadius: 3
+            }}
+            animate={{ width: `${isAwaiting ? 0 : Math.min(100, Math.max(speed > 0 ? 3 : 0, (speed / 200) * 100))}%` }}
+            transition={{ duration: 0.35, ease: 'easeOut' }}
+          />
+        </div>
+      </div>
+
+      {/* High-visibility metadata footer */}
+      <div style={{
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        fontSize: 11.5,
+        fontFamily: "'JetBrains Mono', monospace",
+        fontWeight: 700,
+        color: '#334155'
+      }}>
+        <span>{isAwaiting ? '0 RPM' : `${Math.round(speed * 82)} RPM`}</span>
+        <span style={{ color: '#64748b' }}>LIMIT: 60 km/h</span>
+        <span style={{ color: '#0284c7', fontWeight: 800 }}>
+          MAX: {maxSpeed > 0 ? Math.round(maxSpeed) : 0}
         </span>
       </div>
     </div>
@@ -1076,12 +1030,12 @@ export default function DriverDashboard({ vehicleId, vehicleName, vehicleColor, 
                 {isPro ? '★ PRO ACTIVE' : '☆ FREE TIER (UPGRADE)'}
               </button>
               {[
-                { label: latest ? 'HMAC: VALID' : 'HMAC: STANDBY', col: latest ? '#10b981' : '#64748b', active: !!latest },
+                { label: !connected ? 'HMAC: OFFLINE' : !latest ? 'HMAC: STANDBY' : 'HMAC: LIVE', col: !connected ? '#ef4444' : !latest ? '#f59e0b' : '#10b981', active: !!connected },
                 { label: 'PROTOCOL: MQTT/HTTP', col: '#0ea5e9', active: true },
-                { label: connected ? 'CONNECTED' : 'DISCONNECTED', col: connected ? '#10b981' : '#ef4444', active: connected },
-                { label: latest ? `${Math.round(latest.battery_pct)}%` : '--%', col: latest && latest.battery_pct < 20 ? '#ef4444' : '#10b981', active: !!latest },
-                { label: connected ? 'WS LIVE' : 'OFFLINE', col: connected ? '#10b981' : '#ef4444', active: connected },
-              ].map(pill => (<div key={pill.label} style={{ padding: '5px 12px', borderRadius: 20, background: `${pill.col}14`, border: `1px solid ${pill.col}40`, fontSize: 9.5, fontFamily: "'JetBrains Mono', monospace", fontWeight: 700, letterSpacing: '0.04em', color: pill.active ? pill.col : '#64748b', transition: 'all 0.4s' }}>{pill.label}</div>))}
+                { label: !connected ? 'OFFLINE' : !latest ? 'STANDBY' : 'LIVE', col: !connected ? '#ef4444' : !latest ? '#f59e0b' : '#10b981', active: connected },
+                { label: !connected ? 'OFFLINE' : !latest ? 'STANDBY' : `${Math.round(latest.battery_pct)}% SoC`, col: !connected ? '#ef4444' : !latest ? '#64748b' : latest.battery_pct < 20 ? '#ef4444' : '#10b981', active: !!latest },
+                { label: !connected ? 'WS: OFFLINE' : !latest ? 'WS: STANDBY' : 'WS: LIVE', col: !connected ? '#ef4444' : !latest ? '#f59e0b' : '#10b981', active: connected },
+              ].map(pill => (<div key={pill.label} style={{ padding: '5px 12px', borderRadius: 20, background: `${pill.col}14`, border: `1px solid ${pill.col}40`, fontSize: 11.5, fontFamily: "'JetBrains Mono', monospace", fontWeight: 700, letterSpacing: '0.04em', color: pill.active ? pill.col : '#64748b', transition: 'all 0.4s' }}>{pill.label}</div>))}
             </div>
           </motion.div>
 
@@ -1090,7 +1044,7 @@ export default function DriverDashboard({ vehicleId, vehicleName, vehicleColor, 
 
             <StatCard title="Battery SoC" subtitle="High-Voltage DC Pack"
               icon={<Battery size={15} color={latest && latest.battery_pct < 20 ? '#ef4444' : '#10b981'} />}
-              value={latest ? <>{Math.round(latest.battery_pct)}<span style={{ fontSize: 14, color: '#475569', fontWeight: 600 }}>%</span></> : <span style={{ fontSize: 25, color: '#64748b', fontWeight: 800 }}>--%</span>}
+              value={!connected ? <span style={{ fontSize: 25, color: '#ef4444', fontWeight: 800 }}>OFFLINE</span> : !latest ? <span style={{ fontSize: 25, color: '#64748b', fontWeight: 800 }}>STANDBY</span> : <>{Math.round(latest.battery_pct)}<span style={{ fontSize: 14, color: '#475569', fontWeight: 600 }}>%</span></>}
               valueColor={latest && latest.battery_pct < 20 ? '#ef4444' : '#10b981'} accent="#10b981"
               visual={
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
@@ -1109,10 +1063,10 @@ export default function DriverDashboard({ vehicleId, vehicleName, vehicleColor, 
                       )
                     })}
                   </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, fontFamily: "'JetBrains Mono', monospace", fontWeight: 700, color: '#334155' }}>
-                    <span>{latest ? `${((latest.battery_pct / 100) * 82).toFixed(1)} kWh` : '--- kWh'}</span>
-                    <span style={{ color: latest && latest.battery_pct < 20 ? '#ef4444' : '#059669', fontWeight: 800 }}>
-                      {latest ? (mode === 'Charging' ? '⚡ 11 kW CHARGE' : latest.battery_pct < 20 ? 'CRITICAL RESERVE' : '800V NOMINAL') : 'OFFLINE'}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, fontFamily: "'JetBrains Mono', monospace", fontWeight: 700, color: '#334155' }}>
+                    <span>{latest ? `${((latest.battery_pct / 100) * 82).toFixed(1)} kWh` : (!connected ? 'OFFLINE' : 'STANDBY')}</span>
+                    <span style={{ color: !connected ? '#ef4444' : !latest ? '#64748b' : latest.battery_pct < 20 ? '#ef4444' : '#059669', fontWeight: 800 }}>
+                      {!connected ? 'OFFLINE' : !latest ? 'STANDBY' : mode === 'Charging' ? '⚡ 11 kW CHARGE' : latest.battery_pct < 20 ? 'CRITICAL RESERVE' : '800V NOMINAL'}
                     </span>
                   </div>
                 </div>
@@ -1121,24 +1075,24 @@ export default function DriverDashboard({ vehicleId, vehicleName, vehicleColor, 
 
             <StatCard title="Outside & Thermal" subtitle="Ambient & Inverter"
               icon={<Thermometer size={15} color="#0ea5e9" />}
-              value={!isNaN(ambientTemp) ? <>{Math.round(ambientTemp)}<span style={{ fontSize: 14, color: '#475569', fontWeight: 600 }}>°C</span></> : <span style={{ fontSize: 25, color: '#64748b', fontWeight: 800 }}>--°C</span>}
+              value={!connected ? <span style={{ fontSize: 25, color: '#ef4444', fontWeight: 800 }}>OFFLINE</span> : !latest ? <span style={{ fontSize: 25, color: '#64748b', fontWeight: 800 }}>STANDBY</span> : !isNaN(ambientTemp) ? <>{Math.round(ambientTemp)}<span style={{ fontSize: 14, color: '#475569', fontWeight: 600 }}>°C</span></> : <span style={{ fontSize: 25, color: '#64748b', fontWeight: 800 }}>UNAVAILABLE</span>}
               accent="#0ea5e9"
               visual={
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                   <div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 9.5, color: '#334155', marginBottom: 2, fontFamily: "'JetBrains Mono', monospace", fontWeight: 700 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11.5, color: '#334155', marginBottom: 2, fontFamily: "'JetBrains Mono', monospace", fontWeight: 700 }}>
                       <span>AMBIENT</span>
-                      <span style={{ fontWeight: 800, color: '#0284c7' }}>{!isNaN(ambientTemp) ? `${Math.round(ambientTemp)}°C` : '---'}</span>
+                      <span style={{ fontWeight: 800, color: '#0284c7' }}>{!connected ? 'OFFLINE' : !latest ? 'STANDBY' : !isNaN(ambientTemp) ? `${Math.round(ambientTemp)}°C` : 'UNAVAILABLE'}</span>
                     </div>
                     <div style={{ height: 4, borderRadius: 2, background: '#e2e8f0', overflow: 'hidden' }}>
                       <div style={{ height: '100%', width: !isNaN(ambientTemp) ? `${Math.min(100, Math.max(10, (ambientTemp / 50) * 100))}%` : '0%', background: '#0284c7', borderRadius: 2 }} />
                     </div>
                   </div>
                   <div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 9.5, color: '#334155', marginBottom: 2, fontFamily: "'JetBrains Mono', monospace", fontWeight: 700 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11.5, color: '#334155', marginBottom: 2, fontFamily: "'JetBrains Mono', monospace", fontWeight: 700 }}>
                       <span>MOTOR POWERTRAIN</span>
-                      <span style={{ fontWeight: 800, color: latest && latest.motor_temp_c > 75 ? '#ef4444' : '#059669' }}>
-                        {latest ? `${Math.round(latest.motor_temp_c)}°C` : '---'}
+                      <span style={{ fontWeight: 800, color: !connected ? '#ef4444' : !latest ? '#64748b' : latest.motor_temp_c > 75 ? '#ef4444' : '#059669' }}>
+                        {!connected ? 'OFFLINE' : !latest ? 'STANDBY' : `${Math.round(latest.motor_temp_c)}°C`}
                       </span>
                     </div>
                     <div style={{ height: 4, borderRadius: 2, background: '#e2e8f0', overflow: 'hidden' }}>
@@ -1151,7 +1105,7 @@ export default function DriverDashboard({ vehicleId, vehicleName, vehicleColor, 
 
             <StatCard title="Drive Mode" subtitle="Powertrain Dynamics"
               icon={<Gauge size={15} color={mconf.accent} />}
-              value={<span style={{ fontSize: 24, fontWeight: 900, color: mconf.accent }}>{driveMode}</span>}
+              value={!connected ? <span style={{ fontSize: 24, fontWeight: 900, color: '#ef4444' }}>OFFLINE</span> : !latest ? <span style={{ fontSize: 24, fontWeight: 900, color: '#64748b' }}>STANDBY</span> : <span style={{ fontSize: 24, fontWeight: 900, color: mconf.accent }}>{driveMode}</span>}
               valueColor={mconf.accent} accent={mconf.accent}
               visual={
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
@@ -1178,7 +1132,7 @@ export default function DriverDashboard({ vehicleId, vehicleName, vehicleColor, 
                           }}
                           style={{
                             padding: '3px 0', textAlign: 'center', borderRadius: 4,
-                            fontSize: 8.5, fontWeight: 800, fontFamily: "'JetBrains Mono', monospace",
+                            fontSize: 9.5, fontWeight: 800, fontFamily: "'JetBrains Mono', monospace",
                             background: isCur ? `${seg.col}22` : '#f8fafc',
                             color: isCur ? seg.col : '#64748b',
                             border: `1.5px solid ${isCur ? seg.col : '#e2e8f0'}`,
@@ -1192,9 +1146,9 @@ export default function DriverDashboard({ vehicleId, vehicleName, vehicleColor, 
                       )
                     })}
                   </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 9.5, color: '#334155', fontFamily: "'JetBrains Mono', monospace", fontWeight: 700 }}>
-                    <span>TORQUE: {mode === 'Sport' ? '40/60 REAR' : mode === 'Eco' ? '100% REAR' : '50/50 AWD'}</span>
-                    <span style={{ color: latest ? mconf.color : '#64748b', fontWeight: 800 }}>● {latest ? 'CAN-BUS SYNC' : 'OFFLINE'}</span>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11.5, color: '#334155', fontFamily: "'JetBrains Mono', monospace", fontWeight: 700 }}>
+                    <span>TORQUE: {!connected ? 'OFFLINE' : !latest ? 'STANDBY' : mode === 'Sport' ? '40/60 REAR' : mode === 'Eco' ? '100% REAR' : '50/50 AWD'}</span>
+                    <span style={{ color: !connected ? '#ef4444' : !latest ? '#64748b' : mconf.color, fontWeight: 800 }}>● {!connected ? 'OFFLINE' : !latest ? 'STANDBY' : 'LIVE'}</span>
                   </div>
                 </div>
               }
@@ -1202,10 +1156,9 @@ export default function DriverDashboard({ vehicleId, vehicleName, vehicleColor, 
 
             <StatCard title="Est. Range" subtitle={mode === 'Charging' ? 'Time to full' : 'Distance remaining'}
               icon={<Map size={15} color="#0ea5e9" />}
-              value={latest ? (mode === 'Charging'
+              value={!connected ? <span style={{ fontSize: 25, color: '#ef4444', fontWeight: 800 }}>OFFLINE</span> : !latest ? <span style={{ fontSize: 25, color: '#64748b', fontWeight: 800 }}>STANDBY</span> : mode === 'Charging'
                 ? <>{Math.round(((100 - latest.battery_pct) / 100) * 60)}<span style={{ fontSize: 14, color: '#475569', fontWeight: 600 }}> min</span></>
-                : <>{Math.round(latest.range_km)}<span style={{ fontSize: 14, color: '#475569', fontWeight: 600 }}> km</span></>)
-                : <span style={{ fontSize: 25, color: '#64748b', fontWeight: 800 }}>-- km</span>}
+                : <>{Math.round(latest.range_km)}<span style={{ fontSize: 14, color: '#475569', fontWeight: 600 }}> km</span></>}
               accent="#0ea5e9"
               visual={
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
@@ -1217,18 +1170,18 @@ export default function DriverDashboard({ vehicleId, vehicleName, vehicleColor, 
                       borderRadius: 2.5
                     }} />
                   </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 9.5, color: '#334155', fontFamily: "'JetBrains Mono', monospace", fontWeight: 700 }}>
-                    <span>CITY: {latest ? `${Math.round(latest.range_km * 1.08)} km` : '---'}</span>
-                    <span>HWY: {latest ? `${Math.round(latest.range_km * 0.88)} km` : '---'}</span>
-                    <span style={{ color: '#0284c7', fontWeight: 800 }}>{latest ? `${Math.round(135 + latest.speed_kmh * 0.7)} Wh/km` : '--- Wh/km'}</span>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11.5, color: '#334155', fontFamily: "'JetBrains Mono', monospace", fontWeight: 700 }}>
+                    <span>CITY: {latest ? `${Math.round(latest.range_km * 1.08)} km` : (!connected ? 'OFFLINE' : 'STANDBY')}</span>
+                    <span>HWY: {latest ? `${Math.round(latest.range_km * 0.88)} km` : (!connected ? 'OFFLINE' : 'STANDBY')}</span>
+                    <span style={{ color: '#0284c7', fontWeight: 800 }}>{latest ? `${Math.round(135 + latest.speed_kmh * 0.7)} Wh/km` : (!connected ? 'OFFLINE' : 'STANDBY')}</span>
                   </div>
                 </div>
               }
               onClick={() => setOpenCard('range')} P={P} L9={L9} SB={SB} V={V} />
 
-            <StatCard title="Drive Score" subtitle={isPro ? (latest ? ds.label : 'Waiting for Telemetry...') : 'AI Driver Rating'}
+            <StatCard title="Drive Score" subtitle={isPro ? (!connected ? 'OFFLINE' : !latest ? 'STANDBY' : ds.label) : 'AI Driver Rating'}
               icon={<Star size={15} color="#f59e0b" fill={isPro ? '#f59e0b' : 'none'} />}
-              value={isPro ? (latest && !isNaN(ds.score) ? <>{ds.score}<span style={{ fontSize: 14, color: '#475569', fontWeight: 600 }}>/10</span></> : <span style={{ fontSize: 25, color: '#64748b', fontWeight: 800 }}>--/10</span>) : <span style={{ fontSize: 16, color: '#b45309', fontWeight: 800 }}>PRO AI</span>}
+              value={isPro ? (!connected ? <span style={{ fontSize: 25, color: '#ef4444', fontWeight: 800 }}>OFFLINE</span> : !latest ? <span style={{ fontSize: 25, color: '#64748b', fontWeight: 800 }}>STANDBY</span> : !isNaN(ds.score) ? <>{ds.score}<span style={{ fontSize: 14, color: '#475569', fontWeight: 600 }}>/10</span></> : <span style={{ fontSize: 25, color: '#64748b', fontWeight: 800 }}>UNAVAILABLE</span>) : <span style={{ fontSize: 16, color: '#b45309', fontWeight: 800 }}>PRO AI</span>}
               valueColor={isPro && latest && !isNaN(ds.score) ? (ds.score >= 8 ? '#10b981' : ds.score >= 6 ? '#f59e0b' : '#ef4444') : undefined} accent="#f59e0b"
               visual={
                 !isPro ? (
@@ -1240,8 +1193,8 @@ export default function DriverDashboard({ vehicleId, vehicleName, vehicleColor, 
                 ) : (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <span style={{ fontSize: 9.5, padding: '2px 8px', borderRadius: 10, background: 'rgba(245,158,11,0.15)', color: '#b45309', fontWeight: 800, fontFamily: "'JetBrains Mono', monospace" }}>
-                        {latest && !isNaN(ds.score) ? ds.label : 'Waiting for Telemetry...'}
+                      <span style={{ fontSize: 11.5, padding: '2px 8px', borderRadius: 10, background: 'rgba(245,158,11,0.15)', color: '#b45309', fontWeight: 800, fontFamily: "'JetBrains Mono', monospace" }}>
+                        {!connected ? 'OFFLINE' : !latest ? 'STANDBY' : !isNaN(ds.score) ? ds.label : 'UNAVAILABLE'}
                       </span>
                     </div>
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 3 }}>
@@ -1789,21 +1742,21 @@ export default function DriverDashboard({ vehicleId, vehicleName, vehicleColor, 
                 icon={<span style={{ fontSize: 15 }}>🛞</span>}
                 value={
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                    <span style={{ fontSize: 15, color: latest ? (Object.values(tires).some(p => p !== null && p < 30) ? '#ef4444' : '#10b981') : '#64748b', fontWeight: 800 }}>
-                      {latest ? (Object.values(tires).some(p => p !== null && p < 30) ? 'PRESSURE LOW' : 'ALL OPTIMAL') : 'OFFLINE'}
+                    <span style={{ fontSize: 15, color: !connected ? '#ef4444' : !latest ? '#f59e0b' : tires.fl == null ? '#64748b' : (Object.values(tires).some(p => p !== null && p < 30) ? '#ef4444' : '#10b981'), fontWeight: 800 }}>
+                      {!connected ? 'OFFLINE' : !latest ? 'STANDBY' : tires.fl == null ? 'UNAVAILABLE' : (Object.values(tires).some(p => p !== null && p < 30) ? 'PRESSURE LOW' : 'LIVE')}
                     </span>
-                    <span style={{ fontSize: 11, color: '#334155', fontWeight: 700, fontFamily: "'JetBrains Mono', monospace" }}>
-                      {tires.fl != null ? `• ${tires.fl}/${tires.fr}/${tires.rl}/${tires.rr} PSI` : '• --- PSI'}
+                    <span style={{ fontSize: 12, color: '#0f172a', fontWeight: 800, fontFamily: "'JetBrains Mono', monospace" }}>
+                      {tires.fl != null ? `• ${tires.fl}/${tires.fr}/${tires.rl}/${tires.rr} PSI` : (!connected ? '• OFFLINE' : !latest ? '• STANDBY' : '• UNAVAILABLE')}
                     </span>
                   </div>
                 }
                 accent="#10b981"
                 visual={
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, padding: '6px 10px', background: '#f8fafc', borderRadius: 8, border: '1px solid #e2e8f0', fontSize: 10, fontFamily: "'JetBrains Mono', monospace", fontWeight: 700 }}>
-                    <span style={{ color: tires.fl != null && tires.fl < 30 ? '#ef4444' : '#059669' }}>FL: {tires.fl != null ? `${tires.fl} PSI` : '---'}</span>
-                    <span style={{ color: tires.fr != null && tires.fr < 30 ? '#ef4444' : '#059669', textAlign: 'right' }}>FR: {tires.fr != null ? `${tires.fr} PSI` : '---'}</span>
-                    <span style={{ color: tires.rl != null && tires.rl < 30 ? '#ef4444' : '#059669' }}>RL: {tires.rl != null ? `${tires.rl} PSI` : '---'}</span>
-                    <span style={{ color: tires.rr != null && tires.rr < 30 ? '#ef4444' : '#059669', textAlign: 'right' }}>RR: {tires.rr != null ? `${tires.rr} PSI` : '---'}</span>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, padding: '6px 10px', background: '#f8fafc', borderRadius: 8, border: '1px solid #e2e8f0', fontSize: 12, fontFamily: "'JetBrains Mono', monospace", fontWeight: 800 }}>
+                    <span style={{ color: !connected ? '#ef4444' : !latest ? '#64748b' : tires.fl != null && tires.fl < 30 ? '#ef4444' : '#059669' }}>FL: {tires.fl != null ? `${tires.fl} PSI` : (!connected ? 'OFFLINE' : !latest ? 'STANDBY' : 'UNAVAILABLE')}</span>
+                    <span style={{ color: !connected ? '#ef4444' : !latest ? '#64748b' : tires.fr != null && tires.fr < 30 ? '#ef4444' : '#059669', textAlign: 'right' }}>FR: {tires.fr != null ? `${tires.fr} PSI` : (!connected ? 'OFFLINE' : !latest ? 'STANDBY' : 'UNAVAILABLE')}</span>
+                    <span style={{ color: !connected ? '#ef4444' : !latest ? '#64748b' : tires.rl != null && tires.rl < 30 ? '#ef4444' : '#059669' }}>RL: {tires.rl != null ? `${tires.rl} PSI` : (!connected ? 'OFFLINE' : !latest ? 'STANDBY' : 'UNAVAILABLE')}</span>
+                    <span style={{ color: !connected ? '#ef4444' : !latest ? '#64748b' : tires.rr != null && tires.rr < 30 ? '#ef4444' : '#059669', textAlign: 'right' }}>RR: {tires.rr != null ? `${tires.rr} PSI` : (!connected ? 'OFFLINE' : !latest ? 'STANDBY' : 'UNAVAILABLE')}</span>
                   </div>
                 }
                 onClick={() => setOpenCard('tires')} P={P} L9={L9} SB={SB} V={V} />
@@ -1811,11 +1764,13 @@ export default function DriverDashboard({ vehicleId, vehicleName, vehicleColor, 
               {/* 2. Key Suggestions (Pro Gated) */}
               <StatCard title="Key Suggestions" subtitle="AI Driving Insights"
                 icon={<BrainCircuit size={15} color={isPro ? '#0ea5e9' : '#94a3b8'} />}
-                value={latest ? (isPro ? <span style={{ fontSize: 15, color: '#0284c7', fontWeight: 800 }}>{keySugs.length} tips active</span> : <span style={{ fontSize: 15, color: '#b45309', fontWeight: 800 }}>PRO AI</span>) : <span style={{ fontSize: 13, color: '#94a3b8', fontWeight: 700 }}>STANDBY</span>}
+                value={!connected ? <span style={{ fontSize: 15, color: '#ef4444', fontWeight: 800 }}>OFFLINE</span> : !latest ? <span style={{ fontSize: 13, color: '#64748b', fontWeight: 800 }}>STANDBY</span> : (isPro ? <span style={{ fontSize: 15, color: '#0284c7', fontWeight: 800 }}>{keySugs.length} tips active</span> : <span style={{ fontSize: 15, color: '#b45309', fontWeight: 800 }}>PRO AI</span>)}
                 accent="#0ea5e9"
                 visual={
                   !latest ? (
-                    <div style={{ fontSize: 10, color: '#94a3b8', textAlign: 'center', padding: '8px 0' }}>Awaiting telemetry feed...</div>
+                    <div style={{ fontSize: 11.5, color: '#64748b', textAlign: 'center', padding: '8px 0', fontFamily: "'JetBrains Mono', monospace", fontWeight: 700 }}>
+                      {!connected ? 'Communication unavailable' : 'Waiting for vehicle telemetry'}
+                    </div>
                   ) : !isPro ? (
                     <ProLockedCard
                       title="AI Neural Insights"
@@ -1825,11 +1780,11 @@ export default function DriverDashboard({ vehicleId, vehicleName, vehicleColor, 
                   ) : (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                       {keySugs.slice(0, 2).map((s, idx) => (
-                        <div key={idx} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '4px 8px', background: '#f8fafc', borderRadius: 6, border: '1px solid #e2e8f0', fontSize: 10 }}>
+                        <div key={idx} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '4px 8px', background: '#f8fafc', borderRadius: 6, border: '1px solid #e2e8f0', fontSize: 11.5 }}>
                           <span style={{ color: '#0f172a', fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                             {s.icon} {s.title}
                           </span>
-                          <span style={{ fontSize: 8.5, padding: '2px 5px', borderRadius: 4, background: s.priority === 'high' ? '#fee2e2' : '#fef3c7', color: s.priority === 'high' ? '#dc2626' : '#b45309', fontWeight: 800, fontFamily: 'monospace' }}>
+                          <span style={{ fontSize: 9.5, padding: '2px 5px', borderRadius: 4, background: s.priority === 'high' ? '#fee2e2' : '#fef3c7', color: s.priority === 'high' ? '#dc2626' : '#b45309', fontWeight: 800, fontFamily: 'monospace' }}>
                             {s.priority.toUpperCase()}
                           </span>
                         </div>
@@ -1891,7 +1846,7 @@ export default function DriverDashboard({ vehicleId, vehicleName, vehicleColor, 
                   speed={latest?.speed_kmh ?? 0}
                   maxSpeed={maxSpeed}
                   accent={mconf.accent}
-                  isAwaiting={!latest}
+                  isAwaiting={!latest || !connected}
                 />
               </motion.div>
 
@@ -1923,9 +1878,9 @@ export default function DriverDashboard({ vehicleId, vehicleName, vehicleColor, 
                 }
                 valueColor="#0f172a" accent="#0ea5e9"
                 visual={
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 10, fontFamily: "'JetBrains Mono', monospace", fontWeight: 700, color: '#334155' }}>
-                    <span>HVAC DRAW: {latest ? `${Math.round(latest.cabin_climate_w ?? 0)} W` : '--- W'}</span>
-                    <span style={{ color: '#0284c7', fontWeight: 800, background: '#e0f2fe', padding: '2px 6px', borderRadius: 4 }}>{climateMode.toUpperCase()}</span>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 12, fontFamily: "'JetBrains Mono', monospace", fontWeight: 700, color: '#0f172a' }}>
+                    <span>HVAC DRAW: {!connected ? 'OFFLINE' : !latest ? 'STANDBY' : latest.cabin_climate_w != null ? `${Math.round(latest.cabin_climate_w)} W` : 'UNAVAILABLE'}</span>
+                    <span style={{ color: '#0284c7', fontWeight: 800, background: '#e0f2fe', padding: '2px 8px', borderRadius: 4, fontSize: 11.5 }}>{climateMode.toUpperCase()}</span>
                   </div>
                 }
                 onClick={() => setOpenCard('climate')} P={P} L9={L9} SB={SB} V={V} />
@@ -1950,31 +1905,40 @@ export default function DriverDashboard({ vehicleId, vehicleName, vehicleColor, 
               {/* 1. Alerts */}
               <StatCard title="Vehicle Alerts" subtitle="Real-time Health"
                 icon={<AlertTriangle size={15} color={alerts.length > 0 ? '#ef4444' : '#10b981'} />}
-                value={<span style={{ fontSize: 15, color: alerts.length > 0 ? '#ef4444' : '#10b981', fontWeight: 800 }}>{alerts.length > 0 ? `${alerts.length} ALERTS` : 'ALL CLEAR'}</span>}
+                value={!connected ? <span style={{ fontSize: 15, color: '#ef4444', fontWeight: 800 }}>OFFLINE</span> : !latest ? <span style={{ fontSize: 15, color: '#64748b', fontWeight: 800 }}>STANDBY</span> : <span style={{ fontSize: 15, color: alerts.length > 0 ? '#ef4444' : '#10b981', fontWeight: 800 }}>{alerts.length > 0 ? `${alerts.length} ALERTS` : 'LIVE'}</span>}
                 accent={alerts.length > 0 ? '#ef4444' : '#10b981'}
                 visual={
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: 10, fontFamily: "'JetBrains Mono', monospace", fontWeight: 700, color: '#334155' }}>
-                    <span>{latest?.fault_code ? `0x${latest.fault_code.toString(16).toUpperCase()} FAULT` : 'NO ACTIVE FAULTS'}</span>
-                    <span style={{ color: alerts.length > 0 ? '#ef4444' : '#059669', fontWeight: 800 }}>
-                      ● {alerts.length > 0 ? 'ATTN REQUIRED' : 'NOMINAL'}
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: 12, fontFamily: "'JetBrains Mono', monospace", fontWeight: 700, color: '#334155' }}>
+                    <span>{!connected ? 'COMMUNICATION OFFLINE' : !latest ? 'WAITING FOR TELEMETRY' : latest?.fault_code ? `0x${latest.fault_code.toString(16).toUpperCase()} FAULT` : 'NO ACTIVE FAULTS'}</span>
+                    <span style={{ color: !connected ? '#ef4444' : !latest ? '#64748b' : alerts.length > 0 ? '#ef4444' : '#059669', fontWeight: 800 }}>
+                      ● {!connected ? 'OFFLINE' : !latest ? 'STANDBY' : alerts.length > 0 ? 'ATTN REQUIRED' : 'NOMINAL'}
                     </span>
                   </div>
                 }
                 onClick={() => setOpenCard('alerts')} P={P} L9={L9} SB={SB} V={V} />
 
               {/* 2. AI Advisory */}
-              <StatCard title="AI Advisory" subtitle="CVIS Intelligence"
+              <StatCard title="AI DRIVING ADVISOR" subtitle="CVIS Intelligent Copilot"
                 icon={<BrainCircuit size={15} color="#0284c7" />}
-                value={<span style={{ fontSize: 15, color: '#0284c7', fontWeight: 800 }}>{aiRec ? 'Advisory Active' : 'Standby'}</span>}
+                value={
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+                    <span style={{ fontSize: 15, color: !connected ? '#ef4444' : !latest ? '#f59e0b' : '#0284c7', fontWeight: 800, fontFamily: "'JetBrains Mono', monospace" }}>
+                      {!connected ? 'OFFLINE' : !latest ? 'STANDBY' : (aiRec ? 'LIVE' : 'STANDBY')}
+                    </span>
+                    <span style={{ fontSize: 11, fontWeight: 800, padding: '2px 8px', borderRadius: 6, background: !connected ? '#fee2e2' : !latest ? '#fef3c7' : '#e0f2fe', color: !connected ? '#ef4444' : !latest ? '#b45309' : '#0284c7', fontFamily: "'JetBrains Mono', monospace" }}>
+                      {!connected ? 'OFFLINE' : !latest ? 'STANDBY' : 'LIVE'}
+                    </span>
+                  </div>
+                }
                 accent="#0ea5e9"
                 visual={
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                    <div style={{ fontSize: 10, fontWeight: 600, color: '#334155', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      {aiRec ? aiRec.slice(0, 42) + '...' : (connected ? 'Awaiting multi-factor telemetry...' : 'Connecting to Edge AI...')}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+                    <div style={{ fontSize: 12, fontWeight: 600, color: latest ? '#0f172a' : '#64748b', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', lineHeight: 1.3 }}>
+                      {!connected ? 'Communication unavailable' : !latest ? 'Waiting for vehicle telemetry' : (aiRec ? aiRec : 'Optimal throttle profile maintained.')}
                     </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 9.5, fontFamily: "'JetBrains Mono', monospace", fontWeight: 700, color: '#475569' }}>
-                      <span>MODEL: LLAMA3.2:3B</span>
-                      <span style={{ color: '#0284c7', fontWeight: 800 }}>EDGE REASONING</span>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 11.5, fontFamily: "'JetBrains Mono', monospace", fontWeight: 700, color: '#334155', borderTop: '1px solid #f1f5f9', paddingTop: 2 }}>
+                      <span>POWERTRAIN OPTIMIZATION</span>
+                      <span style={{ color: '#0284c7', fontWeight: 800 }}>DETAILS ↗</span>
                     </div>
                   </div>
                 }
@@ -1983,7 +1947,7 @@ export default function DriverDashboard({ vehicleId, vehicleName, vehicleColor, 
               {/* 3. Efficiency Graph (Pro Gated) */}
               <StatCard title="Efficiency Graph" subtitle={isPro ? 'Energy & Consumption' : 'Pro Feature'}
                 icon={<TrendingUp size={15} color={isPro ? '#0284c7' : '#94a3b8'} />}
-                value={isPro ? (latest ? <>{Math.round(135 + latest.speed_kmh * 0.7)}<span style={{ fontSize: 14, color: '#475569', fontWeight: 600 }}> Wh/km</span></> : <span style={{ fontSize: 25, color: '#64748b', fontWeight: 800 }}>--- Wh/km</span>) : <span style={{ fontSize: 15, color: '#b45309', fontWeight: 800 }}>PRO FEATURE</span>}
+                value={isPro ? (!connected ? <span style={{ fontSize: 25, color: '#ef4444', fontWeight: 800 }}>OFFLINE</span> : !latest ? <span style={{ fontSize: 25, color: '#64748b', fontWeight: 800 }}>STANDBY</span> : <>{Math.round(135 + latest.speed_kmh * 0.7)}<span style={{ fontSize: 14, color: '#475569', fontWeight: 600 }}> Wh/km</span></>) : <span style={{ fontSize: 15, color: '#b45309', fontWeight: 800 }}>PRO FEATURE</span>}
                 accent="#0ea5e9"
                 visual={
                   !isPro ? (
@@ -2003,7 +1967,7 @@ export default function DriverDashboard({ vehicleId, vehicleName, vehicleColor, 
                           )
                         })}
                       </div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 9.5, fontFamily: "'JetBrains Mono', monospace", fontWeight: 700, color: '#475569' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, fontFamily: "'JetBrains Mono', monospace", fontWeight: 700, color: '#334155' }}>
                         <span>HISTORY ({history.length} pts)</span>
                         <span style={{ color: '#0284c7', fontWeight: 800 }}>TARGET: 140 Wh/km</span>
                       </div>
@@ -2021,7 +1985,7 @@ export default function DriverDashboard({ vehicleId, vehicleName, vehicleColor, 
               {/* 4. Power Flow */}
               <StatCard title="Power Flow" subtitle="Live Distribution"
                 icon={<Zap size={15} color={mconf.accent} />}
-                value={latest && !isNaN(totalKw) ? <>{Math.round(totalKw)}<span style={{ fontSize: 14, color: '#475569', fontWeight: 600 }}> kW</span></> : <span style={{ fontSize: 25, color: '#64748b', fontWeight: 800 }}>-- kW</span>}
+                value={!connected ? <span style={{ fontSize: 25, color: '#ef4444', fontWeight: 800 }}>OFFLINE</span> : !latest ? <span style={{ fontSize: 25, color: '#64748b', fontWeight: 800 }}>STANDBY</span> : latest && !isNaN(totalKw) ? <>{Math.round(totalKw)}<span style={{ fontSize: 14, color: '#475569', fontWeight: 600 }}> kW</span></> : <span style={{ fontSize: 25, color: '#64748b', fontWeight: 800 }}>UNAVAILABLE</span>}
                 valueColor={mconf.accent} accent={mconf.accent}
                 visual={
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
@@ -2034,9 +1998,9 @@ export default function DriverDashboard({ vehicleId, vehicleName, vehicleColor, 
                         borderRadius: 3
                       }} />
                     </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, fontFamily: "'JetBrains Mono', monospace", fontWeight: 700, color: '#334155' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, fontFamily: "'JetBrains Mono', monospace", fontWeight: 700, color: '#334155' }}>
                       <span>{mode === 'Charging' ? '← REGEN INGEST' : 'POWER OUT →'}</span>
-                      <span style={{ color: '#0f172a', fontWeight: 800 }}>{!isNaN(totalHp) ? `${totalHp} HP` : '--- HP'}</span>
+                      <span style={{ color: '#0f172a', fontWeight: 800 }}>{!isNaN(totalHp) ? `${totalHp} HP` : (!connected ? 'OFFLINE' : 'STANDBY')}</span>
                     </div>
                   </div>
                 }
@@ -2241,10 +2205,25 @@ export default function DriverDashboard({ vehicleId, vehicleName, vehicleColor, 
                     {aiRec ? <FormattedAiText text={aiRec} /> : <span style={{ color: '#94a3b8' }}>{!connected ? '◌ Connecting to CVIS AI Edge Service...' : 'AI on standby — awaiting multi-factor telemetry snapshot.'}</span>}
                   </div>
 
-                  {/* Grounding Parameters Bar */}
-                  <div style={{ padding: '10px 14px', background: '#f8fafc', borderRadius: 8, border: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', fontSize: 10.5, color: '#64748b', fontFamily: 'monospace' }}>
-                    <span>EVALUATED: SPEED {latest ? Math.round(latest.speed_kmh) : '---'} KM/H · SOC {latest ? Math.round(latest.battery_pct) : '---'}% · TEMP {latest ? Math.round(latest.motor_temp_c) : '---'}°C</span>
-                    <span>MODEL: LLAMA3.2:3B</span>
+                  {/* Technical Demonstration Specifications (Moved from main driver card into inspector) */}
+                  <div style={{ padding: '12px 16px', background: '#f8fafc', borderRadius: 10, border: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <span style={{ fontSize: 12, fontWeight: 800, color: '#0f172a', fontFamily: "'JetBrains Mono', monospace" }}>
+                          MODEL: LLAMA-3.2B
+                        </span>
+                        <span style={{ fontSize: 10, fontWeight: 800, padding: '2px 6px', borderRadius: 4, background: '#e0f2fe', color: '#0284c7' }}>
+                          OLLAMA LOCAL
+                        </span>
+                      </div>
+                      <span style={{ fontSize: 11.5, fontWeight: 800, color: '#0284c7', fontFamily: "'JetBrains Mono', monospace" }}>
+                        EDGE REASONING
+                      </span>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11.5, color: '#475569', fontFamily: "'JetBrains Mono', monospace" }}>
+                      <span>EVALUATED: SPEED {latest ? Math.round(latest.speed_kmh) : '---'} KM/H · SOC {latest ? Math.round(latest.battery_pct) : '---'}% · TEMP {latest ? Math.round(latest.motor_temp_c) : '---'}°C</span>
+                      <span style={{ color: '#059669', fontWeight: 700 }}>MULTI-FACTOR GROUNDING</span>
+                    </div>
                   </div>
                 </div>
               </CardModal>
