@@ -32,13 +32,8 @@ export default function HomePage() {
     )
   }
 
-  // Fallback vehicle list if API is starting up
-  const displayVehicles = vehicles.length > 0 ? vehicles : [
-    { device_id: 'ESP32-ALPHA', name: 'Alpha Vehicle', color: '#0284c7', active: true },
-    { device_id: 'ESP32-BETA',  name: 'Beta Vehicle',  color: '#10b981', active: true },
-    { device_id: 'ESP32-GAMMA', name: 'Gamma Vehicle', color: '#8b5cf6', active: false },
-    { device_id: 'ESP32-DELTA', name: 'Delta Vehicle', color: '#f59e0b', active: false },
-  ]
+  // Fleet vehicles strictly populated from real backend database
+  const displayVehicles = vehicles
 
   return (
     <div style={{
@@ -121,12 +116,21 @@ export default function HomePage() {
         </div>
 
         {/* Vehicle Cards Grid */}
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
-          gap: 20,
-        }}>
-          {displayVehicles.map((v) => {
+        {loading ? (
+          <div style={{ padding: '60px 0', textAlign: 'center', color: '#64748b', fontSize: 14, fontFamily: 'monospace' }}>
+            CONNECTING TO CVIS FLEET NETWORK...
+          </div>
+        ) : displayVehicles.length === 0 ? (
+          <div style={{ padding: '60px 0', textAlign: 'center', color: '#64748b', fontSize: 14 }}>
+            No vehicles registered in network. Connect an ESP32 vehicle node to begin.
+          </div>
+        ) : (
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
+            gap: 20,
+          }}>
+            {displayVehicles.map((v) => {
             const slug = v.device_id.toLowerCase().replace('esp32-', '')
             return (
               <motion.button
@@ -287,6 +291,7 @@ export default function HomePage() {
             )
           })}
         </div>
+      )}
 
         {/* Global Navigation Links (NOC / Admin) */}
         <div style={{

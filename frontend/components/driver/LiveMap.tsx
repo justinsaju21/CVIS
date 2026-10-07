@@ -382,12 +382,12 @@ export default function LiveMap({ speed_kmh }: { speed_kmh: number }) {
       }}>
         <div style={{ display: 'flex', flexDirection: 'column' }}>
           <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
-            <span style={{ fontSize: 24, fontWeight: 800, color: '#15803d', letterSpacing: '-0.02em', fontFamily: "'Inter', sans-serif" }}>
-              {etaMinutes > 0 ? `${Math.ceil(etaMinutes)} min` : 'Arrived'}
+            <span style={{ fontSize: 24, fontWeight: 800, color: progress >= 0.98 ? '#15803d' : speed_kmh > 0 ? '#0284c7' : '#64748b', letterSpacing: '-0.02em', fontFamily: "'Inter', sans-serif" }}>
+              {progress >= 0.98 ? 'Arrived' : speed_kmh > 0 ? `${Math.ceil(etaMinutes)} min` : 'Standby'}
             </span>
           </div>
           <div style={{ fontSize: 13, color: '#334155', fontWeight: 600, marginTop: 2, fontFamily: "'Inter', sans-serif" }}>
-            {remainingKm.toFixed(1)} km • {etaTime}
+            {remainingKm.toFixed(1)} km remaining • {speed_kmh > 0 ? etaTime : 'Stationary'}
           </div>
         </div>
         

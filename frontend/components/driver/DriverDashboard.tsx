@@ -44,9 +44,9 @@ const DRIVE_MODE_LABEL: Record<string, string> = {
 
 const KEY_SUGGESTIONS: Record<string, { icon: string; title: string; desc: string; priority: 'low' | 'med' | 'high' }[]> = {
   'Healthy': [
-    { icon: '\u26a1', title: 'Optimize Speed', desc: 'Maintain 55\u201365 km/h for best efficiency', priority: 'low' },
-    { icon: '\u3030', title: 'Lane Discipline', desc: 'Keep safe distance for smooth deceleration', priority: 'low' },
-    { icon: '\ud83d\udd0b', title: 'Check Tire Pressure', desc: 'Rear left tire slightly low', priority: 'med' },
+    { icon: '\u26a1', title: 'Optimal Efficiency', desc: 'Powertrain operating within peak efficiency curve', priority: 'low' },
+    { icon: '\u3030', title: 'Smooth Dynamics', desc: 'Acceleration and regenerative braking nominal', priority: 'low' },
+    { icon: '\ud83d\udee1\ufe0f', title: 'System Health Nominal', desc: 'All telemetry channels reporting normal status', priority: 'low' },
   ],
   'Eco': [
     { icon: '\ud83c\udf3f', title: 'Eco Mode Active', desc: 'Regeneration maximized', priority: 'low' },
@@ -102,11 +102,9 @@ function calcDriveScore(latest: TelemetryRow | null): { score: number; label: st
 }
 
 function getTirePressures(latest: TelemetryRow | null): { fl: number | null; fr: number | null; rl: number | null; rr: number | null } {
-  if (!latest) return { fl: null, fr: null, rl: null, rr: null }
-  const base = latest.tire_pressure_psi != null ? Math.round(latest.tire_pressure_psi) : 34
-  if (latest.mode === 'Motor Fault') return { fl: base, fr: base + 1, rl: base - 6, rr: base }
-  if (latest.mode === 'Battery Overheating') return { fl: base + 1, fr: base + 2, rl: base, rr: base + 1 }
-  return { fl: base, fr: base + 1, rl: base - 1, rr: base }
+  if (!latest || latest.tire_pressure_psi == null) return { fl: null, fr: null, rl: null, rr: null }
+  const base = Math.round(latest.tire_pressure_psi)
+  return { fl: base, fr: base, rl: base, rr: base }
 }
 
 function ProLockedCard({ title, desc, onUnlock }: { title: string; desc: string; onUnlock: () => void }) {
@@ -929,21 +927,21 @@ export default function DriverDashboard({ vehicleId, vehicleName, vehicleColor, 
   const mconf = modeOf(mode)
   const driveMode = latest ? (DRIVE_MODE_LABEL[mode] ?? 'NORMAL') : '---'
   const tires = getTirePressures(latest), ds = calcDriveScore(latest)
-  const keySugs = KEY_SUGGESTIONS[mode] ?? KEY_SUGGESTIONS['Healthy']
+  const keySugs = latest ? (KEY_SUGGESTIONS[mode] ?? KEY_SUGGESTIONS['Healthy']) : []
   const avgSpd = history.length > 0 ? history.reduce((a, b) => a + b.speed, 0) / history.length : 0
-  // Use actual ambient_temp_c from firmware if available, otherwise derive from battery temp
-  const ambientTemp = latest
-    ? (latest.ambient_temp_c != null ? latest.ambient_temp_c : Math.max(15, Math.min(40, latest.battery_temp_c - 5)))
-    : NaN
+  // Use actual ambient_temp_c from firmware if available
+  const ambientTemp = latest?.ambient_temp_c != null ? latest.ambient_temp_c : NaN
   const enginePct = !latest ? 0 : mode === 'Charging' || mode === 'Motor Fault' ? 0 : mode === 'Eco' ? 55 : mode === 'Sport' ? 92 : 78
   const battPct2 = !latest ? 0 : mode === 'Charging' ? 100 : mode === 'Motor Fault' ? 20 : mode === 'Eco' ? 82 : mode === 'Sport' ? 58 : Math.round(latest.battery_pct)
   const motorPct = !latest ? 0 : mode === 'Motor Fault' ? 5 : mode === 'Eco' ? 35 : mode === 'Sport' ? 88 : 45
   const regenPct = !latest ? 0 : mode === 'Eco' ? 85 : mode === 'Heavy Traffic' ? 72 : mode === 'Charging' ? 100 : 63
-  // Actual kW from telemetry when charging; estimated from speed and mode otherwise
+  // Actual kW from telemetry when charging; calculated from speed and mode when running; idle when stationary
   const totalKw = latest
     ? (mode === 'Charging'
-        ? (latest?.charging_rate_w ?? 0) / 1000
-        : Math.round((latest.speed_kmh / 120) * (mode === 'Sport' ? 320 : mode === 'Eco' ? 160 : 240)))
+        ? -((latest?.charging_rate_w ?? 0) / 1000)
+        : latest.speed_kmh === 0
+          ? (latest.cabin_climate_w ? Math.round(latest.cabin_climate_w / 1000) : 0)
+          : Math.round((latest.speed_kmh / 120) * (mode === 'Sport' ? 320 : mode === 'Eco' ? 160 : 240) + ((latest.cabin_climate_w ?? 0) / 1000)))
     : NaN
   const totalHp = !isNaN(totalKw) ? Math.round(totalKw * 1.341) : NaN
 
@@ -968,8 +966,8 @@ export default function DriverDashboard({ vehicleId, vehicleName, vehicleColor, 
         driveMode={driveMode}
         driveScore={ds}
         ambientTemp={ambientTemp}
-        tires={{ fl: tires.fl ?? 0, fr: tires.fr ?? 0, rl: tires.rl ?? 0, rr: tires.rr ?? 0 }}
-        totalKw={isNaN(totalKw) ? 0 : totalKw}
+        tires={tires}
+        totalKw={isNaN(totalKw) ? null : totalKw}
         chatOpen={chatOpen}
         setChatOpen={setChatOpen}
         chatMsg={chatMsg}
@@ -1300,39 +1298,44 @@ export default function DriverDashboard({ vehicleId, vehicleName, vehicleColor, 
                       <span style={{ fontSize: 11, fontWeight: 700, color: '#334155', fontFamily: 'monospace' }}>
                         CELL VOLTAGE BALANCE MATRIX (96s PACK)
                       </span>
-                      <span style={{ fontSize: 10, color: latest ? '#059669' : '#94a3b8', fontWeight: 700, fontFamily: 'monospace' }}>
-                        DELTA: {latest ? `${latest.max_cell_voltage_delta ?? 11} mV (BALANCED)` : '--- mV'}
+                      <span style={{ fontSize: 10, color: latest ? (latest.max_cell_voltage_delta && latest.max_cell_voltage_delta > 30 ? '#ef4444' : '#059669') : '#94a3b8', fontWeight: 700, fontFamily: 'monospace' }}>
+                        DELTA: {latest?.max_cell_voltage_delta != null ? `${latest.max_cell_voltage_delta} mV (${latest.max_cell_voltage_delta > 30 ? 'IMBALANCE' : 'BALANCED'})` : (latest ? 'MEASURING' : '--- mV')}
                       </span>
                     </div>
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(12, 1fr)', gap: 4 }}>
-                      {Array.from({ length: 12 }, (_, i) => (
-                        <div
-                          key={i}
-                          title={latest ? `Cell Bank #${i + 1}: ${(4.16 + (i % 3) * 0.01).toFixed(2)}V` : 'Cell Bank: Offline'}
-                          style={{
-                            height: 18,
-                            borderRadius: 3,
-                            background: latest ? (latest.battery_temp_c > 50 ? '#fca5a5' : '#86efac') : '#f1f5f9',
-                            border: `1px solid ${latest ? (latest.battery_temp_c > 50 ? '#ef4444' : '#22c55e') : '#e2e8f0'}`,
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            fontSize: 8,
-                            fontWeight: 700,
-                            color: latest ? '#0f172a' : '#94a3b8',
-                            fontFamily: 'monospace',
-                          }}
-                        >
-                          {latest ? (4.16 + (i % 3) * 0.01).toFixed(2) : '---'}
-                        </div>
-                      ))}
+                      {Array.from({ length: 12 }, (_, i) => {
+                        const cellV = latest
+                          ? (3.2 + (latest.battery_pct / 100) * 0.95 + ((i % 4) * (latest.max_cell_voltage_delta ?? 12) / 1000)).toFixed(2)
+                          : '---'
+                        return (
+                          <div
+                            key={i}
+                            title={latest ? `Cell Bank #${i + 1}: ${cellV}V` : 'Cell Bank: Offline'}
+                            style={{
+                              height: 18,
+                              borderRadius: 3,
+                              background: latest ? (latest.battery_temp_c > 50 ? '#fca5a5' : '#86efac') : '#f1f5f9',
+                              border: `1px solid ${latest ? (latest.battery_temp_c > 50 ? '#ef4444' : '#22c55e') : '#e2e8f0'}`,
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              fontSize: 8,
+                              fontWeight: 700,
+                              color: latest ? '#0f172a' : '#94a3b8',
+                              fontFamily: 'monospace',
+                            }}
+                          >
+                            {cellV}
+                          </div>
+                        )
+                      })}
                     </div>
                   </div>
 
                   {/* Telemetry Stats Grid */}
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
                     {[
-                      { label: 'Pack Voltage', val: latest ? (latest.battery_pct > 50 ? '794 V' : '768 V') : '--- V', col: '#0f172a' },
+                      { label: 'Pack Voltage', val: latest ? `${Math.round(96 * (3.3 + (latest.battery_pct / 100) * 0.85))} V` : '--- V', col: '#0f172a' },
                       {
                         label: 'Battery Temp',
                         val: latest ? `${Math.round(latest.battery_temp_c)}°C` : '--- °C',
@@ -1382,10 +1385,10 @@ export default function DriverDashboard({ vehicleId, vehicleName, vehicleColor, 
                   {/* Aerodynamics & Environmental Impact Grid */}
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
                     {[
-                      { label: 'Headwind Velocity', val: latest ? `${latest.headwind_kmh ?? 0} km/h` : '--- km/h', detail: 'Opposing aerodynamic force' },
+                      { label: 'Headwind Velocity', val: latest?.headwind_kmh != null ? `${latest.headwind_kmh} km/h` : '--- km/h', detail: 'Opposing aerodynamic force' },
                       { label: 'Road Gradient', val: latest?.road_gradient_pct != null ? `${latest.road_gradient_pct > 0 ? '+' : ''}${latest.road_gradient_pct.toFixed(1)}%` : '---%', detail: 'Incline elevation load' },
                       { label: 'Drag Coefficient (Cd)', val: '0.208 Cd', detail: 'Low-slung sports silhouette' },
-                      { label: 'Cabin HVAC Draw', val: latest ? `${latest.cabin_climate_w ?? 0} W` : '--- W', detail: `Set to ${cabinTemp}°C Auto` },
+                      { label: 'Cabin HVAC Draw', val: latest?.cabin_climate_w != null ? `${Math.round(latest.cabin_climate_w)} W` : '--- W', detail: `Set to ${cabinTemp}°C Auto` },
                     ].map(item => (
                       <div key={item.label} style={{ padding: '12px 14px', background: '#f8fafc', borderRadius: 8, border: '1px solid #e2e8f0' }}>
                         <div style={{ fontSize: 11, color: '#64748b', marginBottom: 2 }}>{item.label}</div>
@@ -1400,8 +1403,8 @@ export default function DriverDashboard({ vehicleId, vehicleName, vehicleColor, 
                     <span style={{ fontSize: 12, color: '#475569', fontWeight: 500 }}>
                       Net Aerodynamic & Climate Impact on Range:
                     </span>
-                    <span style={{ fontSize: 13, fontWeight: 700, color: ambientTemp < 18 ? '#059669' : ambientTemp > 30 ? '#dc2626' : '#0284c7', fontFamily: 'monospace' }}>
-                      {ambientTemp < 18 ? '+2.4% (Dense air boost)' : ambientTemp > 30 ? '-2.8% (HVAC thermal load)' : 'Optimal (+0.0%)'}
+                    <span style={{ fontSize: 13, fontWeight: 700, color: isNaN(ambientTemp) ? '#94a3b8' : ambientTemp < 18 ? '#059669' : ambientTemp > 30 ? '#dc2626' : '#0284c7', fontFamily: 'monospace' }}>
+                      {isNaN(ambientTemp) ? 'Standby (No Telemetry)' : ambientTemp < 18 ? '+2.4% (Dense air boost)' : ambientTemp > 30 ? '-2.8% (HVAC thermal load)' : 'Optimal (+0.0%)'}
                     </span>
                   </div>
                 </div>
@@ -1531,17 +1534,27 @@ export default function DriverDashboard({ vehicleId, vehicleName, vehicleColor, 
                   </div>
 
                   {/* Nearest High-Power Fast Charger Guidance */}
-                  <div style={{ padding: '14px 16px', background: '#f0f9ff', borderRadius: 10, border: '1px solid #bae6fd' }}>
+                  <div style={{ padding: '14px 16px', background: latest && mode === 'Low Battery' ? '#fef2f2' : '#f0f9ff', borderRadius: 10, border: `1px solid ${latest && mode === 'Low Battery' ? '#fecaca' : '#bae6fd'}` }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-                      <span style={{ fontSize: 12, fontWeight: 700, color: '#0369a1' }}>NEAREST DC ULTRA-FAST CHARGER</span>
-                      <span style={{ fontSize: 11, fontWeight: 700, color: '#0284c7', fontFamily: 'monospace' }}>4.2 km · 8 min</span>
+                      <span style={{ fontSize: 12, fontWeight: 700, color: latest && mode === 'Low Battery' ? '#b91c1c' : '#0369a1' }}>
+                        {latest?.mode === 'Charging' ? 'ACTIVE CHARGING SESSION' : 'NEAREST DC ULTRA-FAST CHARGER'}
+                      </span>
+                      <span style={{ fontSize: 11, fontWeight: 700, color: latest && mode === 'Low Battery' ? '#dc2626' : '#0284c7', fontFamily: 'monospace' }}>
+                        {latest ? (latest.mode === 'Charging' ? `${((latest.charging_rate_w ?? 0)/1000).toFixed(1)} kW INGEST` : '4.2 km · 8 min') : 'OFFLINE'}
+                      </span>
                     </div>
                     <div style={{ fontSize: 11, color: '#334155', lineHeight: 1.5 }}>
-                      Ionity Hub #04 · 350 kW CCS2 Connector · 6 of 8 stalls available.
+                      {latest?.mode === 'Charging'
+                        ? `Connected to 350 kW CCS2 station · Battery absorbing charge at ${((latest.charging_rate_w ?? 0)/1000).toFixed(1)} kW.`
+                        : latest
+                          ? 'Ionity Hub #04 · 350 kW CCS2 Connector · 6 of 8 stalls available.'
+                          : 'Awaiting vehicle telemetry connection...'}
                     </div>
-                    <div style={{ fontSize: 10, color: '#0284c7', marginTop: 6, fontWeight: 600 }}>
-                      ✓ Battery Thermal Preconditioning Active for Fast Charge Ingestion
-                    </div>
+                    {latest && (
+                      <div style={{ fontSize: 10, color: '#0284c7', marginTop: 6, fontWeight: 600 }}>
+                        {latest.battery_temp_c > 45 ? '⚠️ Battery cooling system engaged for thermal management' : '✓ Battery Thermal Preconditioning Active for Fast Charge Ingestion'}
+                      </div>
+                    )}
                   </div>
                 </div>
               </CardModal>
@@ -1642,27 +1655,27 @@ export default function DriverDashboard({ vehicleId, vehicleName, vehicleColor, 
                     </svg>
 
                     {/* Overlay PSI Callouts */}
-                    <div style={{ position: 'absolute', top: 38, left: 16, background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: 6, padding: '3px 8px', fontSize: 11, fontWeight: 700, fontFamily: 'monospace', color: tires.fl != null && tires.fl < 30 ? '#ef4444' : '#059669' }}>
-                      FL: {tires.fl != null ? `${tires.fl} PSI · 31°C` : '--- PSI'}
+                    <div style={{ position: 'absolute', top: 38, left: 16, background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: 6, padding: '3px 8px', fontSize: 11, fontWeight: 700, fontFamily: 'monospace', color: tires.fl != null && tires.fl < 30 ? '#ef4444' : tires.fl != null ? '#059669' : '#94a3b8' }}>
+                      FL: {tires.fl != null ? `${tires.fl} PSI` : '--- PSI'}
                     </div>
-                    <div style={{ position: 'absolute', top: 38, right: 16, background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: 6, padding: '3px 8px', fontSize: 11, fontWeight: 700, fontFamily: 'monospace', color: tires.fr != null && tires.fr < 30 ? '#ef4444' : '#059669' }}>
-                      FR: {tires.fr != null ? `${tires.fr} PSI · 32°C` : '--- PSI'}
+                    <div style={{ position: 'absolute', top: 38, right: 16, background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: 6, padding: '3px 8px', fontSize: 11, fontWeight: 700, fontFamily: 'monospace', color: tires.fr != null && tires.fr < 30 ? '#ef4444' : tires.fr != null ? '#059669' : '#94a3b8' }}>
+                      FR: {tires.fr != null ? `${tires.fr} PSI` : '--- PSI'}
                     </div>
-                    <div style={{ position: 'absolute', bottom: 38, left: 16, background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: 6, padding: '3px 8px', fontSize: 11, fontWeight: 700, fontFamily: 'monospace', color: tires.rl != null && tires.rl < 30 ? '#ef4444' : '#059669' }}>
-                      RL: {tires.rl != null ? `${tires.rl} PSI · 30°C` : '--- PSI'}
+                    <div style={{ position: 'absolute', bottom: 38, left: 16, background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: 6, padding: '3px 8px', fontSize: 11, fontWeight: 700, fontFamily: 'monospace', color: tires.rl != null && tires.rl < 30 ? '#ef4444' : tires.rl != null ? '#059669' : '#94a3b8' }}>
+                      RL: {tires.rl != null ? `${tires.rl} PSI` : '--- PSI'}
                     </div>
-                    <div style={{ position: 'absolute', bottom: 38, right: 16, background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: 6, padding: '3px 8px', fontSize: 11, fontWeight: 700, fontFamily: 'monospace', color: tires.rr != null && tires.rr < 30 ? '#ef4444' : '#059669' }}>
-                      RR: {tires.rr != null ? `${tires.rr} PSI · 31°C` : '--- PSI'}
+                    <div style={{ position: 'absolute', bottom: 38, right: 16, background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: 6, padding: '3px 8px', fontSize: 11, fontWeight: 700, fontFamily: 'monospace', color: tires.rr != null && tires.rr < 30 ? '#ef4444' : tires.rr != null ? '#059669' : '#94a3b8' }}>
+                      RR: {tires.rr != null ? `${tires.rr} PSI` : '--- PSI'}
                     </div>
                   </div>
 
                   {/* Individual Wheel Telemetry Rows */}
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
                     {[
-                      { pos: 'Front Left (FL)', psi: tires.fl, temp: '31°C' },
-                      { pos: 'Front Right (FR)', psi: tires.fr, temp: '32°C' },
-                      { pos: 'Rear Left (RL)', psi: tires.rl, temp: '30°C' },
-                      { pos: 'Rear Right (RR)', psi: tires.rr, temp: '31°C' },
+                      { pos: 'Front Left (FL)', psi: tires.fl },
+                      { pos: 'Front Right (FR)', psi: tires.fr },
+                      { pos: 'Rear Left (RL)', psi: tires.rl },
+                      { pos: 'Rear Right (RR)', psi: tires.rr },
                     ].map(w => {
                       const isLow = w.psi != null && w.psi < 30
                       const isHigh = w.psi != null && w.psi > 36
@@ -1674,7 +1687,7 @@ export default function DriverDashboard({ vehicleId, vehicleName, vehicleColor, 
                             <span style={{ fontSize: 13, fontWeight: 700, color: col, fontFamily: 'monospace' }}>{w.psi != null ? `${w.psi} PSI` : '--- PSI'}</span>
                           </div>
                           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: '#64748b' }}>
-                            <span>Temp: {w.temp}</span>
+                            <span>Status</span>
                             <span>{w.psi != null ? (isLow ? '⚠️ LOW PRESSURE' : isHigh ? '⚠️ HIGH' : '✓ OPTIMAL') : 'NO DATA'}</span>
                           </div>
                         </div>
@@ -1682,10 +1695,10 @@ export default function DriverDashboard({ vehicleId, vehicleName, vehicleColor, 
                     })}
                   </div>
 
-                  {/* Alignment & Tread Wear Readout */}
+                  {/* Alignment & Telemetry Status Readout */}
                   <div style={{ display: 'flex', justifyContent: 'space-between', padding: '12px 14px', background: '#f8fafc', borderRadius: 8, border: '1px solid #e2e8f0', fontSize: 11, color: '#475569', fontFamily: 'monospace' }}>
-                    <span>ALIGNMENT: TOE 0.0° · CAMBER -1.2°</span>
-                    <span>TREAD DEPTH: 6.8 mm (GOOD)</span>
+                    <span>TPMS PROTOCOL: CAN-BUS ACTIVE</span>
+                    <span>STATUS: {tires.fl != null ? 'STREAMING' : 'STANDBY'}</span>
                   </div>
                 </div>
               </CardModal>
@@ -1726,10 +1739,12 @@ export default function DriverDashboard({ vehicleId, vehicleName, vehicleColor, 
               {/* 2. Key Suggestions (Pro Gated) */}
               <StatCard title="Key Suggestions" subtitle="AI Driving Insights"
                 icon={<BrainCircuit size={15} color={isPro ? '#0ea5e9' : '#94a3b8'} />}
-                value={isPro ? <span style={{ fontSize: 15, color: '#0284c7', fontWeight: 800 }}>{keySugs.length} tips active</span> : <span style={{ fontSize: 15, color: '#b45309', fontWeight: 800 }}>PRO AI</span>}
+                value={latest ? (isPro ? <span style={{ fontSize: 15, color: '#0284c7', fontWeight: 800 }}>{keySugs.length} tips active</span> : <span style={{ fontSize: 15, color: '#b45309', fontWeight: 800 }}>PRO AI</span>) : <span style={{ fontSize: 13, color: '#94a3b8', fontWeight: 700 }}>STANDBY</span>}
                 accent="#0ea5e9"
                 visual={
-                  !isPro ? (
+                  !latest ? (
+                    <div style={{ fontSize: 10, color: '#94a3b8', textAlign: 'center', padding: '8px 0' }}>Awaiting telemetry feed...</div>
+                  ) : !isPro ? (
                     <ProLockedCard
                       title="AI Neural Insights"
                       desc="Multi-factor telemetry recommendations"
@@ -2050,17 +2065,17 @@ export default function DriverDashboard({ vehicleId, vehicleName, vehicleColor, 
                       {/* 6-Point Subsystem Checklist */}
                       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 4 }}>
                         {[
-                          { name: '800V DC Battery Pack', status: 'BALANCED (11 mV)', ok: true },
-                          { name: 'Permanent Magnet Motor', status: 'OPTIMAL THERMAL', ok: true },
-                          { name: 'SiC Power Inverter', status: '98.4% EFFICIENCY', ok: true },
-                          { name: 'HMAC-SHA256 Auth', status: 'CRYPTOGRAPHICALLY VALID', ok: true },
-                          { name: 'MQTT / HTTP Comms Layer', status: 'LOW LATENCY CONNECTED', ok: true },
-                          { name: 'Brake-by-Wire & ABS', status: 'CALIBRATED', ok: true },
+                          { name: '800V DC Battery Pack', status: latest?.max_cell_voltage_delta != null ? `BALANCED (${latest.max_cell_voltage_delta} mV)` : (latest ? 'BALANCED' : 'OFFLINE'), ok: !latest || (latest.max_cell_voltage_delta == null || latest.max_cell_voltage_delta <= 30) },
+                          { name: 'Permanent Magnet Motor', status: latest ? `${Math.round(latest.motor_temp_c)}°C ${latest.motor_temp_c > 80 ? 'HIGH TEMP' : 'OPTIMAL'}` : 'OFFLINE', ok: !latest || latest.motor_temp_c <= 80 },
+                          { name: 'SiC Power Inverter', status: latest ? (mode === 'Sport' ? 'PEAK DISCHARGE' : mode === 'Eco' ? 'ECO REGEN' : 'NOMINAL') : 'STANDBY', ok: true },
+                          { name: 'HMAC-SHA256 Auth', status: latest ? 'CRYPTOGRAPHICALLY VALID' : 'OFFLINE', ok: !!latest },
+                          { name: 'MQTT / HTTP Comms Layer', status: latest ? 'LOW LATENCY CONNECTED' : 'STANDBY', ok: !!latest },
+                          { name: 'Vehicle Powertrain', status: latest?.fault_code ? `FAULT (0x${latest.fault_code.toString(16).toUpperCase()})` : (latest ? 'NOMINAL' : 'STANDBY'), ok: !latest?.fault_code },
                         ].map(sys => (
                           <div key={sys.name} style={{ padding: '10px 12px', background: '#f8fafc', borderRadius: 8, border: '1px solid #e2e8f0' }}>
                             <div style={{ fontSize: 11, fontWeight: 600, color: '#0f172a' }}>{sys.name}</div>
-                            <div style={{ fontSize: 9.5, fontWeight: 700, color: '#059669', fontFamily: 'monospace', marginTop: 2 }}>
-                              ✓ {sys.status}
+                            <div style={{ fontSize: 9.5, fontWeight: 700, color: sys.ok ? '#059669' : '#dc2626', fontFamily: 'monospace', marginTop: 2 }}>
+                              {sys.ok ? '✓' : '⚠️'} {sys.status}
                             </div>
                           </div>
                         ))}
@@ -2298,10 +2313,12 @@ export default function DriverDashboard({ vehicleId, vehicleName, vehicleColor, 
                     <div>
                       <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginBottom: 4 }}>
                         <span style={{ fontWeight: 600, color: '#334155' }}>Front/Rear Dual Motor Torque Split</span>
-                        <span style={{ fontWeight: 700, color: '#0284c7', fontFamily: 'monospace' }}>45% Front / 55% Rear</span>
+                        <span style={{ fontWeight: 700, color: '#0284c7', fontFamily: 'monospace' }}>
+                          {mode === 'Sport' ? '40% Front / 60% Rear (Rear Bias)' : mode === 'Eco' ? '100% Front / 0% Rear (FWD Eco)' : mode === 'Charging' ? '0% Front / 0% Rear (Idle)' : '45% Front / 55% Rear'}
+                        </span>
                       </div>
                       <div style={{ height: 8, borderRadius: 4, background: '#e2e8f0', overflow: 'hidden' }}>
-                        <div style={{ height: '100%', width: '45%', background: '#0284c7', borderRadius: '4px 0 0 4px' }} />
+                        <div style={{ height: '100%', width: `${mode === 'Sport' ? 40 : mode === 'Eco' ? 100 : mode === 'Charging' ? 0 : 45}%`, background: '#0284c7', borderRadius: '4px 0 0 4px' }} />
                       </div>
                     </div>
 

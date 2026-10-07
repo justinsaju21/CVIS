@@ -70,8 +70,8 @@ export interface MobileDriverProps {
   driveMode: string
   driveScore: { score: number; label: string }
   ambientTemp: number
-  tires: { fl: number; fr: number; rl: number; rr: number }
-  totalKw: number
+  tires: { fl: number | null; fr: number | null; rl: number | null; rr: number | null }
+  totalKw: number | null
   // chat (same backend endpoint)
   chatOpen: boolean
   setChatOpen: (v: boolean) => void
@@ -473,9 +473,9 @@ export default function MobileDriverDashboard(props: MobileDriverProps) {
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', padding: '0' }}>
                 {[
-                  { label: 'Battery', value: `${Math.round(battT)}°C`, color: battT > 50 ? '#ef4444' : battT > 40 ? '#f59e0b' : '#10b981' },
-                  { label: 'Motor', value: `${Math.round(motorT)}°C`, color: motorT > 80 ? '#ef4444' : motorT > 65 ? '#f59e0b' : '#10b981' },
-                  { label: 'Ambient', value: `${Math.round(ambientTemp)}°C`, color: '#0ea5e9' },
+                  { label: 'Battery', value: latest ? `${Math.round(battT)}°C` : '---°C', color: battT > 50 ? '#ef4444' : battT > 40 ? '#f59e0b' : '#10b981' },
+                  { label: 'Motor', value: latest ? `${Math.round(motorT)}°C` : '---°C', color: motorT > 80 ? '#ef4444' : motorT > 65 ? '#f59e0b' : '#10b981' },
+                  { label: 'Ambient', value: !isNaN(ambientTemp) ? `${Math.round(ambientTemp)}°C` : '---°C', color: '#0ea5e9' },
                 ].map(item => (
                   <div key={item.label} style={{ padding: '18px 0', textAlign: 'center', borderRight: '1px solid rgba(0,0,0,0.05)' }}>
                     <div style={{ fontSize: 22, fontWeight: 700, color: item.color }}>{item.value}</div>
@@ -493,10 +493,10 @@ export default function MobileDriverDashboard(props: MobileDriverProps) {
                   <MLabel>Power Output</MLabel>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'flex-end', gap: 12 }}>
-                  <MValue color={modeAccent} size={40}>{Math.round(totalKw)}</MValue>
+                  <MValue color={modeAccent} size={40}>{latest && totalKw != null && !isNaN(totalKw) ? Math.round(totalKw) : '---'}</MValue>
                   <div style={{ fontSize: 14, color: 'rgba(0,0,0,0.4)', marginBottom: 4 }}>kW</div>
                   <div style={{ marginLeft: 'auto', textAlign: 'right' }}>
-                    <div style={{ fontSize: 22, fontWeight: 700, color: '#0f172a' }}>{Math.round(totalKw * 1.341)}</div>
+                    <div style={{ fontSize: 22, fontWeight: 700, color: '#0f172a' }}>{latest && totalKw != null && !isNaN(totalKw) ? Math.round(totalKw * 1.341) : '---'}</div>
                     <div style={{ fontSize: 10, color: 'rgba(0,0,0,0.4)' }}>HP</div>
                   </div>
                 </div>
@@ -514,8 +514,8 @@ export default function MobileDriverDashboard(props: MobileDriverProps) {
                   ['Front Right', tires.fr],
                   ['Rear Left', tires.rl],
                   ['Rear Right', tires.rr],
-                ] as [string, number][]).map(([pos, psi], i) => {
-                  const col = psi < 30 ? '#ef4444' : psi > 36 ? '#f59e0b' : '#10b981'
+                ] as [string, number | null][]).map(([pos, psi], i) => {
+                  const col = psi == null ? '#94a3b8' : psi < 30 ? '#ef4444' : psi > 36 ? '#f59e0b' : '#10b981'
                   return (
                     <div key={pos} style={{
                       padding: '14px 16px',
@@ -523,10 +523,10 @@ export default function MobileDriverDashboard(props: MobileDriverProps) {
                       borderBottom: i < 2 ? '1px solid rgba(0,0,0,0.05)' : 'none',
                     }}>
                       <div style={{ fontSize: 10, color: 'rgba(0,0,0,0.4)', marginBottom: 6, letterSpacing: '0.06em' }}>{pos.toUpperCase()}</div>
-                      <div style={{ fontSize: 24, fontWeight: 700, color: col }}>{psi}</div>
-                      <div style={{ fontSize: 9, color: 'rgba(0,0,0,0.4)', marginTop: 2 }}>PSI {psi < 30 ? '⚠ Low' : psi > 36 ? '⚠ High' : '✓ OK'}</div>
+                      <div style={{ fontSize: 24, fontWeight: 700, color: col }}>{psi != null ? psi : '---'}</div>
+                      <div style={{ fontSize: 9, color: 'rgba(0,0,0,0.4)', marginTop: 2 }}>{psi != null ? `PSI ${psi < 30 ? '⚠ Low' : psi > 36 ? '⚠ High' : '✓ OK'}` : 'OFFLINE'}</div>
                       <div style={{ height: 3, borderRadius: 2, background: 'rgba(0,0,0,0.07)', marginTop: 8, overflow: 'hidden' }}>
-                        <div style={{ height: '100%', width: `${(psi / 44) * 100}%`, background: col, borderRadius: 2 }} />
+                        <div style={{ height: '100%', width: psi != null ? `${(psi / 44) * 100}%` : '0%', background: col, borderRadius: 2 }} />
                       </div>
                     </div>
                   )
