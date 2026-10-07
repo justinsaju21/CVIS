@@ -359,6 +359,9 @@ export default function NocPage() {
       const mEv = ev as unknown as { event: string; enabled: boolean }
       setGlobalMobileAccess(mEv.enabled)
     }
+    if (ev.event === 'device_disconnected' || ev.event === 'device_reconnected') {
+      fetchVehicles().then((fleet) => setVehicles(fleet as FleetVehicle[])).catch(() => {})
+    }
     if (ev.event === 'config_changed') {
       fetchConfig().then((c) => {
         const cfg = c as ServerConfig
@@ -404,13 +407,24 @@ export default function NocPage() {
   const handleReplay     = (v: boolean)                     => save('replay',     () => setReplay(v))
   const handleChaos      = (loss: number, latency: number, tamper: boolean) =>
     save('chaos', () => setChaos({ loss_pct: loss, latency_ms: latency, tamper }))
+  const targetDeviceId = selectedVehicleId || deviceId
   const handleDisconnect = () => {
-    if (!deviceId.trim()) { toast.error('Enter device ID'); return }
-    save('disconnect', () => disconnectDevice(deviceId.trim()))
+    const id = targetDeviceId.trim()
+    if (!id) { toast.error('Select a vehicle to disconnect'); return }
+    save('disconnect', async () => {
+      await disconnectDevice(id)
+      const fleet = await fetchVehicles() as FleetVehicle[]
+      setVehicles(fleet)
+    }, `Vehicle ${id} disconnected`)
   }
   const handleReconnect = () => {
-    if (!deviceId.trim()) { toast.error('Enter device ID'); return }
-    save('reconnect', () => reconnectDevice(deviceId.trim()))
+    const id = targetDeviceId.trim()
+    if (!id) { toast.error('Select a vehicle to reconnect'); return }
+    save('reconnect', async () => {
+      await reconnectDevice(id)
+      const fleet = await fetchVehicles() as FleetVehicle[]
+      setVehicles(fleet)
+    }, `Vehicle ${id} reconnected`)
   }
   const handleAiToggle = (v: boolean) => {
     setAiEnabled(v)
@@ -674,15 +688,20 @@ export default function NocPage() {
                   <div style={{ position: 'relative', marginBottom: 8 }}>
                     <select
                       value={selectedVehicleId ?? ''}
-                      onChange={(e) => setSelectedVehicleId(e.target.value || null)}
+                      onChange={(e) => {
+                        const val = e.target.value || null
+                        setSelectedVehicleId(val)
+                        if (val) setDeviceId(val)
+                      }}
                       style={{
                         width: '100%',
-                        background: 'rgba(0,0,0,0.06)',
-                        border: '1px solid rgba(0,0,0,0.06)',
-                        borderRadius: 3,
-                        padding: '7px 28px 7px 10px',
-                        color: deviceId ? '#0f172a' : 'rgba(0,0,0,0.4)',
+                        background: '#ffffff',
+                        border: '1px solid #cbd5e1',
+                        borderRadius: 6,
+                        padding: '8px 28px 8px 10px',
+                        color: selectedVehicleId ? '#0f172a' : '#64748b',
                         fontSize: 13,
+                        fontWeight: 600,
                         fontFamily: 'Inter, sans-serif',
                         outline: 'none',
                         cursor: 'pointer',
@@ -690,7 +709,7 @@ export default function NocPage() {
                         WebkitAppearance: 'none',
                       }}
                     >
-                      <option value="" style={{ background: '#ffffff', color: 'rgba(0,0,0,0.4)' }}>— all vehicles —</option>
+                      <option value="" style={{ background: '#ffffff', color: '#64748b' }}>— all vehicles —</option>
                       {vehicles.map((v) => (
                         <option
                           key={v.device_id}
@@ -703,8 +722,8 @@ export default function NocPage() {
                     </select>
                     {/* Custom dropdown arrow */}
                     <div style={{
-                      position: 'absolute', right: 9, top: '50%', transform: 'translateY(-50%)',
-                      pointerEvents: 'none', color: 'rgba(0,0,0,0.06)', fontSize: 12,
+                      position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)',
+                      pointerEvents: 'none', color: '#64748b', fontSize: 11,
                     }}>▼</div>
                   </div>
 
@@ -714,41 +733,43 @@ export default function NocPage() {
                     return v ? (
                       <div style={{
                         display: 'flex', alignItems: 'center', gap: 6,
-                        padding: '5px 9px', marginBottom: 8,
-                        background: 'rgba(0,0,0,0.06)',
-                        border: '1px solid rgba(0,0,0,0.06)',
-                        borderRadius: 3,
+                        padding: '6px 10px', marginBottom: 8,
+                        background: v.active ? 'rgba(16,185,129,0.08)' : 'rgba(239,68,68,0.08)',
+                        border: `1px solid ${v.active ? 'rgba(16,185,129,0.25)' : 'rgba(239,68,68,0.25)'}`,
+                        borderRadius: 6,
                       }}>
                         <div style={{
-                          width: 6, height: 6, borderRadius: '50%',
+                          width: 7, height: 7, borderRadius: '50%',
                           background: v.active ? '#10b981' : '#ef4444',
                           boxShadow: `0 0 6px ${v.active ? '#10b981' : '#ef4444'}`,
                           flexShrink: 0,
                         }} />
-                        <span style={{ fontSize: 13, color: 'rgba(0,0,0,0.6)', fontFamily: 'Inter, sans-serif', flex: 1 }}>
+                        <span style={{ fontSize: 13, color: '#0f172a', fontWeight: 600, fontFamily: 'Inter, sans-serif', flex: 1 }}>
                           {v.name ?? v.device_id}
                         </span>
-                        <span style={{ fontSize: 12, color: v.active ? '#10b981' : '#ef4444' }}>
-                          {v.active ? 'ONLINE' : 'OFFLINE'}
+                        <span style={{ fontSize: 11, fontWeight: 700, fontFamily: 'monospace', color: v.active ? '#059669' : '#dc2626' }}>
+                          {v.active ? 'ONLINE' : 'REVOKED / OFFLINE'}
                         </span>
                       </div>
                     ) : null
                   })()}
 
                   <div style={{ display: 'flex', gap: 6 }}>
-                    <button onClick={handleDisconnect} disabled={loading('disconnect') || !deviceId} style={{
-                      flex: 1, padding: '7px', borderRadius: 3, fontSize: 13, cursor: 'pointer',
+                    <button onClick={handleDisconnect} disabled={loading('disconnect') || !targetDeviceId} style={{
+                      flex: 1, padding: '8px', borderRadius: 6, fontSize: 12, fontWeight: 700, cursor: !targetDeviceId ? 'not-allowed' : 'pointer',
                       fontFamily: 'Inter, sans-serif',
-                      background: 'rgba(255,71,87,0.08)', border: '1px solid rgba(255,71,87,0.25)',
-                      color: '#ef4444',
-                      opacity: (loading('disconnect') || !deviceId) ? 0.4 : 1,
+                      background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.3)',
+                      color: '#dc2626',
+                      opacity: (loading('disconnect') || !targetDeviceId) ? 0.4 : 1,
+                      transition: 'all 0.15s ease',
                     }}>DISCONNECT</button>
-                    <button onClick={handleReconnect} disabled={loading('reconnect') || !deviceId} style={{
-                      flex: 1, padding: '7px', borderRadius: 3, fontSize: 13, cursor: 'pointer',
+                    <button onClick={handleReconnect} disabled={loading('reconnect') || !targetDeviceId} style={{
+                      flex: 1, padding: '8px', borderRadius: 6, fontSize: 12, fontWeight: 700, cursor: !targetDeviceId ? 'not-allowed' : 'pointer',
                       fontFamily: 'Inter, sans-serif',
-                      background: 'rgba(46,213,115,0.08)', border: '1px solid rgba(46,213,115,0.25)',
-                      color: '#10b981',
-                      opacity: (loading('reconnect') || !deviceId) ? 0.4 : 1,
+                      background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.3)',
+                      color: '#059669',
+                      opacity: (loading('reconnect') || !targetDeviceId) ? 0.4 : 1,
+                      transition: 'all 0.15s ease',
                     }}>RECONNECT</button>
                   </div>
                 </div>
@@ -854,7 +875,7 @@ export default function NocPage() {
                       const authOk     = p.auth_status === 'ok' || p.auth_status === 'no_auth'
                       const protoColor = p.protocol === 'mqtt' ? '#f59e0b' : '#0ea5e9'
                       return (
-                        <tr key={p.packet_id} onClick={() => setInspector(p)}>
+                        <tr key={p.packet_id} onClick={() => setInspector(p)} style={{ cursor: 'pointer' }}>
                           <td style={{ color: 'rgba(0,0,0,0.4)', fontSize: 13 }}>
                             {p.packet_id}
                           </td>
