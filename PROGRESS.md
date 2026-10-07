@@ -112,6 +112,31 @@ python test_phase3.py
 
 ---
 
+## Phase 6.1 — Driver Dashboard UX & Visual Legibility Refinements
+**Status:** ✅ Complete — Deployed & running live on Home Lab (`192.168.1.8`).
+**Commit:** `1d2a5c9`
+
+### Key Enhancements Implemented
+1. **Turn-by-Turn Navigation Instruction HUD Overlay (`LiveMap.tsx`)**:
+   - Added a floating glassmorphic Turn-by-Turn banner (`↑ Continue for 850 m`, `Vijayanagar Main Road`).
+   - Enhanced route polyline with high-contrast dual casing (10px white border + 6px vivid cyan `#0284c7`), preventing the route line from getting lost in OpenStreetMap tiles.
+2. **Dominant Digital Speedometer (`DriverDashboard.tsx`)**:
+   - Redesigned the Speed card: when stationary or driving, `0 km/h` is the dominant 36px element with a sleek linear velocity bar (0–200 km/h).
+   - Moved detailed circular gauge dial to the click-to-expand telemetry modal.
+3. **Driver-Centric AI Driving Advisor Card**:
+   - Transformed the card title to `AI DRIVING ADVISOR`, displaying driver-focused status (`STANDBY` / `LIVE`) and clear advisory prompts (`Waiting for vehicle telemetry` or `Optimal throttle profile maintained`).
+   - Relegated technical demo tags (`MODEL: LLAMA-3.2B`, `EDGE REASONING`, `MULTI-FACTOR GROUNDING`) to the click-to-expand inspector modal.
+4. **Unified 4-State System Across All Cards**:
+   - Standardized status terminology across every card:
+     - `OFFLINE`: Communication unavailable
+     - `STANDBY`: System connected but vehicle inactive / awaiting telemetry
+     - `LIVE`: Receiving current telemetry
+     - `UNAVAILABLE`: Metric cannot currently be calculated
+5. **High-Visibility Typography & Contrast**:
+   - Scaled up small metadata text across all cards (`TARGET: 140 Wh/km`, `HISTORY (0 pts)`, `HVAC DRAW`, 4-wheel tire labels `FL`/`FR`/`RL`/`RR`, `TORQUE split`, `AMBIENT`) from 8.5–9.5px to **11.5–12px** with high-contrast `#0f172a` / `#334155`.
+
+---
+
 ## Phase 7 — Documentation Pack
 **Status:** ✅ Complete (all docs except PowerPoint, which must be created manually)
 **Target:** Week 7–8
@@ -140,4 +165,4 @@ python test_phase3.py
 
 ---
 
-*Last updated: Phase 6 & 7 complete — UI polished, Pro gating active, build passing, pushed to GitHub.*
+*Last updated: Driver Dashboard UX & legibility refinements deployed live to Home Lab server.*
