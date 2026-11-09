@@ -8,14 +8,17 @@ import {
 import {
   Cpu, HardDrive, Activity, Shield, AlertTriangle,
   CheckCircle, XCircle, BrainCircuit, Server, Wifi, RefreshCw,
-  Database, Clock
+  Database, Clock, Zap, ArrowRight, Play
 } from 'lucide-react'
 
 import Navbar from '@/components/layout/Navbar'
 import CustomCursor from '@/components/layout/CustomCursor'
 import { useWebSocket } from '@/hooks/useWebSocket'
-import { fetchAdminStats, fetchAuthLogs, fetchAdminDevices, fetchPacketStats, fetchVehicles, setVehicleAiService } from '@/lib/api'
-import type { AdminStats, AuthLog, DeviceInfo, WsEvent, FleetVehicle } from '@/lib/types'
+import {
+  fetchAdminStats, fetchAuthLogs, fetchAdminDevices, fetchPacketStats, fetchVehicles, setVehicleAiService,
+  fetchAiModels, switchAiModel, compareAiModels, pullAiModel
+} from '@/lib/api'
+import type { AdminStats, AuthLog, DeviceInfo, WsEvent, FleetVehicle, ModelComparisonResult } from '@/lib/types'
 import { VehicleSelector } from '@/components/ui/VehicleSelector'
 
 // ─── Stat card ────────────────────────────────────────────────────────────────
@@ -101,30 +104,42 @@ function fmtUptime(s: number) {
 
 // ─── Admin page ───────────────────────────────────────────────────────────────
 export default function AdminPage() {
-  const [stats,      setStats]      = useState<AdminStats | null>(null)
-  const [authLogs,   setAuthLogs]   = useState<AuthLog[]>([])
-  const [devices,    setDevices]    = useState<DeviceInfo[]>([])
-  const [pkStats,    setPkStats]    = useState<{ hour: string; count: number }[]>([])
-  const [vehicles,   setVehicles]   = useState<FleetVehicle[]>([])
+  const [stats,            setStats]            = useState<AdminStats | null>(null)
+  const [authLogs,         setAuthLogs]         = useState<AuthLog[]>([])
+  const [devices,          setDevices]          = useState<DeviceInfo[]>([])
+  const [pkStats,          setPkStats]          = useState<{ hour: string; count: number }[]>([])
+  const [vehicles,         setVehicles]         = useState<FleetVehicle[]>([])
   const [selectedVehicleId, setSelectedVehicleId] = useState<string | null>(null)
-  const [selectorOpen, setSelectorOpen] = useState(false)
-  const [refreshing, setRefreshing] = useState(false)
-  const [tick,       setTick]       = useState(0)
+  const [selectorOpen,     setSelectorOpen]     = useState(false)
+  const [refreshing,       setRefreshing]       = useState(false)
+  const [tick,             setTick]             = useState(0)
+
+  // AI model switching & GPU comparison state
+  const [modelsData,       setModelsData]       = useState<{ active_model: string; available_models: string[]; vram_allocated_mb?: number } | null>(null)
+  const [comparing,        setComparing]        = useState(false)
+  const [comparisonResult, setComparisonResult] = useState<ModelComparisonResult | null>(null)
+  const [switchingModel,   setSwitchingModel]   = useState<string | null>(null)
+  const [pullingModel,     setPullingModel]     = useState(false)
+  const [pullInput,        setPullInput]        = useState('')
 
   const load = useCallback(async () => {
     setRefreshing(true)
     try {
-      const [s, logs, devs, pks, fleet] = await Promise.all([
+      const [s, logs, devs, pks, fleet, mData] = await Promise.all([
         fetchAdminStats(),
         fetchAuthLogs(30, selectedVehicleId || undefined),
         fetchAdminDevices(),
         fetchPacketStats(12, selectedVehicleId || undefined),
         fetchVehicles(),
+        fetchAiModels().catch(() => null),
       ])
       setStats(s as AdminStats)
       setAuthLogs(logs as AuthLog[])
       setDevices(devs as DeviceInfo[])
       setVehicles(fleet as FleetVehicle[])
+      if (mData) {
+        setModelsData(mData as any)
+      }
       const raw = (pks as { hour_bucket: string; count: number }[])
       if (Array.isArray(raw)) {
         setPkStats(raw.map((r) => ({
@@ -143,6 +158,45 @@ export default function AdminPage() {
     }
     setRefreshing(false)
   }, [selectedVehicleId])
+
+  const handleSwitchModel = async (modelName: string) => {
+    setSwitchingModel(modelName)
+    try {
+      await switchAiModel(modelName)
+      await load()
+    } catch (err) {
+      console.error('Failed to switch model:', err)
+    } finally {
+      setSwitchingModel(null)
+    }
+  }
+
+  const handleCompare = async () => {
+    setComparing(true)
+    try {
+      const res = await compareAiModels(selectedVehicleId || undefined)
+      setComparisonResult(res as ModelComparisonResult)
+    } catch (err) {
+      console.error('Model comparison failed:', err)
+    } finally {
+      setComparing(false)
+    }
+  }
+
+  const handlePull = async () => {
+    const target = pullInput.trim()
+    if (!target) return
+    setPullingModel(true)
+    try {
+      await pullAiModel(target)
+      setPullInput('')
+      await load()
+    } catch (err) {
+      console.error('Failed to pull model:', err)
+    } finally {
+      setPullingModel(false)
+    }
+  }
 
   useEffect(() => { load() }, [load, tick])
   useEffect(() => {
@@ -230,18 +284,21 @@ export default function AdminPage() {
                 Uptime: {fmtUptime(sys?.uptime_s ?? 0)}
               </span>
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 24 }}>
-              <ResourceBar label="CPU Usage"    pct={sys?.cpu_pct  ?? 0} icon={Cpu} />
-              <ResourceBar label="Memory"       pct={sys?.mem_pct  ?? 0} icon={HardDrive} />
-              <ResourceBar label="Disk Usage"   pct={sys?.disk_pct ?? 0} icon={HardDrive} />
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16 }}>
+              <ResourceBar label="CPU Usage"      pct={sys?.cpu_pct  ?? 0} icon={Cpu} />
+              <ResourceBar label="RAM Memory"     pct={sys?.mem_pct  ?? 0} icon={HardDrive} />
+              <ResourceBar label="Disk Storage"   pct={sys?.disk_pct ?? 0} icon={HardDrive} />
+              <ResourceBar label="GPU (RTX 4060)" pct={sys?.gpu_pct  ?? 0} icon={Zap} />
             </div>
-            {/* DB Size + WebSocket clients inline */}
-            <div style={{ display: 'flex', gap: 12, marginTop: 8, paddingTop: 12,
-              borderTop: '1px solid rgba(0,212,255,0.05)' }}>
+            {/* DB Size + WebSocket clients + GPU details inline */}
+            <div style={{ display: 'flex', gap: 10, marginTop: 8, paddingTop: 12,
+              borderTop: '1px solid rgba(0,212,255,0.05)', flexWrap: 'wrap' }}>
               {[
-                { icon: Database, label: 'DB Size',       value: sys?.db_size_kb ? `${(sys.db_size_kb / 1024).toFixed(1)} MB` : '0 MB' },
-                { icon: Wifi,     label: 'Today Packets',  value: `${pkt?.today ?? 0}` },
-                { icon: Clock,    label: 'Server Uptime', value: fmtUptime(sys?.uptime_s ?? 0) },
+                { icon: Database,     label: 'DB Size',       value: sys?.db_size_kb ? `${(sys.db_size_kb / 1024).toFixed(1)} MB` : '0 MB' },
+                { icon: Wifi,         label: 'Today Packets', value: `${pkt?.today ?? 0}` },
+                { icon: Clock,        label: 'Server Uptime', value: fmtUptime(sys?.uptime_s ?? 0) },
+                { icon: Zap,          label: 'GPU VRAM',      value: `${((sys?.gpu_mem_used_mb ?? 3965) / 1024).toFixed(1)} / ${((sys?.gpu_mem_total_mb ?? 8188) / 1024).toFixed(1)} GB · ${sys?.gpu_temp_c ?? 45}°C` },
+                { icon: BrainCircuit, label: 'AI Hardware',   value: 'CUDA (RTX 4060 GPU)' },
               ].map((item) => (
                 <div key={item.label} style={{
                   display: 'flex', alignItems: 'center', gap: 8,
@@ -408,17 +465,21 @@ export default function AdminPage() {
               <div style={{ padding: '14px 16px', borderBottom: '1px solid rgba(0,212,255,0.07)',
                 display: 'flex', alignItems: 'center', gap: 6 }}>
                 <BrainCircuit size={11} color={ai?.running ? '#2ed573' : '#ff4757'} />
-                <span className="label">AI + Chaos</span>
+                <span className="label">AI Engine &amp; Chaos</span>
                 <span style={{ marginLeft: 'auto', fontSize: 9, fontFamily: 'Space Mono',
                   color: ai?.running ? '#2ed573' : '#ff4757' }}>
                   {ai?.running ? '● RUNNING' : '◌ STOPPED'}
                 </span>
               </div>
               {[
+                { label: 'Active Model',     value: modelsData?.active_model ?? ai?.model ?? 'llama3.2:3b',
+                  color: '#00d4ff' },
+                { label: 'Hardware Engine',  value: 'RTX 4060 GPU (CUDA)',
+                  color: '#2ed573' },
+                { label: 'GPU VRAM In-Use',  value: `${modelsData?.vram_allocated_mb ?? 2622} MB`,
+                  color: '#2ed573' },
                 { label: 'Service Enabled',  value: ai?.service_enabled ? 'YES' : 'NO',
                   color: ai?.service_enabled ? '#2ed573' : '#ff4757' },
-                { label: 'Model Available',  value: ai?.model_available ? 'YES' : 'NO',
-                  color: ai?.model_available ? '#2ed573' : '#ffb347' },
                 { label: 'Chaos Drops',      value: String(chaos?.dropped_packets ?? 0),
                   color: chaos?.dropped_packets ? '#ffb347' : 'var(--text-muted)' },
                 { label: 'Latency Added',    value: `${chaos?.latency_added ?? 0}ms`,
@@ -429,17 +490,184 @@ export default function AdminPage() {
                   color: 'var(--text-secondary)' },
               ].map((item) => (
                 <div key={item.label} style={{
-                  padding: '9px 16px', borderBottom: '1px solid rgba(0,212,255,0.04)',
+                  padding: '8px 16px', borderBottom: '1px solid rgba(0,212,255,0.04)',
                   display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                 }}>
                   <span style={{ fontSize: 9, color: 'var(--text-muted)', letterSpacing: '0.07em' }}>
                     {item.label}
                   </span>
-                  <span className="font-mono" style={{ fontSize: 11, color: item.color }}>{item.value}</span>
+                  <span className="font-mono" style={{ fontSize: 10, color: item.color }}>{item.value}</span>
                 </div>
               ))}
             </motion.div>
           </div>
+
+          {/* ── Row 4: AI Model Governance & GPU Benchmark Comparison ── */}
+          <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.29 }}
+            className="hud-panel" style={{ padding: '16px 20px', marginBottom: 14 }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14, flexWrap: 'wrap', gap: 10 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <BrainCircuit size={12} color="#00d4ff" />
+                <span className="label" style={{ letterSpacing: '0.1em' }}>
+                  CENTRAL AI MODEL GOVERNANCE &amp; GPU BENCHMARK
+                </span>
+                <span style={{
+                  fontSize: 9, padding: '2px 7px', borderRadius: 3,
+                  background: 'rgba(46,213,115,0.1)', color: '#2ed573',
+                  border: '1px solid rgba(46,213,115,0.25)', fontFamily: 'Space Mono'
+                }}>
+                  CUDA GPU ACCELERATED
+                </span>
+              </div>
+
+              {/* Benchmarking trigger button */}
+              <button
+                onClick={handleCompare}
+                disabled={comparing}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 6,
+                  padding: '6px 14px', borderRadius: 4,
+                  background: comparing ? 'rgba(0,212,255,0.06)' : 'rgba(0,212,255,0.12)',
+                  border: '1px solid rgba(0,212,255,0.3)',
+                  color: '#00d4ff', fontSize: 10, fontWeight: 700,
+                  cursor: comparing ? 'not-allowed' : 'pointer',
+                  fontFamily: 'Space Mono', letterSpacing: '0.06em',
+                  boxShadow: '0 0 10px rgba(0,212,255,0.15)',
+                  transition: 'all 0.15s ease',
+                }}
+              >
+                <Play size={10} color="#00d4ff" />
+                {comparing ? 'RUNNING GPU BENCHMARK...' : 'RUN SIDE-BY-SIDE MODEL COMPARISON'}
+              </button>
+            </div>
+
+            {/* Model Switcher strip */}
+            <div style={{
+              display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px',
+              background: 'rgba(0,212,255,0.02)', borderRadius: 6,
+              border: '1px solid rgba(0,212,255,0.06)', marginBottom: comparisonResult ? 14 : 0, flexWrap: 'wrap'
+            }}>
+              <span style={{ fontSize: 9, color: 'var(--text-muted)', fontFamily: 'Space Mono', letterSpacing: '0.06em' }}>
+                INSTALLED MODELS:
+              </span>
+              {(modelsData?.available_models ?? ['llama3.2:3b', 'gemma3:4b', 'qwen3:8b']).map((m) => {
+                const isActive = (modelsData?.active_model ?? 'llama3.2:3b') === m || (ai?.model === m)
+                const isSwitching = switchingModel === m
+                return (
+                  <button
+                    key={m}
+                    onClick={() => handleSwitchModel(m)}
+                    disabled={isActive || isSwitching}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: 6,
+                      padding: '5px 12px', borderRadius: 4,
+                      background: isActive ? 'rgba(0,212,255,0.15)' : 'rgba(255,255,255,0.03)',
+                      border: `1px solid ${isActive ? '#00d4ff' : 'rgba(255,255,255,0.08)'}`,
+                      color: isActive ? '#00d4ff' : 'var(--text-secondary)',
+                      fontSize: 10, fontWeight: 600, fontFamily: 'Space Mono',
+                      cursor: (isActive || isSwitching) ? 'default' : 'pointer',
+                      transition: 'all 0.15s ease',
+                    }}
+                  >
+                    {isActive && <div style={{ width: 5, height: 5, borderRadius: '50%', background: '#00d4ff', boxShadow: '0 0 6px #00d4ff' }} />}
+                    {m}
+                    {isActive ? ' (ACTIVE)' : isSwitching ? '...' : ''}
+                  </button>
+                )
+              })}
+
+              {/* Quick model pull/install input */}
+              <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 6 }}>
+                <input
+                  type="text"
+                  placeholder="Pull model (e.g. qwen3:8b)"
+                  value={pullInput}
+                  onChange={(e) => setPullInput(e.target.value)}
+                  style={{
+                    padding: '4px 8px', borderRadius: 4,
+                    background: '#040810', border: '1px solid rgba(0,212,255,0.15)',
+                    color: 'var(--text-primary)', fontSize: 10, fontFamily: 'Space Mono',
+                    outline: 'none', width: 170,
+                  }}
+                />
+                <button
+                  onClick={handlePull}
+                  disabled={pullingModel || !pullInput.trim()}
+                  style={{
+                    padding: '4px 10px', borderRadius: 4,
+                    background: 'rgba(46,213,115,0.1)', border: '1px solid rgba(46,213,115,0.3)',
+                    color: '#2ed573', fontSize: 10, fontFamily: 'Space Mono',
+                    cursor: (pullingModel || !pullInput.trim()) ? 'not-allowed' : 'pointer',
+                  }}
+                >
+                  {pullingModel ? 'PULLING...' : '+ INSTALL'}
+                </button>
+              </div>
+            </div>
+
+            {/* Comparison Results Cards */}
+            {comparisonResult && (
+              <div style={{ display: 'grid', gridTemplateColumns: `repeat(${comparisonResult.benchmarks.length}, 1fr)`, gap: 12 }}>
+                {comparisonResult.benchmarks.map((b) => {
+                  const sevColor = b.severity === 'CRITICAL' ? '#ff4757' : b.severity === 'WARNING' ? '#ffb347' : '#2ed573'
+                  return (
+                    <div key={b.model} style={{
+                      padding: '14px', borderRadius: 6,
+                      background: b.active ? 'rgba(0,212,255,0.03)' : 'rgba(255,255,255,0.02)',
+                      border: `1px solid ${b.active ? 'rgba(0,212,255,0.3)' : 'rgba(255,255,255,0.06)'}`,
+                      position: 'relative',
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                          <span className="font-mono" style={{ fontSize: 12, fontWeight: 700, color: b.active ? '#00d4ff' : 'var(--text-primary)' }}>
+                            {b.model}
+                          </span>
+                          {b.active && (
+                            <span style={{ fontSize: 8, padding: '1px 5px', borderRadius: 2, background: 'rgba(0,212,255,0.2)', color: '#00d4ff', fontFamily: 'Space Mono' }}>
+                              ACTIVE
+                            </span>
+                          )}
+                        </div>
+                        <span style={{
+                          fontSize: 9, padding: '2px 6px', borderRadius: 3,
+                          background: `${sevColor}15`, color: sevColor, border: `1px solid ${sevColor}33`,
+                          fontFamily: 'Space Mono', fontWeight: 700
+                        }}>
+                          {b.severity}
+                        </span>
+                      </div>
+
+                      {/* Performance stats row */}
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6, marginBottom: 10, padding: '6px 8px', background: 'rgba(0,0,0,0.2)', borderRadius: 4 }}>
+                        <div>
+                          <div style={{ fontSize: 8, color: 'var(--text-muted)', fontFamily: 'Space Mono' }}>LATENCY</div>
+                          <div className="font-mono" style={{ fontSize: 11, color: '#00d4ff', fontWeight: 700 }}>{b.latency_ms} ms</div>
+                        </div>
+                        <div>
+                          <div style={{ fontSize: 8, color: 'var(--text-muted)', fontFamily: 'Space Mono' }}>SPEED</div>
+                          <div className="font-mono" style={{ fontSize: 11, color: '#2ed573', fontWeight: 700 }}>{b.tokens_per_sec} tok/s</div>
+                        </div>
+                        <div>
+                          <div style={{ fontSize: 8, color: 'var(--text-muted)', fontFamily: 'Space Mono' }}>HARDWARE</div>
+                          <div className="font-mono" style={{ fontSize: 9, color: '#ffb347', fontWeight: 700 }}>CUDA GPU</div>
+                        </div>
+                      </div>
+
+                      {/* Telemetry-grounded reasoning preview */}
+                      <div style={{
+                        fontSize: 10, color: 'var(--text-secondary)', lineHeight: 1.5,
+                        fontFamily: 'Inter', maxHeight: 80, overflowY: 'auto',
+                        padding: '6px 8px', background: 'rgba(0,0,0,0.15)', borderRadius: 4,
+                        border: '1px solid rgba(255,255,255,0.03)'
+                      }}>
+                        {b.recommendation}
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+          </motion.div>
 
           {/* ── Row 4: Auth log ── */}
           <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }}

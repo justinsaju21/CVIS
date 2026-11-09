@@ -96,11 +96,30 @@ async def ingest_telemetry_data(
             )
             pkt_id = c.lastrowid
             await db.commit()
+
+            # Record outbound rejection response to complete the to-and-fro cycle
+            try:
+                rej_resp = json.dumps({"status": "rejected", "detail": reason, "device_id": resolved_dev_id})
+                await db.execute(
+                    """
+                    INSERT INTO packets
+                        (received_at, device_id, protocol, direction, size_bytes, status, raw_json,
+                         encrypted, encryption_method, auth_status)
+                    VALUES (?, ?, ?, 'outbound', ?, 'rejected', ?, ?, ?, ?)
+                    """,
+                    (received_at, resolved_dev_id, protocol, len(rej_resp.encode("utf-8")), rej_resp,
+                     1 if encrypted else 0, enc_m, auth_st),
+                )
+                await db.commit()
+            except Exception:
+                pass
+
             await manager.broadcast({
                 "event": "telemetry",
                 "packet_id": pkt_id,
                 "received_at": received_at,
                 "protocol": protocol,
+                "direction": "inbound",
                 "device_id": resolved_dev_id,
                 "status": "rejected",
                 "auth_status": auth_st,
@@ -123,6 +142,7 @@ async def ingest_telemetry_data(
     # ── 1. Auth: verify API key ──────────────────────────────────────────
     device_id: Optional[str] = None
     device_secret: Optional[str] = None
+    auth_status_label = "ok"
 
     if auth_enabled:
         if not api_key:
@@ -145,6 +165,18 @@ async def ingest_telemetry_data(
         device_id = row["device_id"]
         device_secret = row["device_secret"]
         await _log_auth(device_id, "auth_ok", source_ip, "API key accepted")
+    else:
+        auth_status_label = "no_auth"
+        if api_key:
+            key_hash = hash_api_key(api_key)
+            async with db.execute(
+                "SELECT device_id, device_secret FROM devices WHERE api_key_hash = ? AND active = 1",
+                (key_hash,),
+            ) as cur:
+                row = await cur.fetchone()
+                if row:
+                    device_id = row["device_id"]
+                    device_secret = row["device_secret"]
 
     # ── 2. Decrypt if AES-GCM enabled ────────────────────────────────────
     plaintext_json = raw_json
@@ -183,6 +215,9 @@ async def ingest_telemetry_data(
         await _record_rejected(device_id, "fail", f"Parse fail: {e}")
         raise ValueError(f"PARSE_FAIL: {e}")
 
+    if not auth_enabled:
+        await _log_auth(payload.device_id, "no_auth", source_ip, "Auth enforcement disabled")
+
     # ── 5. Replay protection ───────────────────────────────────────
     replay_err = check_replay(payload.device_id, payload.timestamp_ms)
     if replay_err:
@@ -207,10 +242,10 @@ async def ingest_telemetry_data(
         INSERT INTO packets
             (received_at, device_id, protocol, direction, size_bytes, status, raw_json,
              encrypted, encryption_method, auth_status)
-        VALUES (?, ?, ?, 'inbound', ?, 'ok', ?, ?, ?, 'ok')
+        VALUES (?, ?, ?, 'inbound', ?, 'ok', ?, ?, ?, ?)
         """,
         (received_at, payload.device_id, protocol, size_bytes, raw_json,
-         1 if encrypted else 0, enc_method),
+         1 if encrypted else 0, enc_method, auth_status_label),
     )
     packet_id: int = cursor.lastrowid  # type: ignore
 
@@ -242,12 +277,15 @@ async def ingest_telemetry_data(
         f"batt={payload.battery_pct:.1f}%"
     )
 
-    # ── 7. WebSocket broadcast ────────────────────────────────────────────
+    # ── 7. WebSocket broadcast ────────────────────────────────────
     broadcast_payload = {
         "event": "telemetry",
         "packet_id": packet_id,
         "received_at": received_at,
         "protocol": protocol,
+        "direction": "inbound",
+        "status": "ok",
+        "auth_status": auth_status_label,
         "encrypted": 1 if encrypted else 0,
         "encryption_method": enc_method,
         "raw_payload": raw_json,
@@ -281,12 +319,29 @@ async def ingest_telemetry_data(
     except ImportError:
         pass
 
-    return {
+    ack_dict = {
         "status": "ok",
         "packet_id": packet_id,
         "received_at": received_at,
         "device_id": payload.device_id,
     }
+    try:
+        ack_raw = json.dumps(ack_dict)
+        await db.execute(
+            """
+            INSERT INTO packets
+                (received_at, device_id, protocol, direction, size_bytes, status, raw_json,
+                 encrypted, encryption_method, auth_status)
+            VALUES (?, ?, ?, 'outbound', ?, 'ok', ?, ?, ?, ?)
+            """,
+            (received_at, payload.device_id, protocol, len(ack_raw.encode("utf-8")), ack_raw,
+             1 if encrypted else 0, enc_method, auth_status_label),
+        )
+        await db.commit()
+    except Exception as ack_err:
+        logger.debug(f"[INGEST] Outbound ACK log skip: {ack_err}")
+
+    return ack_dict
 
 
 async def _send_ai_recommendation(
@@ -330,9 +385,14 @@ async def _send_ai_recommendation(
         system, user = build_recommendation_prompt(payload, history, prev_mode)
         result = await generate_recommendation(system, user)
 
+        if not result:
+            # Fallback to multi-factor deterministic intelligence cache when Ollama is offline or latent
+            from ai.ai_cache import get_multi_factor_recommendation
+            result = get_multi_factor_recommendation(payload, history, prev_mode)
+
         if result:
             severity, recommendation = result   # ③ unpack severity
-            await manager.broadcast({
+            rec_event = {
                 "event":          "ai_recommendation",
                 "packet_id":      packet_id,
                 "received_at":    received_at,
@@ -340,7 +400,25 @@ async def _send_ai_recommendation(
                 "mode":           payload.mode,
                 "severity":       severity,          # ③ NEW field
                 "recommendation": recommendation,
-            })
+            }
+            await manager.broadcast(rec_event)
+
+            # Log outbound AI recommendation packet into packets table
+            try:
+                rec_raw = json.dumps(rec_event)
+                await db.execute(
+                    """
+                    INSERT INTO packets
+                        (received_at, device_id, protocol, direction, size_bytes, status, raw_json,
+                         encrypted, encryption_method, auth_status)
+                    VALUES (?, ?, 'websocket', 'outbound', ?, 'ok', ?, 0, 'PLAIN', 'ok')
+                    """,
+                    (received_at, payload.device_id, len(rec_raw.encode("utf-8")), rec_raw),
+                )
+                await db.commit()
+            except Exception:
+                pass
+
             logger.info(
                 f"[AI] Recommendation sent for packet_id={packet_id} "
                 f"severity={severity}"

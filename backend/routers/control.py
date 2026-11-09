@@ -79,6 +79,8 @@ _vehicle_ai_override: dict[str, bool] = {}  # device_id -> enabled
 
 
 def is_ai_enabled(device_id: str | None = None) -> bool:
+    if not _ai_service_enabled:
+        return False
     if device_id and device_id in _vehicle_ai_override:
         return _vehicle_ai_override[device_id]
     return _ai_service_enabled
@@ -292,11 +294,40 @@ async def set_vehicle_ai_service(body: VehicleAiRequest) -> dict:
     """Override AI service state for a specific vehicle without affecting others."""
     _vehicle_ai_override[body.device_id] = body.enabled
     logger.info(f"[CONTROL] AI for {body.device_id} set to {'ENABLED' if body.enabled else 'DISABLED'}")
+
+    tier = "premium" if body.enabled else "free"
+    db = await get_db()
+    cur = await db.execute(
+        """
+        UPDATE devices
+        SET tier = ?, mobile_access_enabled = ?
+        WHERE device_id = ?
+        """,
+        (tier, 1 if body.enabled else 0, body.device_id),
+    )
+    if cur.rowcount == 0:
+        await db.execute(
+            """
+            INSERT OR IGNORE INTO devices (device_id, api_key_hash, device_secret, tier, mobile_access_enabled, active)
+            VALUES (?, 'fleet_seeded', 'fleet_seeded', ?, ?, 1)
+            """,
+            (body.device_id, tier, 1 if body.enabled else 0),
+        )
+    await db.commit()
+
     from ws_manager import manager
     await manager.broadcast({
         "event": "vehicle_ai_status",
         "device_id": body.device_id,
         "enabled": body.enabled,
+        "tier": tier,
     })
-    return {"device_id": body.device_id, "ai_enabled": body.enabled, "status": "ok"}
+    await manager.broadcast({
+        "event": "mobile_access_changed",
+        "vehicle_id": body.device_id,
+        "enabled": body.enabled,
+        "tier": tier,
+    })
+    return {"device_id": body.device_id, "ai_enabled": body.enabled, "tier": tier, "status": "ok"}
+
 

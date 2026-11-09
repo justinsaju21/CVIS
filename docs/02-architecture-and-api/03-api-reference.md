@@ -179,6 +179,21 @@ Toggle global mobile app access:
 {"enabled": true}
 ```
 
+### `GET /api/v1/config/mobile-access?vehicle_id=ESP32-ALPHA`
+Query mobile app eligibility and tier status for a specific vehicle node. Access is granted only when global mobile access is enabled AND the vehicle possesses an active `premium` tier.
+- If the device is registered in SQLite, reads `devices.tier`.
+- If unseeded, falls back to canonical fleet defaults (`ALPHA`/`BETA` = premium, `GAMMA`/`DELTA` = free).
+- Checks `is_ai_enabled(vehicle_id)`: if AI is disabled, effective tier degrades to free.
+
+Response `200`:
+```json
+{
+  "vehicle_id": "ESP32-ALPHA",
+  "tier": "premium",
+  "enabled": true
+}
+```
+
 ---
 
 ## AI
@@ -198,7 +213,7 @@ On-demand multi-factor AI recommendation using current + recent telemetry:
 ```json
 {"device_id": "ESP32-ALPHA"}
 ```
-Response:
+Response `200`:
 ```json
 {
   "device_id": "ESP32-ALPHA",
@@ -207,13 +222,14 @@ Response:
   "severity": "warn"
 }
 ```
+Error `503`: Returned if AI service is disabled globally or for this vehicle (`is_ai_enabled = false`).
 
 ### `POST /api/v1/ai/chat`
 Grounded driver chat — AI has access to current snapshot + last 10 telemetry rows:
 ```json
 {"device_id": "ESP32-ALPHA", "message": "Should I be worried about the battery?"}
 ```
-Response:
+Response `200`:
 ```json
 {
   "device_id": "ESP32-ALPHA",
@@ -222,36 +238,46 @@ Response:
   "reply": "Battery is at 58% with an estimated 142km range. At current Sport mode drain rate (~2.8%/min), you have approximately 20 minutes before hitting Low Battery threshold. Consider Eco mode if your destination is more than 100km away."
 }
 ```
+Error `503`: Returned if AI service is disabled globally or for this vehicle.
 
 ---
 
 ## Control (NOC)
 
 ### `POST /api/v1/control/disconnect`
-Deactivate a vehicle node — next packet returns 401. A `device_disconnected` WS event is broadcast.
+Deactivate a vehicle node — next packet returns 401. A `device_disconnected` WS event is broadcast, and for MQTT a `"disconnect"` command is published to `cvis/config/control/{device_id}` causing firmware to pause transmission.
 ```json
 {"device_id": "ESP32-ALPHA", "reason": "scheduled maintenance"}
 ```
 
 ### `POST /api/v1/control/reconnect`
-Re-activate a deactivated device (credentials remain valid):
+Re-activate a deactivated device (credentials remain valid). Publishes `"reconnect"` command to `cvis/config/control/{device_id}` to resume firmware transmission.
 ```json
 {"device_id": "ESP32-ALPHA", "reason": "maintenance complete"}
 ```
 
 ### `GET /api/v1/control/vehicles`
-List all fleet vehicles with their status, mode, battery, and AI toggle state.
+List all fleet vehicles with their status, mode, battery, tier, and AI toggle state.
 
 ### `POST /api/v1/control/ai-service`
-Stop or start AI recommendations globally. Telemetry still flows.
+Stop or start AI recommendations globally. Telemetry still flows. Global STOP supersedes all per-vehicle overrides.
 ```json
 {"enabled": false}
 ```
 
 ### `POST /api/v1/control/ai-service/vehicle`
-Toggle AI per vehicle:
+Toggle AI per vehicle. Automatically persists tier (`premium` if true, `free` if false) and `mobile_access_enabled` to SQLite `devices` table, and broadcasts `vehicle_ai_status` and `mobile_access_changed` via WebSocket:
 ```json
-{"device_id": "ESP32-ALPHA", "enabled": false}
+{"device_id": "ESP32-ALPHA", "enabled": true}
+```
+Response `200`:
+```json
+{
+  "device_id": "ESP32-ALPHA",
+  "ai_enabled": true,
+  "tier": "premium",
+  "status": "ok"
+}
 ```
 
 ---

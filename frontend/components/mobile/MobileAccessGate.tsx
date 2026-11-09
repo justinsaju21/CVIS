@@ -13,10 +13,12 @@
  * CCNS mapping: Unit 4 (Access Control, Authorisation Tiers)
  */
 
-import { useEffect, useState, ReactNode } from 'react'
+import { useEffect, useState, useCallback, ReactNode } from 'react'
 import { motion } from 'framer-motion'
 import { Crown, Lock, Wifi, AlertTriangle } from 'lucide-react'
 import { fetchMobileAccess } from '@/lib/api'
+import { useWebSocket } from '@/hooks/useWebSocket'
+import type { WsEvent } from '@/lib/types'
 
 interface AccessState {
   loading: boolean
@@ -232,7 +234,7 @@ export default function MobileAccessGate({ vehicleId, vehicleName, children }: M
     error: null,
   })
 
-  useEffect(() => {
+  const checkAccess = useCallback(() => {
     fetchMobileAccess(vehicleId)
       .then((data) => {
         const d = data as { tier: 'free' | 'premium'; enabled: boolean }
@@ -247,8 +249,21 @@ export default function MobileAccessGate({ vehicleId, vehicleName, children }: M
       })
   }, [vehicleId])
 
+  useEffect(() => {
+    checkAccess()
+  }, [checkAccess])
+
+  const handleWs = useCallback((ev: WsEvent) => {
+    if (ev.event === 'mobile_access_changed' || ev.event === 'global_mobile_app_changed' || ev.event === 'vehicle_ai_status') {
+      checkAccess()
+    }
+  }, [checkAccess])
+
+  useWebSocket(handleWs)
+
   if (state.loading) return <LoadingSkeleton />
   if (!state.enabled) return <PremiumGate vehicleName={vehicleName} />
   
   return <>{children}</>
 }
+

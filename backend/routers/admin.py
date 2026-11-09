@@ -11,6 +11,9 @@ shows live system load during demos.
 """
 
 import logging
+import os
+import subprocess
+import shutil
 from datetime import datetime, timezone
 
 import psutil
@@ -30,6 +33,42 @@ logger = logging.getLogger("cvis.admin")
 _start_time = datetime.now(timezone.utc)
 
 
+def get_gpu_metrics() -> dict:
+    """Read live NVIDIA GPU telemetry via nvidia-smi."""
+    if not shutil.which("nvidia-smi"):
+        return {"available": False}
+    try:
+        flags = subprocess.CREATE_NO_WINDOW if os.name == 'nt' else 0
+        res = subprocess.run(
+            ["nvidia-smi", "--query-gpu=name,utilization.gpu,memory.used,memory.total,temperature.gpu", "--format=csv,noheader,nounits"],
+            capture_output=True,
+            text=True,
+            timeout=1.5,
+            creationflags=flags,
+        )
+        if res.returncode == 0 and res.stdout.strip():
+            parts = [p.strip() for p in res.stdout.strip().split(",")]
+            if len(parts) >= 5:
+                name = parts[0]
+                gpu_pct = float(parts[1])
+                used_mb = float(parts[2])
+                total_mb = float(parts[3])
+                temp_c = float(parts[4])
+                mem_pct = round((used_mb / total_mb) * 100, 1) if total_mb > 0 else 0.0
+                return {
+                    "available": True,
+                    "name": name,
+                    "gpu_pct": gpu_pct,
+                    "gpu_mem_used_mb": round(used_mb),
+                    "gpu_mem_total_mb": round(total_mb),
+                    "gpu_mem_pct": mem_pct,
+                    "gpu_temp_c": temp_c,
+                }
+    except Exception as e:
+        logger.debug(f"[ADMIN] nvidia-smi query failed: {e}")
+    return {"available": False}
+
+
 @router.get("/stats", summary="Overall server + system stats")
 async def get_stats() -> dict:
     """Comprehensive server stats for the admin dashboard."""
@@ -38,6 +77,12 @@ async def get_stats() -> dict:
     # Packet counts
     async with db.execute("SELECT COUNT(*) as n FROM packets") as cur:
         total_packets = (await cur.fetchone())["n"]
+    async with db.execute("SELECT COUNT(*) as n FROM packets WHERE received_at >= date('now', 'start of day')") as cur:
+        today_packets = (await cur.fetchone())["n"]
+    async with db.execute("SELECT COUNT(*) as n FROM packets WHERE received_at >= datetime('now', '-1 hour')") as cur:
+        last_hour_packets = (await cur.fetchone())["n"]
+    async with db.execute("SELECT COALESCE(AVG(size_bytes), 0) as n FROM packets") as cur:
+        avg_size_bytes = (await cur.fetchone())["n"]
     async with db.execute("SELECT COUNT(*) as n FROM packets WHERE status='ok'") as cur:
         ok_packets = (await cur.fetchone())["n"]
     async with db.execute("SELECT COUNT(*) as n FROM packets WHERE status='rejected'") as cur:
@@ -68,9 +113,20 @@ async def get_stats() -> dict:
     cpu_pct = psutil.cpu_percent(interval=0.1)
     mem     = psutil.virtual_memory()
     uptime  = (datetime.now(timezone.utc) - _start_time).total_seconds()
+    try:
+        disk_pct = psutil.disk_usage(".").percent
+    except Exception:
+        disk_pct = 0.0
+
+    try:
+        async with db.execute("SELECT (page_count * page_size) / 1024 as n FROM pragma_page_count(), pragma_page_size()") as cur:
+            db_size_kb = (await cur.fetchone())["n"]
+    except Exception:
+        db_size_kb = 0
 
     # AI status (non-blocking)
     ai_status = await check_ollama_status()
+    gpu_metrics = get_gpu_metrics()
 
     return {
         "server": {
@@ -80,12 +136,26 @@ async def get_stats() -> dict:
         },
         "system": {
             "cpu_pct": cpu_pct,
+            "mem_pct": mem.percent,
+            "memory_pct": mem.percent,
             "memory_total_mb": round(mem.total / 1024 / 1024),
             "memory_used_mb":  round(mem.used  / 1024 / 1024),
-            "memory_pct":      mem.percent,
+            "disk_pct": disk_pct,
+            "uptime_s": int(uptime),
+            "db_size_kb": db_size_kb,
+            "gpu_pct": gpu_metrics.get("gpu_pct", 0.0),
+            "gpu_mem_pct": gpu_metrics.get("gpu_mem_pct", 0.0),
+            "gpu_mem_used_mb": gpu_metrics.get("gpu_mem_used_mb", 0),
+            "gpu_mem_total_mb": gpu_metrics.get("gpu_mem_total_mb", 0),
+            "gpu_temp_c": gpu_metrics.get("gpu_temp_c", 0.0),
+            "gpu_name": gpu_metrics.get("name", "NVIDIA GeForce RTX 4060 Laptop GPU"),
         },
+        "gpu": gpu_metrics,
         "packets": {
             "total":              total_packets,
+            "today":              today_packets,
+            "last_hour":          last_hour_packets,
+            "avg_size_bytes":     round(avg_size_bytes, 1),
             "ok":                 ok_packets,
             "rejected":           rejected_packets,
             "protocol_breakdown": protocol_breakdown,
@@ -136,10 +206,6 @@ async def get_packet_stats(
     """Return packet counts grouped by hour for the last N hours."""
     db = await get_db()
     device_filter = "AND device_id = ?" if device_id else ""
-    base_params = [f"-{hours} hours"]
-    if device_id:
-        base_params.insert(0, device_id) if device_filter else None
-        base_params = [f"-{hours} hours", device_id] if device_id else [f"-{hours} hours"]
 
     async with db.execute(
         f"""
@@ -187,6 +253,7 @@ async def get_devices() -> list[dict]:
             d.registered_at,
             d.active,
             t.mode AS last_mode,
+            t.battery_pct AS last_battery,
             t.battery_pct AS last_battery_pct,
             t.received_at AS last_seen,
             t.fault_code  AS last_fault_code

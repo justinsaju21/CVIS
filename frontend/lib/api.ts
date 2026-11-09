@@ -1,10 +1,31 @@
-export const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'https://api-cvis.justinsaju.me'
-export const WS_URL   = process.env.NEXT_PUBLIC_WS_URL  || 'wss://api-cvis.justinsaju.me/ws'
+export function getApiBase(): string {
+  if (typeof window !== 'undefined') {
+    if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+      return `http://${window.location.hostname}:8000`
+    }
+  }
+  if (process.env.NEXT_PUBLIC_API_URL) return process.env.NEXT_PUBLIC_API_URL
+  return 'https://api-cvis.justinsaju.me'
+}
+
+export function getWsUrl(): string {
+  if (typeof window !== 'undefined') {
+    if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+      return `ws://${window.location.hostname}:8000/ws`
+    }
+  }
+  if (process.env.NEXT_PUBLIC_WS_URL) return process.env.NEXT_PUBLIC_WS_URL
+  return 'wss://api-cvis.justinsaju.me/ws'
+}
+
+export const API_BASE = getApiBase()
+export const WS_URL   = getWsUrl()
 
 // ─── Generic fetch helper ────────────────────────────────────────────────
 async function req<T>(method: string, path: string, body?: unknown): Promise<T> {
+  const base = getApiBase()
   try {
-    const res = await fetch(`${API_BASE}${path}`, {
+    const res = await fetch(`${base}${path}`, {
       method,
       headers: { 'Content-Type': 'application/json' },
       body: body ? JSON.stringify(body) : undefined,
@@ -57,6 +78,11 @@ export const fetchVehicles    = () => api.get('/api/v1/control/vehicles')
 
 // ─── AI ──────────────────────────────────────────────────────────────────
 export const fetchAiStatus        = ()                       => api.get('/api/v1/ai/status')
+export const fetchAiModels        = ()                       => api.get('/api/v1/ai/models')
+export const switchAiModel        = (model: string)          => api.post('/api/v1/ai/models/switch', { model })
+export const pullAiModel          = (model: string)          => api.post('/api/v1/ai/models/pull', { model })
+export const compareAiModels      = (device_id?: string, models?: string[]) =>
+  api.post('/api/v1/ai/compare', { device_id, models })
 export const fetchRecommendation  = (device_id: string)      =>
   api.post('/api/v1/ai/recommendation', { device_id })
 export const sendChat             = (device_id: string, message: string) =>

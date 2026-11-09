@@ -742,7 +742,7 @@ export default function DriverDashboard({ vehicleId, vehicleName, vehicleColor, 
     if (ev.event === 'ai_recommendation' && ev.device_id === vehicleId && ev.recommendation) typewriterEffect(ev.recommendation)
     if (ev.event === 'vehicle_ai_status' && ev.device_id === vehicleId) setIsPro(ev.enabled)
     if (ev.event === 'ai_service_status') setIsPro(ev.enabled as boolean)
-    if (ev.event === 'config_changed' && 'force_mode' in ev) setForcedMode((ev as any).force_mode ?? null)
+    if (ev.event === 'config_changed' && 'force_mode' in ev) setForcedMode(ev.force_mode ?? null)
   }, [vehicleId, typewriterEffect])
 
   const { connected } = useWebSocket(handleWs)
@@ -1030,12 +1030,30 @@ export default function DriverDashboard({ vehicleId, vehicleName, vehicleColor, 
                 {isPro ? '★ PRO ACTIVE' : '☆ FREE TIER (UPGRADE)'}
               </button>
               {[
-                { label: !connected ? 'HMAC: OFFLINE' : !latest ? 'HMAC: STANDBY' : 'HMAC: LIVE', col: !connected ? '#ef4444' : !latest ? '#f59e0b' : '#10b981', active: !!connected },
-                { label: 'PROTOCOL: MQTT/HTTP', col: '#0ea5e9', active: true },
-                { label: !connected ? 'OFFLINE' : !latest ? 'STANDBY' : 'LIVE', col: !connected ? '#ef4444' : !latest ? '#f59e0b' : '#10b981', active: connected },
-                { label: !connected ? 'OFFLINE' : !latest ? 'STANDBY' : `${Math.round(latest.battery_pct)}% SoC`, col: !connected ? '#ef4444' : !latest ? '#64748b' : latest.battery_pct < 20 ? '#ef4444' : '#10b981', active: !!latest },
-                { label: !connected ? 'WS: OFFLINE' : !latest ? 'WS: STANDBY' : 'WS: LIVE', col: !connected ? '#ef4444' : !latest ? '#f59e0b' : '#10b981', active: connected },
-              ].map(pill => (<div key={pill.label} style={{ padding: '5px 12px', borderRadius: 20, background: `${pill.col}14`, border: `1px solid ${pill.col}40`, fontSize: 11.5, fontFamily: "'JetBrains Mono', monospace", fontWeight: 700, letterSpacing: '0.04em', color: pill.active ? pill.col : '#64748b', transition: 'all 0.4s' }}>{pill.label}</div>))}
+                { id: 'pill-hmac',   label: !connected ? 'HMAC: OFFLINE' : !latest ? 'HMAC: STANDBY' : 'HMAC: LIVE', col: !connected ? '#ef4444' : !latest ? '#f59e0b' : '#10b981', active: !!connected },
+                { id: 'pill-proto',  label: 'PROTOCOL: MQTT/HTTP', col: '#0ea5e9', active: true },
+                { id: 'pill-status', label: !connected ? 'NODE: OFFLINE' : !latest ? 'NODE: STANDBY' : 'NODE: LIVE', col: !connected ? '#ef4444' : !latest ? '#f59e0b' : '#10b981', active: connected },
+                { id: 'pill-soc',    label: !connected ? 'BATTERY: ---' : !latest ? 'BATTERY: STANDBY' : `${Math.round(latest.battery_pct)}% SoC`, col: !connected ? '#ef4444' : !latest ? '#64748b' : latest.battery_pct < 20 ? '#ef4444' : '#10b981', active: !!latest },
+                { id: 'pill-ws',     label: !connected ? 'WS: OFFLINE' : !latest ? 'WS: STANDBY' : 'WS: LIVE', col: !connected ? '#ef4444' : !latest ? '#f59e0b' : '#10b981', active: connected },
+              ].map(pill => (
+                <div
+                  key={pill.id}
+                  style={{
+                    padding: '5px 12px',
+                    borderRadius: 20,
+                    background: `${pill.col}14`,
+                    border: `1px solid ${pill.col}40`,
+                    fontSize: 11.5,
+                    fontFamily: "'JetBrains Mono', monospace",
+                    fontWeight: 700,
+                    letterSpacing: '0.04em',
+                    color: pill.active ? pill.col : '#64748b',
+                    transition: 'all 0.4s'
+                  }}
+                >
+                  {pill.label}
+                </div>
+              ))}
             </div>
           </motion.div>
 

@@ -120,6 +120,17 @@ class VehicleSimulator:
         self.state_batt_temp  = m_bt
         self.state_motor_temp = m_mt
 
+        # Realistic story-arc personality sequences
+        if "ALPHA" in device_id:
+            self.mode_sequence = [0, 3, 0, 4, 6]  # Healthy -> Heavy Traffic -> Healthy -> Low Battery -> Charging
+        elif "BETA" in device_id:
+            self.mode_sequence = [0, 2, 2, 7, 0]  # Healthy -> Sport -> Sport -> Motor Fault -> Healthy
+        elif "GAMMA" in device_id:
+            self.mode_sequence = [0, 1, 1, 0, 1]  # Healthy -> Eco -> Eco -> Healthy -> Eco
+        else:
+            self.mode_sequence = list(range(len(MODES)))  # DELTA cycles all 8 modes
+        self.seq_index = 0
+
     def register(self) -> bool:
         # Deactivate first so we always get fresh credentials
         deact_url = f"{self.base_url}/api/v1/admin/deactivate-device?device_id={self.device_id}"
@@ -317,30 +328,41 @@ class VehicleSimulator:
                     **packet,
                 })
 
+        if not hasattr(self, "_mqtt_client") or self._mqtt_client is None:
+            try:
+                c = mqtt_client.Client(
+                    mqtt_client.CallbackAPIVersion.VERSION2,
+                    client_id=f"{self.device_id}-{random.randint(1000, 9999)}",
+                )
+                c.connect(BROKER_HOST, BROKER_PORT, keepalive=30)
+                c.loop_start()
+                self._mqtt_client = c
+            except Exception as e:
+                return 500, str(e)
+
         try:
-            client = mqtt_client.Client(
-                mqtt_client.CallbackAPIVersion.VERSION2,
-                client_id=f"{self.device_id}-pub",
-            )
-            client.connect(BROKER_HOST, BROKER_PORT, keepalive=10)
-            client.loop_start()          # background thread to handle ACKs
-            result = client.publish(topic, payload, qos=1)
-            result.wait_for_publish(timeout=5)  # wait for broker ACK
-            client.loop_stop()
-            client.disconnect()
+            result = self._mqtt_client.publish(topic, payload, qos=1)
+            result.wait_for_publish(timeout=2)
             return 200, "mqtt ok"
         except Exception as e:
+            try:
+                self._mqtt_client.loop_stop()
+                self._mqtt_client.disconnect()
+            except Exception:
+                pass
+            self._mqtt_client = None
             return 500, str(e)
 
-    def run(self, stop_event: threading.Event, max_packets: int = 0):
+    def run(self, stop_event: threading.Event, max_packets: int = 0, callback = None):
         print(f"[{self.name}] Starting — mode={MODES[self.mode_index][0]}, "
               f"interval={self.interval}s, cycle={self.cycle_secs}s")
         count = 0
         while not stop_event.is_set():
-            # Cycle mode
+            # Cycle mode along personality sequence
             if time.time() - self.last_cycle >= self.cycle_secs:
-                self.mode_index   = (self.mode_index + 1) % len(MODES)
-                self.last_cycle   = time.time()
+                self.seq_index = (self.seq_index + 1) % len(self.mode_sequence)
+                self.mode_index = self.mode_sequence[self.seq_index]
+                self.last_cycle = time.time()
                 print(f"[{self.name}] Mode -> {MODES[self.mode_index][0]}")
 
             cfg        = self.get_backend_config()
@@ -357,17 +379,39 @@ class VehicleSimulator:
             tamper     = self.force_tamper or cfg.get("chaos", {}).get("tamper", False)
             pkt        = self.generate_packet()
 
-            if protocol == "mqtt" and MQTT_OK:
-                code, _ = self.send_mqtt(pkt, encryption, tamper=tamper)
-            else:
-                code, _ = self.send_http(pkt, encryption, tamper=tamper)
+            # Transmission with CCNS Ack + Backoff Retry mechanism
+            max_retries = 2
+            attempts = 0
+            code = 500
+            retry_tag = ""
+            while attempts <= max_retries and not stop_event.is_set():
+                if protocol == "mqtt" and MQTT_OK:
+                    code, _ = self.send_mqtt(pkt, encryption, tamper=tamper)
+                else:
+                    code, _ = self.send_http(pkt, encryption, tamper=tamper)
+
+                if code in (200, 401):  # 200 = OK, 401 = rejected (auth/tamper intentional)
+                    break
+
+                # 503 (chaos packet loss) or transient socket drop -> backoff and retry
+                attempts += 1
+                if attempts <= max_retries:
+                    retry_tag = f"[RETRY-{attempts}]"
+                    backoff = 0.15 * (2 ** (attempts - 1))
+                    time.sleep(backoff)
 
             count += 1
+            if callback:
+                try:
+                    callback(protocol, encryption, tamper, code, attempts > 0)
+                except Exception:
+                    pass
+
             enc_str    = "[ENC]" if encryption else "[PLN]"
             tamper_str = "[TAMPER]" if tamper else "        "
             proto_str  = protocol.upper()
             status_str = "OK" if code == 200 else f"ERR{code}"
-            print(f"[{self.name}] #{count:04d} {enc_str} {tamper_str} [{proto_str}] {pkt['mode']:<20} "
+            print(f"[{self.name}] #{count:04d} {enc_str} {tamper_str} [{proto_str}] {retry_tag:<10} {pkt['mode']:<20} "
                   f"Spd:{pkt['speed_kmh']:5.1f} Bat:{pkt['battery_pct']:4.1f}% -> {status_str}")
 
             if max_packets > 0 and count >= max_packets:

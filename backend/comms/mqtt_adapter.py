@@ -35,6 +35,7 @@ import asyncio
 import json
 import logging
 import threading
+import time
 from typing import Callable, Awaitable, Optional
 
 import paho.mqtt.client as mqtt
@@ -63,6 +64,7 @@ class MqttAdapter:
         self._thread: Optional[threading.Thread] = None
         self._on_telemetry: Optional[Callable[[str, str], Awaitable[None]]] = None
         self._running = False
+        self._last_fail_time = 0.0
 
         self._client.on_connect    = self._on_connect
         self._client.on_message    = self._on_message
@@ -83,6 +85,7 @@ class MqttAdapter:
         try:
             self._client.connect(BROKER_HOST, BROKER_PORT, keepalive=60)
         except Exception as e:
+            self._last_fail_time = time.time()
             logger.warning(f"[MQTT] Cannot connect to broker at "
                            f"{BROKER_HOST}:{BROKER_PORT} — {e}")
             logger.warning("[MQTT] Adapter inactive. Start Mosquitto to enable MQTT.")
@@ -105,11 +108,28 @@ class MqttAdapter:
             self._running = False
             logger.info("[MQTT] Adapter stopped.")
 
+    def ensure_started(self, loop: Optional[asyncio.AbstractEventLoop] = None) -> bool:
+        if self._running:
+            return True
+        # Circuit-breaker cooldown: avoid blocking event loop if connection failed recently
+        if time.time() - self._last_fail_time < 30.0:
+            return False
+        if loop is None:
+            try:
+                loop = asyncio.get_running_loop()
+            except RuntimeError:
+                pass
+        if loop:
+            return self.start(loop)
+        return False
+
     def publish_config(self, key: str, value: str) -> None:
         """
         Publish a config update to all subscribed ESP32 nodes.
         Used for protocol-switch and encryption-toggle broadcasts.
         """
+        if not self._running:
+            self.ensure_started()
         if not self._running:
             return
         topic = f"cvis/config/{key}"

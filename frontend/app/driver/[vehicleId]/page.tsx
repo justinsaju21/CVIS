@@ -13,7 +13,8 @@ const VEHICLE_MAP: Record<string, { deviceId: string; name: string; color: strin
 
 export default function VehiclePage({ params }: { params: Promise<{ vehicleId: string }> }) {
   const { vehicleId } = use(params)
-  const vehicle = VEHICLE_MAP[vehicleId.toLowerCase()]
+  const normalizedId = vehicleId.toLowerCase().replace(/^esp32-/, '')
+  const vehicle = VEHICLE_MAP[normalizedId]
   if (!vehicle) notFound()
   return (
     <DriverDashboard

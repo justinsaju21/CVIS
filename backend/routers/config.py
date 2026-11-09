@@ -252,21 +252,34 @@ async def get_mobile_access(vehicle_id: str) -> dict:
     Access is granted only if the global mobile_app_enabled is true AND vehicle is premium.
     """
     from fastapi import HTTPException
+    from routers.control import FLEET, is_ai_enabled
+
     db = await get_db()
     async with db.execute(
         "SELECT tier FROM devices WHERE device_id = ?",
         (vehicle_id,),
     ) as cur:
         row = await cur.fetchone()
-    if not row:
+
+    tier: str | None = None
+    if row and row["tier"]:
+        tier = row["tier"]
+    else:
+        fleet_match = next((f for f in FLEET if f["device_id"] == vehicle_id), None)
+        if fleet_match:
+            tier = "premium" if vehicle_id in ("ESP32-ALPHA", "ESP32-BETA") else "free"
+
+    if tier is None:
         raise HTTPException(404, f"Device '{vehicle_id}' not found")
-        
+
     mobile_app_global = (await get_config("mobile_app_enabled") or "true") == "true"
-    
+    ai_active = is_ai_enabled(vehicle_id)
+    effective_premium = (tier == "premium") and ai_active
+
     return {
         "vehicle_id": vehicle_id,
-        "tier":       row["tier"],
-        "enabled":    mobile_app_global and (row["tier"] == "premium"),
+        "tier":       tier,
+        "enabled":    mobile_app_global and effective_premium,
     }
 
 @router.post("/mobile-app", summary="Globally enable or disable mobile app access")

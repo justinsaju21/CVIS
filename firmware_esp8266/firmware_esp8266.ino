@@ -69,6 +69,9 @@ char activeProtocol[8] = "http";
 // ─── Encryption flag (set by backend config) ────────────────
 bool encryptionEnabled = false;
 
+// ─── Node operational state (NOC revocation control) ───────
+bool isSuspended = false;
+
 // ─── State ─────────────────────────────────────────────────
 uint32_t          lastSendMs       = 0;
 uint32_t          lastConfigPollMs = 0;
@@ -352,7 +355,7 @@ bool publishViaMqtt(const TelemetryPacket& pkt) {
 
   if (!encrypted) {
     // Merge telemetry fields into envelope
-    StaticJsonDocument<512> inner;
+    StaticJsonDocument<1024> inner;
     deserializeJson(inner, plaintext);
     for (JsonPair kv : inner.as<JsonObject>()) {
       envelope[kv.key()] = kv.value();
@@ -430,6 +433,14 @@ void mqttOnMessage(char* topic, byte* payload, unsigned int length) {
       encryptionEnabled = enc;
       Serial.printf("[MQTT] Encryption %s\n", enc ? "ENABLED" : "DISABLED");
     }
+  } else if (String(topic) == String("cvis/config/control/") + DEVICE_ID) {
+    if (msg == "disconnect") {
+      isSuspended = true;
+      Serial.println("[CONTROL] Node disconnected by NOC command — transmissions paused");
+    } else if (msg == "reconnect") {
+      isSuspended = false;
+      Serial.println("[CONTROL] Node reconnected by NOC command — transmissions resumed");
+    }
   }
 }
 
@@ -441,6 +452,8 @@ void connectMqtt() {
   if (mqttClient.connect(MQTT_CLIENT_ID)) {
     mqttClient.subscribe("cvis/config/protocol");
     mqttClient.subscribe("cvis/config/encryption");
+    String controlTopic = String("cvis/config/control/") + DEVICE_ID;
+    mqttClient.subscribe(controlTopic.c_str());
     Serial.println("[MQTT] Connected to broker");
   } else {
     Serial.printf("[MQTT] Connect failed, state=%d\n", mqttClient.state());
@@ -497,6 +510,11 @@ void setup() {
 // ─── loop() ───────────────────────────────────────────────────
 void loop() {
   if (mqttClient.connected()) mqttClient.loop();
+
+  if (isSuspended) {
+    delay(500);
+    return;
+  }
 
   uint32_t now = millis();
 

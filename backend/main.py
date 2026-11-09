@@ -67,8 +67,11 @@ async def _handle_mqtt_telemetry(topic: str, payload_str: str) -> None:
     ct        = data.pop("ct",  None)
     tag       = data.pop("tag", None)
 
-    # Re-serialise the canonical payload (without _meta)
-    raw_json = json.dumps(data)
+    # Re-serialise the canonical wire payload (without _meta)
+    if encrypted and iv and ct and tag:
+        raw_json = json.dumps({"iv": iv, "ct": ct, "tag": tag})
+    else:
+        raw_json = json.dumps(data)
 
     try:
         await ingest_telemetry_data(

@@ -181,8 +181,10 @@ function PacketInspector({ packet, onClose }: { packet: PacketRow; onClose: () =
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginBottom: 20 }}>
           {[
             { label: 'Device',    value: packet.device_id },
+            { label: 'Direction', value: (packet.direction ?? 'inbound').toUpperCase(),
+              color: packet.direction === 'outbound' ? '#8b5cf6' : '#0ea5e9' },
             { label: 'Protocol',  value: packet.protocol.toUpperCase(),
-              color: packet.protocol === 'mqtt' ? '#f59e0b' : '#0ea5e9' },
+              color: packet.protocol === 'mqtt' ? '#f59e0b' : packet.protocol === 'websocket' ? '#ec4899' : '#0ea5e9' },
             { label: 'Size',      value: `${packet.size_bytes} B` },
             { label: 'Timestamp', value: new Date(packet.timestamp).toLocaleTimeString(), span: 2 },
             { label: 'Encrypted', value: packet.encrypted ? 'AES-256-GCM' : 'Plaintext',
@@ -266,8 +268,10 @@ export default function NocPage() {
   const [inspector, setInspector]   = useState<PacketRow | null>(null)
   const [deviceId,  setDeviceId]    = useState('') // for manual disconnect/reconnect
   const [aiEnabled, setAiEnabled]   = useState(true)
-  const [saving,    setSaving]      = useState<string | null>(null)
-  const [filter,    setFilter]      = useState<'all' | 'ok' | 'rejected'>('all')
+  const [saving,      setSaving]      = useState<string | null>(null)
+  const [filter,      setFilter]      = useState<'all' | 'ok' | 'rejected'>('all')
+  const [dirFilter,   setDirFilter]   = useState<'all' | 'inbound' | 'outbound'>('all')
+  const [protoFilter, setProtoFilter] = useState<'all' | 'http' | 'mqtt' | 'websocket'>('all')
   
   // Fleet state
   const [vehicles,   setVehicles]   = useState<FleetVehicle[]>([])
@@ -332,7 +336,7 @@ export default function NocPage() {
         return [{
           packet_id:         t.packet_id,
           timestamp:         t.received_at,
-          direction:         'inbound',
+          direction:         (t as any).direction || 'inbound',
           protocol:          t.protocol,
           device_id:         t.device_id,
           size_bytes:        t.size_bytes ?? 0,
@@ -441,14 +445,21 @@ export default function NocPage() {
   const filteredPackets = useMemo(() => packets.filter((p) => {
     // Vehicle filter — only show packets for the selected vehicle
     if (selectedVehicleId && p.device_id !== selectedVehicleId) return false
+    // Direction filter
+    if (dirFilter !== 'all' && (p.direction || 'inbound') !== dirFilter) return false
+    // Protocol filter
+    if (protoFilter !== 'all' && p.protocol !== protoFilter) return false
+    // Status filter
     if (filter === 'ok')       return p.status === 'ok' && p.auth_status !== 'fail' && p.auth_status !== 'tamper_detected'
     if (filter === 'rejected') return p.status !== 'ok' || p.auth_status === 'fail' || p.auth_status === 'tamper_detected'
     return true
-  }), [packets, selectedVehicleId, filter])
+  }), [packets, selectedVehicleId, dirFilter, protoFilter, filter])
 
   const scopedPackets  = useMemo(() => selectedVehicleId ? packets.filter(p => p.device_id === selectedVehicleId) : packets, [packets, selectedVehicleId])
   const totalOk        = useMemo(() => scopedPackets.filter(p => p.status === 'ok').length, [scopedPackets])
   const totalRejected  = useMemo(() => scopedPackets.filter(p => p.status !== 'ok').length, [scopedPackets])
+  const totalInbound   = useMemo(() => scopedPackets.filter(p => (p.direction || 'inbound') === 'inbound').length, [scopedPackets])
+  const totalOutbound  = useMemo(() => scopedPackets.filter(p => p.direction === 'outbound').length, [scopedPackets])
 
   return (
     <>
@@ -825,25 +836,69 @@ export default function NocPage() {
                   )
                 })()}
 
-                {/* Filter chips */}
-                <div style={{ marginLeft: 'auto', display: 'flex', gap: 5 }}>
-                  {([
-                    { key: 'all',      label: `ALL (${scopedPackets.length})` },
-                    { key: 'ok',       label: `ACCEPTED (${totalOk})` },
-                    { key: 'rejected', label: `REJECTED (${totalRejected})` },
-                  ] as const).map((f) => (
-                    <button key={f.key} onClick={() => setFilter(f.key)}
-                      style={{
-                        padding: '3px 8px', borderRadius: 3, fontSize: 12, cursor: 'pointer',
-                        fontFamily: 'Inter, sans-serif', letterSpacing: '0.01em',
-                        background: filter === f.key ? 'rgba(0,0,0,0.06)' : 'transparent',
-                        border: `1px solid ${filter === f.key ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.06)'}`,
-                        color: filter === f.key ? '#0ea5e9' : 'rgba(0,0,0,0.4)',
-                        transition: 'all 120ms',
-                      }}>
-                      {f.label}
-                    </button>
-                  ))}
+                {/* Filter chips: Direction, Protocol, Status */}
+                <div style={{ marginLeft: 'auto', display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
+                  {/* Direction filter */}
+                  <div style={{ display: 'flex', gap: 2, background: 'rgba(0,0,0,0.04)', padding: '2px 4px', borderRadius: 4 }}>
+                    {([
+                      { key: 'all',      label: 'ALL DIRS' },
+                      { key: 'inbound',  label: `▲ IN (${totalInbound})` },
+                      { key: 'outbound', label: `▼ OUT (${totalOutbound})` },
+                    ] as const).map((d) => (
+                      <button key={d.key} onClick={() => setDirFilter(d.key)}
+                        style={{
+                          padding: '2px 6px', borderRadius: 3, fontSize: 11, cursor: 'pointer',
+                          fontFamily: 'Inter, sans-serif', fontWeight: 600,
+                          background: dirFilter === d.key ? (d.key === 'outbound' ? 'rgba(139,92,246,0.15)' : 'rgba(14,165,233,0.15)') : 'transparent',
+                          border: `1px solid ${dirFilter === d.key ? (d.key === 'outbound' ? 'rgba(139,92,246,0.3)' : 'rgba(14,165,233,0.3)') : 'transparent'}`,
+                          color: dirFilter === d.key ? (d.key === 'outbound' ? '#8b5cf6' : '#0ea5e9') : 'rgba(0,0,0,0.4)',
+                        }}>
+                        {d.label}
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Protocol filter */}
+                  <div style={{ display: 'flex', gap: 2, background: 'rgba(0,0,0,0.04)', padding: '2px 4px', borderRadius: 4 }}>
+                    {([
+                      { key: 'all',       label: 'ALL PROTO' },
+                      { key: 'http',      label: 'HTTP' },
+                      { key: 'mqtt',      label: 'MQTT' },
+                      { key: 'websocket', label: 'WS' },
+                    ] as const).map((pr) => (
+                      <button key={pr.key} onClick={() => setProtoFilter(pr.key)}
+                        style={{
+                          padding: '2px 6px', borderRadius: 3, fontSize: 11, cursor: 'pointer',
+                          fontFamily: 'Inter, sans-serif', fontWeight: 600,
+                          background: protoFilter === pr.key ? 'rgba(0,0,0,0.08)' : 'transparent',
+                          border: `1px solid ${protoFilter === pr.key ? 'rgba(0,0,0,0.15)' : 'transparent'}`,
+                          color: protoFilter === pr.key ? '#0ea5e9' : 'rgba(0,0,0,0.4)',
+                        }}>
+                        {pr.label}
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Status filter */}
+                  <div style={{ display: 'flex', gap: 2 }}>
+                    {([
+                      { key: 'all',      label: `ALL (${scopedPackets.length})` },
+                      { key: 'ok',       label: `ACCEPTED (${totalOk})` },
+                      { key: 'rejected', label: `REJECTED (${totalRejected})` },
+                    ] as const).map((f) => (
+                      <button key={f.key} onClick={() => setFilter(f.key)}
+                        style={{
+                          padding: '3px 8px', borderRadius: 3, fontSize: 11, cursor: 'pointer',
+                          fontFamily: 'Inter, sans-serif', letterSpacing: '0.01em', fontWeight: 600,
+                          background: filter === f.key ? 'rgba(0,0,0,0.06)' : 'transparent',
+                          border: `1px solid ${filter === f.key ? 'rgba(0,0,0,0.12)' : 'rgba(0,0,0,0.04)'}`,
+                          color: filter === f.key ? (f.key === 'rejected' ? '#ef4444' : '#0ea5e9') : 'rgba(0,0,0,0.4)',
+                          transition: 'all 120ms',
+                        }}>
+                        {f.label}
+                      </button>
+                    ))}
+                  </div>
                 </div>
               </div>
 
@@ -856,7 +911,7 @@ export default function NocPage() {
                 <table className="noc-table">
                   <thead>
                     <tr>
-                      {['#', 'Time', 'Proto', 'Device', 'Size', 'Auth', 'Encrypted', 'Status', ''].map((h) => (
+                      {['#', 'Time', 'Dir', 'Proto', 'Device', 'Size', 'Auth', 'Encrypted', 'Status', ''].map((h) => (
                         <th key={h}>{h}</th>
                       ))}
                     </tr>
@@ -864,7 +919,7 @@ export default function NocPage() {
                   <tbody>
                     {filteredPackets.length === 0 ? (
                       <tr>
-                        <td colSpan={9} style={{ padding: '48px 24px', textAlign: 'center',
+                        <td colSpan={10} style={{ padding: '48px 24px', textAlign: 'center',
                           color: 'rgba(0,0,0,0.4)', fontSize: 12, fontFamily: 'Inter, sans-serif',
                           letterSpacing: '0.02em' }}>
                           AWAITING PACKETS...
@@ -873,7 +928,8 @@ export default function NocPage() {
                     ) : filteredPackets.map((p) => {
                       const statusOk   = p.status === 'ok'
                       const authOk     = p.auth_status === 'ok' || p.auth_status === 'no_auth'
-                      const protoColor = p.protocol === 'mqtt' ? '#f59e0b' : '#0ea5e9'
+                      const protoColor = p.protocol === 'mqtt' ? '#f59e0b' : p.protocol === 'websocket' ? '#ec4899' : '#0ea5e9'
+                      const isOutbound = p.direction === 'outbound'
                       return (
                         <tr key={p.packet_id} onClick={() => setInspector(p)} style={{ cursor: 'pointer' }}>
                           <td style={{ color: 'rgba(0,0,0,0.4)', fontSize: 13 }}>
@@ -883,7 +939,21 @@ export default function NocPage() {
                             {new Date(p.timestamp).toLocaleTimeString()}
                           </td>
                           <td>
-                            <span style={{ fontSize: 12, color: protoColor, letterSpacing: '0.01em' }}>
+                            <span style={{
+                              fontSize: 10,
+                              padding: '2px 5px',
+                              borderRadius: 3,
+                              fontWeight: 700,
+                              fontFamily: 'Inter, sans-serif',
+                              background: isOutbound ? 'rgba(139,92,246,0.1)' : 'rgba(14,165,233,0.1)',
+                              color: isOutbound ? '#8b5cf6' : '#0ea5e9',
+                              border: `1px solid ${isOutbound ? 'rgba(139,92,246,0.25)' : 'rgba(14,165,233,0.25)'}`
+                            }}>
+                              {isOutbound ? '▼ OUT' : '▲ IN'}
+                            </span>
+                          </td>
+                          <td>
+                            <span style={{ fontSize: 12, color: protoColor, letterSpacing: '0.01em', fontWeight: 600 }}>
                               {p.protocol.toUpperCase()}
                             </span>
                           </td>

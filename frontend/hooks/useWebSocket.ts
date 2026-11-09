@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useCallback, useState } from 'react'
-import { WS_URL } from '@/lib/api'
+import { getWsUrl } from '@/lib/api'
 import type { WsEvent } from '@/lib/types'
 
 type Handler = (event: WsEvent) => void
@@ -19,7 +19,8 @@ export function useWebSocket(onMessage: Handler) {
     if (ws.current?.readyState === WebSocket.OPEN) return
 
     try {
-      const socket = new WebSocket(WS_URL)
+      const url = getWsUrl()
+      const socket = new WebSocket(url)
       ws.current = socket
 
       socket.onopen = () => {

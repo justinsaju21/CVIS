@@ -61,16 +61,19 @@ def _tamper_body(body_bytes: bytes) -> bytes:
     Mutate a field in the JSON body to simulate packet tampering.
     The HMAC signature in the header still covers the ORIGINAL body,
     so HMAC verification will fail → 'tamper_detected' logged.
+    Values are kept within Pydantic schema bounds so that if auth is
+    toggled off, it doesn't fail with a 422 validation error.
     """
     try:
         data = json.loads(body_bytes)
-        # Flip a numeric field to an obviously wrong value
+        # Mutate a field while staying within schema bounds
         if "battery_pct" in data:
-            data["battery_pct"] = 999.9
+            curr = float(data["battery_pct"])
+            data["battery_pct"] = round(curr - 15.0 if curr > 30.0 else curr + 15.0, 1)
         elif "speed_kmh" in data:
-            data["speed_kmh"] = -1.0
+            data["speed_kmh"] = round(float(data["speed_kmh"]) + 15.0, 1)
         elif "fault_code" in data:
-            data["fault_code"] = 0xFF
+            data["fault_code"] = 2 if data.get("fault_code") == 0 else 0
         tampered = json.dumps(data).encode("utf-8")
         logger.warning(f"[CHAOS] Payload tampered: {len(body_bytes)}B → {len(tampered)}B")
         return tampered

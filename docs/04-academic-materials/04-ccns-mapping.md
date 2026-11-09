@@ -69,6 +69,10 @@
 | AI service kill-switch | Service degradation, graceful degradation | When AI is stopped, telemetry still flows — demonstrates that the secure comms layer is independent of the AI layer (project thesis) |
 | WebSocket fan-out to all views | Event-driven architecture, publish-subscribe at app layer | One WebSocket server pushes to Driver, NOC, and Admin simultaneously — demonstrates event-driven design for real-time networked applications |
 | Cross-mode AI coherence | Knowledge-based systems, context-sensitive response | 8 different vehicle modes produce semantically different AI recommendations — not threshold if/else, but language model reasoning over structured data |
+| GPU-Accelerated Cloud AI Inference | Cloud hardware accelerators, CUDA offloading | Offloading 100% of LLM transformer layers (35/35) to NVIDIA GeForce RTX 4060 VRAM (`num_gpu: 99`) achieving 96+ tok/s — demonstrates cloud AI datacenter economics and accelerator utilization |
+| Side-by-Side Model Benchmarking | Model evaluation, multi-model cloud serving | Runtime comparative benchmark across distinct models (`llama3.2:3b`, `gemma3:4b`, `qwen3:8b`) evaluating latency, token throughput, and multi-factor advisory accuracy |
+| Bidirectional Telemetry Accounting | Full-duplex messaging, protocol handshake accounting | Complete logging and NOC filtering of inbound telemetry frames, outbound transport ACKs (HTTP 200 / MQTT PUBACK), outbound WebSocket AI broadcasts, and rejection frames |
+| Cloud Host Hardware Observability | Datacenter monitoring, resource instrumentation | Real-time telemetry streaming of cloud server resources: GPU utilization %, VRAM allocation, GPU core temp (°C) via `nvidia-smi`, and CPU/RAM/Disk via `psutil` |
 
 ---
 
@@ -80,9 +84,9 @@
 | Unit 2 — Network Models & Protocols | 6 | OSI layers, HTTP vs MQTT, WebSocket upgrade, pub-sub |
 | Unit 3 — Transport Layer | 7 | TCP reliability, retry, packet loss, latency, QoS |
 | Unit 4 — Network Security | 10 | HMAC, AES-GCM, replay, tamper detection, revocation, audit logs |
-| Unit 5 — Advanced / Cloud | 6 | Centralised AI, multi-factor reasoning, graceful degradation |
-| **Total** | **34** | **Covering all 5 CCNS units** |
+| Unit 5 — Advanced / Cloud | 10 | Centralised AI, multi-factor reasoning, GPU offload, model comparison, bidirectional logging, hardware observability |
+| **Total** | **38** | **Covering all 5 CCNS units** |
 
 ---
 
-*Last updated: Phases 1–7 complete. Live deployment confirmed at `https://cvis.justinsaju.me`.*
+*Last updated: Phases 1–7 complete + Phase 6.2 GPU AI Acceleration, Hardware Observability & Bidirectional Packet Flow fully implemented.*

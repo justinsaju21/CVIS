@@ -45,7 +45,7 @@ export interface PacketRow {
   packet_id:          number
   timestamp:          string
   direction:          string
-  protocol:           'http' | 'mqtt'
+  protocol:           'http' | 'mqtt' | 'websocket' | string
   device_id:          string
   size_bytes:         number
   status:             string
@@ -108,11 +108,26 @@ export interface AdminStats {
     protocol_breakdown: Record<string, number>
   }
   system: {
-    cpu_pct:    number
-    mem_pct:    number
-    disk_pct:   number
-    uptime_s:   number
-    db_size_kb: number
+    cpu_pct:           number
+    mem_pct:           number
+    disk_pct:          number
+    uptime_s:          number
+    db_size_kb:        number
+    gpu_pct?:          number
+    gpu_mem_pct?:      number
+    gpu_mem_used_mb?:  number
+    gpu_mem_total_mb?: number
+    gpu_temp_c?:       number
+    gpu_name?:         string
+  }
+  gpu?: {
+    available:         boolean
+    name?:             string
+    gpu_pct?:          number
+    gpu_mem_used_mb?:  number
+    gpu_mem_total_mb?: number
+    gpu_mem_pct?:      number
+    gpu_temp_c?:       number
   }
   auth: {
     active_devices:            number
@@ -122,9 +137,14 @@ export interface AdminStats {
     replay_protection_enabled: boolean
   }
   ai: {
-    running:        boolean
-    model_available:boolean
-    service_enabled:boolean
+    running:          boolean
+    model_available:  boolean
+    service_enabled:  boolean
+    model?:           string
+    available_models?: string[]
+    gpu_enforced?:    boolean
+    gpu_resident?:    boolean
+    vram_allocated_mb?: number
   }
   chaos: {
     total_requests:    number
@@ -135,10 +155,32 @@ export interface AdminStats {
 }
 
 export interface AiStatus {
-  running:         boolean
-  model_available: boolean
-  model:           string
-  available_models: string[]
+  running:           boolean
+  model_available:   boolean
+  model:             string
+  available_models:  string[]
+  gpu_enforced?:     boolean
+  gpu_resident?:     boolean
+  vram_allocated_mb?: number
+}
+
+export interface ModelBenchmark {
+  model:          string
+  active:         boolean
+  severity:       string
+  recommendation: string
+  latency_ms:     number
+  eval_count:     number
+  tokens_per_sec: number
+  gpu_offload:    boolean
+}
+
+export interface ModelComparisonResult {
+  device_id:            string
+  mode:                 string
+  gpu_device:           string
+  gpu_offload_enforced: boolean
+  benchmarks:           ModelBenchmark[]
 }
 
 export interface FleetVehicle {
@@ -169,6 +211,15 @@ export type WsEvent =
   | { event: 'vehicle_ai_status';    device_id: string; enabled: boolean }
   | { event: 'mobile_access_changed'; vehicle_id: string; enabled: boolean }
   | { event: 'global_mobile_app_changed'; enabled: boolean }
-  | { event: 'config_changed' }
+  | {
+      event: 'config_changed'
+      active_protocol?: 'http' | 'mqtt'
+      encryption_enabled?: boolean
+      auth_enabled?: boolean
+      chaos?: ChaosConfig
+      replay_protection_enabled?: boolean
+      force_mode?: string | null
+      [key: string]: any
+    }
   | { event: 'ping' }   // server keep-alive
   | { event: 'pong' }   // response to client ping

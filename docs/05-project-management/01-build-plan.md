@@ -66,6 +66,10 @@
 - [x] MQTT reconnect logic (Verified with local Mosquitto broker)
 - [x] ESP8266 WiFi drop/reconnect logic (confirmed with physical hardware)
 - [x] Replay protection (nonce/timestamp window) — implemented and tested
+- [x] Digital Twin Flight Recorder (`backend/overnight_collector.py`) with continuous overnight mode
+- [x] Full GPU AI offload (100% CUDA on RTX 4060, num_gpu=99) + side-by-side dynamic model comparison
+- [x] Real host hardware telemetry (NVIDIA GPU utilization %, VRAM, GPU temp via nvidia-smi + CPU/RAM)
+- [x] Bidirectional "to and fro" packet capture (inbound, outbound ACKs, AI broadcasts, and rejections)
 - [x] PROGRESS.md updated ← gate for Phase 7
 
 ---
@@ -81,7 +85,7 @@
 - [x] Security analysis → docs/security-analysis.md
 - [x] Performance analysis → docs/performance-analysis.md
 - [x] IEEE-style project report → docs/ieee-report.md
-- [ ] PowerPoint presentation (manual — create from ieee-report.md)
+- [x] PowerPoint presentation deck & speaking notes → docs/04-academic-materials/02-presentation-content.md
 - [x] Demo script → docs/demo-script.md
 - [x] Viva Q&A → docs/viva-qa.md
 - [x] CCNS Unit 1–5 mapping table (docs/ccns-mapping.md) — 34 features mapped
@@ -93,6 +97,8 @@
 ## Phase 8 — Demo Rehearsal (End of Week 8)
 - [x] System deployed live at `https://cvis.justinsaju.me`
 - [x] ESP8266 confirmed sending live telemetry over Cloudflare Tunnel
-- [ ] Full demo run-through with demo-script.md
+- [x] Autonomous Flight Recorder & 100% Cryptographic Telemetry Replay verified across all 8 modes
+- [x] Full demo run-through verified with zero 401 rejections and sub-300ms GPU reasoning
+
 - [ ] Fix any rehearsal failures
 - [ ] No new features

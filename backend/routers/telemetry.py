@@ -112,9 +112,10 @@ async def get_recent_telemetry(limit: int = 10, device_id: Optional[str] = None)
     if device_id:
         async with db.execute(
             """
-            SELECT t.*, p.protocol, p.size_bytes
+            SELECT t.*, p.protocol, p.size_bytes, p.encrypted,
+                   p.encryption_method, p.auth_status, p.raw_json AS raw_payload
             FROM   telemetry t
-            JOIN   packets   p ON p.id = t.packet_id
+            LEFT JOIN packets p ON p.id = t.packet_id
             WHERE  t.device_id = ?
             ORDER  BY t.id DESC
             LIMIT  ?
@@ -125,9 +126,10 @@ async def get_recent_telemetry(limit: int = 10, device_id: Optional[str] = None)
     else:
         async with db.execute(
             """
-            SELECT t.*, p.protocol, p.size_bytes
+            SELECT t.*, p.protocol, p.size_bytes, p.encrypted,
+                   p.encryption_method, p.auth_status, p.raw_json AS raw_payload
             FROM   telemetry t
-            JOIN   packets   p ON p.id = t.packet_id
+            LEFT JOIN packets p ON p.id = t.packet_id
             ORDER  BY t.id DESC
             LIMIT  ?
             """,

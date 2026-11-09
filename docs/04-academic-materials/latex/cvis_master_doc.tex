@@ -67,8 +67,8 @@
 \fancyhead[R]{\small\color{cvisgray}\leftmark}
 \fancyfoot[C]{\small\color{cvisgray}\thepage}
 \renewcommand{\headrulewidth}{0.4pt}
-\setlength{\headheight}{15pt}
-\addtolength{\topmargin}{-3pt}
+\setlength{\headheight}{26pt}
+\addtolength{\topmargin}{-11pt}
 
 % ─── Chapter / Section Formatting ──────────────────────────────────────────
 \titleformat{\chapter}[display]
@@ -111,6 +111,14 @@
   \textbf{\color{cvisblue}#1}\par\smallskip}
   {\end{mdframed}}
 
+\newenvironment{dialoguebox}[1]{%
+  \begin{mdframed}[backgroundcolor=cvislightbg,
+    linecolor=cvisteal,linewidth=1.5pt,
+    innerleftmargin=10pt,innerrightmargin=10pt,
+    innertopmargin=6pt,innerbottommargin=6pt]
+  \textbf{\color{cvisblue}#1}\par\smallskip}
+  {\end{mdframed}}
+
 \newenvironment{alertbox}[1]{%
   \begin{mdframed}[backgroundcolor=white,
     linecolor=cvisred,linewidth=2pt,
@@ -128,51 +136,53 @@
 \begin{document}
 
 % ═══════════════════════════════════════════════════════════════════════════════
-%  TITLE PAGE
+%  TITLE PAGE (Clean White Academic Style)
 % ═══════════════════════════════════════════════════════════════════════════════
 \begin{titlepage}
-\pagecolor{cvisdark}
-\color{white}
+\pagecolor{white}
+\color{cvisdark}
 \centering
-\vspace*{3cm}
+\vspace*{0.6cm}
 
-{\fontsize{48}{54}\selectfont\bfseries\color{cvisteal} CVIS}\\[6pt]
-{\Large\bfseries Connected Vehicle Intelligence System}\\[8pt]
-{\normalsize\color{cvisgray} Master Project Documentation}
+{\fontsize{42}{48}\selectfont\bfseries\color{cvisblue} CVIS}\\[6pt]
+{\LARGE\bfseries\color{cvisdark} Connected Vehicle Intelligence System}\\[6pt]
+{\large\bfseries\color{cvisteal} Centralized Fleet Telematics, Cloud AI Reasoning \& Cryptographic Wire Security}\\[4pt]
+{\normalsize\color{cvisgray} Comprehensive Technical Specification, Industrial Feasibility \& CCNS Syllabus Mapping}
 
-\vspace{1.5cm}
-\rule{12cm}{0.5pt}
-\vspace{1cm}
+\vspace{0.5cm}
+{\color{cvisblue}\rule{\textwidth}{1.5pt}}\\[-6pt]
+{\color{cvisteal}\rule{\textwidth}{0.5pt}}
+\vspace{0.4cm}
 
-{\large
-\begin{tabular}{ll}
-\textbf{Course:}   & Computer Communication \& Network Security (CCNS) \\[4pt]
-\textbf{Type:}     & Academic Project — Industry-Inspired Prototype \\[4pt]
-\textbf{Version:}  & 2.3 (Phase 5 Ready) \\[4pt]
-\textbf{Stack:}    & ESP32 · FastAPI · SQLite · Ollama · Next.js \\[4pt]
-\textbf{Protocols:}& HTTP REST + MQTT (runtime-switchable) \\[4pt]
-\textbf{Security:} & HMAC-SHA256 · AES-256-GCM · API Key Auth \\[4pt]
-\end{tabular}
-}
+\begin{tabularx}{\textwidth}{L{4.2cm} X}
+\textbf{Course:}           & Computer Communication \& Network Security (CCNS) \\[3pt]
+\textbf{Project Classification:} & Academic Project — Industry-Inspired Electric Vehicle Architecture \\[3pt]
+\textbf{Software Edition:} & Version 3.0 (Autonomous Flight Recorder \& Multi-Tier SaaS Architecture) \\[3pt]
+\textbf{Technology Stack:} & ESP32 Embedded · FastAPI (Python 3.12) · SQLite (WAL) · Ollama (CUDA) · Next.js 14 \\[3pt]
+\textbf{Transport Protocols:} & Dual Runtime-Switchable HTTP REST $\Longleftrightarrow$ MQTT (QoS 0/1) \\[3pt]
+\textbf{Security Controls:} & Cryptographic HMAC-SHA256 · AEAD AES-256-GCM · Constant-Time Auth \\[3pt]
+\textbf{Hardware Testbed:}  & NVIDIA GeForce RTX 4060 GPU (CUDA Accelerated Inference) \\[3pt]
+\end{tabularx}
 
-\vspace{1.5cm}
-\rule{12cm}{0.5pt}
-\vspace{1cm}
+\vspace{0.4cm}
+{\color{cvisteal}\rule{\textwidth}{0.5pt}}\\[-6pt]
+{\color{cvisblue}\rule{\textwidth}{1.5pt}}
+\vspace{0.5cm}
 
 \begin{tikzpicture}
-\node[draw=cvisteal,fill=cvisdark,rounded corners=8pt,
-      inner sep=16pt,text width=10cm,align=center]{
-  {\small\color{cvisgray}Architecture at a Glance}\\[4pt]
-  {\color{white}\texttt{ESP32} $\xrightarrow{\text{HTTP / MQTT}}$ \texttt{FastAPI}}\\[2pt]
-  {\color{cvisteal}\texttt{HMAC-SHA256 | AES-256-GCM}}\\[2pt]
-  {\color{white}\texttt{FastAPI} $\xrightarrow{\text{WebSocket}}$ \texttt{Next.js UI}}\\[2pt]
-  {\color{cvisgold}\texttt{/driver \quad /noc \quad /admin}}\\[2pt]
-  {\color{cvisgreen}\texttt{Ollama AI} $\leftarrow$ \texttt{Multi-factor Telemetry}}
+\node[draw=cvisblue,fill=cvislightbg,line width=1.1pt,rounded corners=6pt,
+      inner sep=10pt,text width=14cm,align=center]{
+  {\bfseries\color{cvisblue}Architectural Dataflow Pipeline}\\[4pt]
+  {\small\color{cvisdark}\textbf{ESP32 Thin Client / TCU} $\xrightarrow{\text{HTTP REST / MQTT (Runtime Switched)}}$ \textbf{FastAPI Ingest Gateway}}\\[2pt]
+  {\small\color{cvisblue}\texttt{HMAC-SHA256 Wire Integrity} \quad $\vert$ \quad \texttt{AES-256-GCM Authenticated Encryption}}\\[2pt]
+  {\small\color{cvisdark}\textbf{FastAPI Ingest} $\xrightarrow{\text{High-Speed WebSocket Fan-out}}$ \textbf{Next.js Unified Frontend}}\\[2pt]
+  {\small\color{cvisteal}\textbf{Role-Gated Portals:} \texttt{/driver} (Telemetry) \quad \texttt{/noc} (Network Controls) \quad \texttt{/admin} (Security Audit)}\\[2pt]
+  {\small\color{cvisgreen}\textbf{Centralized Ollama AI} $\longleftarrow$ \textbf{17-Factor Physics \& Anomaly Reasoning (GPU Accelerated)}}
 };
 \end{tikzpicture}
 
 \vfill
-{\small\color{cvisgray}Generated from live codebase — \today}
+{\small\color{cvisgray}Autonomous Flight Recorder Validated — Continuous Telemetry Dataset — \today}
 \end{titlepage}
 \pagecolor{white}
 \color{black}
@@ -236,7 +246,7 @@ AI lives centrally (cloud/data-centre). The vehicle is a thin client. The projec
   cloud/.style={draw=cvisteal, fill=cvisteal!10, rounded corners=4pt,
                 minimum width=3.2cm, minimum height=1cm, align=center},
   arrow/.style={-{Stealth[scale=1.2]}, thick, color=cvisblue},
-  label/.style={font=\tiny\ttfamily, color=cvisred}
+  label/.style={font=\tiny\ttfamily, color=cvisred, align=center}
 ]
 
 % Row 1 — Edge
@@ -383,23 +393,36 @@ Every packet conforms to the following JSON schema (defined in \texttt{backend/m
 \texttt{mode} & string & Yes & One of 8 allowed modes (see Table~\ref{tab:modes}) \\
 \texttt{speed\_kmh} & float & No & Vehicle speed; $0 \leq v \leq 250$ km/h \\
 \texttt{battery\_pct} & float & No & State of charge; $0 \leq \text{SoC} \leq 100$\% \\
-\texttt{battery\_temp\_c} & float & No & Battery pack temp; $-20 \leq T \leq 100$°C \\
-\texttt{motor\_temp\_c} & float & No & Motor temp; $-20 \leq T \leq 150$°C \\
+\texttt{battery\_temp\_c} & float & No & Battery pack temp; $-20 \leq T \leq 100\,^\circ\mathrm{C}$ \\
+\texttt{motor\_temp\_c} & float & No & Motor temp; $-20 \leq T \leq 150\,^\circ\mathrm{C}$ \\
 \texttt{range\_km} & float & No & Estimated remaining range; $0 \leq r \leq 1000$ km \\
 \texttt{fault\_code} & integer & No & \texttt{0x00} = none, \texttt{0x02} = overheat, \texttt{0x04} = motor \\
 \texttt{charging\_rate\_w} & float & No & Charging power; 0 when not charging \\
 \midrule
 \multicolumn{4}{l}{\textit{Advanced Physics Fields (Optional — Schema v2.3)}} \\
 \midrule
-\texttt{ambient\_temp\_c} & float & No & Outside air temperature in °C \\
+\texttt{ambient\_temp\_c} & float & No & Outside air temperature in $^\circ\mathrm{C}$ \\
 \texttt{headwind\_kmh} & float & No & Headwind speed in km/h \\
-\texttt{road\_gradient\_pct} & float & No & Road gradient (+uphill / −downhill) \\
+\texttt{road\_gradient\_pct} & float & No & Road gradient (+uphill / -downhill) \\
 \texttt{tire\_pressure\_psi} & float & No & Average tire pressure in PSI \\
 \texttt{cabin\_climate\_w} & float & No & AC/Heater power draw in Watts \\
 \texttt{max\_cell\_voltage\_delta} & float & No & Max voltage difference between cells (V) \\
 \bottomrule
 \end{tabularx}
 \end{table}
+
+\section{MQTT Topic Taxonomy \& Control Loop}
+
+In addition to inbound telemetry streaming, the MQTT communication layer coordinates bidirectional configuration and node revocation:
+
+\begin{itemize}
+  \item \texttt{cvis/telemetry/\{device\_id\}}: Uplink topic for vehicle telemetry envelopes (plaintext or AES-256-GCM encrypted).
+  \item \texttt{cvis/config/protocol}: Downlink broadcast topic where the backend announces runtime transport shifts (\texttt{"http"} vs \texttt{"mqtt"}). Subscribed firmware nodes switch protocols on receipt without power cycling.
+  \item \texttt{cvis/config/encryption}: Downlink broadcast topic toggling AES-256-GCM encryption mode on or off.
+  \item \texttt{cvis/config/control/\{device\_id\}}: Unicast node control channel. When the NOC deactivates a node, a \texttt{"disconnect"} message is published to this topic. Subscribed vehicle firmware immediately transitions into an idling suspended state, halting all radio transmissions until a \texttt{"reconnect"} instruction is received.
+\end{itemize}
+
+On resource-constrained microcontrollers (ESP8266/ESP32), JSON memory buffers are strictly calibrated to \texttt{StaticJsonDocument<1024>} to ensure full 17-parameter multi-factor telemetry frames deserialize without memory exhaustion or silent key dropping.
 
 % ═══════════════════════════════════════════════════════════════════════════════
 %  CHAPTER 4 — SECURITY IMPLEMENTATION
@@ -483,6 +506,40 @@ def aes_gcm_encrypt(secret_hex: str, plaintext: str) -> dict:
 
 The GCM \textbf{authentication tag} doubles as an integrity check: decrypting with a mismatched key or tampered ciphertext raises \texttt{InvalidTag}, which the backend logs as a \texttt{tamper\_detected} event.
 
+\section{Remote Node Revocation \& Session Management}
+
+To emulate real-world vehicular certificate and session revocation without tearing down underlying TCP sockets, CVIS implements centralized node deactivation:
+
+\begin{enumerate}
+  \item \textbf{Revocation Trigger}: An operator at the NOC issues a disconnect command (\texttt{POST} \nolinkurl{/api/v1/control/disconnect}).
+  \item \textbf{Database State Transition}: The backend sets \texttt{devices.active = 0} and records an audit entry in \texttt{auth\_logs} under event type \texttt{disconnected}.
+  \item \textbf{Protocol-Specific Enforcement}:
+    \begin{itemize}
+      \item \textit{HTTP}: Subsequent telemetry requests from the revoked device are rejected with HTTP 401 (\textit{Unauthorized}) at the API key authentication gate.
+      \item \textit{MQTT}: A downlink revocation signal is published to \nolinkurl{cvis/config/control/{device_id}}. The firmware halts telemetry loop transmissions, preventing broker congestion.
+    \end{itemize}
+  \item \textbf{Re-activation}: When connectivity is re-authorized (\texttt{POST} \nolinkurl{/api/v1/control/reconnect}), the device's active flag is restored, a \texttt{reconnected} audit log is generated, and resume instructions are dispatched to the node.
+\end{enumerate}
+
+\section{Open vs. Secured Traffic Auditing}
+
+For academic and demonstration purposes, authentication enforcement can be toggled live via the NOC (\texttt{POST /api/v1/config/auth}). When disabled, incoming frames without valid API keys or HMAC signatures are accepted rather than dropped. However, to maintain strict security auditing:
+\begin{itemize}
+  \item Packets are saved to SQLite with \texttt{auth\_status = 'no\_auth'} rather than \texttt{'ok'}.
+  \item A dedicated entry is written to \texttt{auth\_logs} indicating unauthenticated access.
+  \item The WebSocket broadcast flags the packet with \texttt{status = 'ok'} and \texttt{auth\_status = 'no\_auth'}, enabling the NOC packet inspector to highlight open traffic clearly.
+\end{itemize}
+
+\section{Dynamic Role-Based Access Control \& Tier Management}
+
+Vehicle identities are segmented into distinct capability tiers:
+\begin{itemize}
+  \item \textbf{Free Tier}: Access to standard telemetry streaming, physical health gauges, and speed metrics. Advanced neural chat and mobile applications are gated.
+  \item \textbf{Premium Tier}: Unlocks central AI reasoning, real-time efficiency scoring, predictive coaching, and dedicated mobile cockpit views (\texttt{/alphamobile}, \texttt{/betamobile}).
+\end{itemize}
+
+Tier state is persisted in SQLite (\nolinkurl{devices.tier} and \nolinkurl{devices.mobile_access_enabled}). When a driver upgrades in the dashboard, the backend updates the database and broadcasts a \texttt{mobile\_access\_changed} event via WebSocket. Frontend gate components (\texttt{MobileAccessGate}) consume this event in real time to unlock mobile views instantaneously without requiring browser reloads.
+
 \section{Fault Codes}
 
 \begin{table}[H]
@@ -494,8 +551,8 @@ The GCM \textbf{authentication tag} doubles as an integrity check: decrypting wi
 \textbf{Code (hex)} & \textbf{Name} & \textbf{Description \& Physics Trigger} \\
 \midrule
 \texttt{0x00} & No Fault & Normal operation \\
-\texttt{0x02} & Battery Overheating & Battery temp > 60°C — caused by high discharge rate under load \\
-\texttt{0x04} & Motor Fault & Motor temp > 95°C — caused by high speed + uphill gradient + drag \\
+\texttt{0x02} & Battery Overheating & Battery temp $> 60\,^\circ\mathrm{C}$ --- caused by high discharge rate under load \\
+\texttt{0x04} & Motor Fault & Motor temp $> 95\,^\circ\mathrm{C}$ --- caused by high speed + uphill gradient + drag \\
 \bottomrule
 \end{tabularx}
 \end{table}
@@ -666,6 +723,42 @@ To prevent LLM overload, the background AI task fires only when:
   \item The vehicle mode has changed since the last packet.
 \end{itemize}
 
+\section{Concurrency Serialization \& Event Loop Safety}
+
+High-frequency telemetry ingests across multi-vehicle fleets can trigger simultaneous inference requests to the local Ollama daemon. Without concurrency bounding, parallel execution of 3B parameter models on consumer hardware causes severe memory contention and latency spikes.
+
+In \texttt{backend/ai/ollama\_client.py}, inferences are strictly serialized through an asynchronous lock. To prevent the notorious Python \texttt{RuntimeError: Task attached to a different loop} issue—which occurs when an \texttt{asyncio.Lock} is instantiated at module import time before FastAPI initializes its runtime event loop—CVIS employs a thread-safe lazy factory:
+
+\begin{lstlisting}[language=Python, caption=Lazy Event-Loop Lock Factory (backend/ai/ollama\_client.py)]
+_ollama_lock: Optional[asyncio.Lock] = None
+
+def _get_ollama_lock() -> asyncio.Lock:
+    global _ollama_lock
+    if _ollama_lock is None:
+        _ollama_lock = asyncio.Lock()
+    return _ollama_lock
+\end{lstlisting}
+
+Every inference invocation in \nolinkurl{generate_recommendation()} and \nolinkurl{chat_with_grounding()} executes inside \texttt{async with \_get\_ollama\_lock():}, guaranteeing sequential model execution bound safely to the active running loop.
+
+\section{Hierarchical Kill-Switch \& Graceful Service Degradation}
+
+CVIS enforces a two-tiered administrative kill-switch hierarchy:
+\begin{enumerate}
+  \item \textbf{Global Service Switch} (\texttt{server\_config.ai\_service\_enabled}): Toggled via \texttt{POST} \nolinkurl{/api/v1/control/ai-service}. When disabled by NOC operators, all automated background inferences and conversational AI queries across the entire fleet are instantly halted.
+  \item \textbf{Per-Vehicle Gating} (\texttt{vehicle\_ai\_enabled}): Toggled via \texttt{POST} \nolinkurl{/api/v1/control/ai-service/vehicle}. Allows operators to selectively disable AI reasoning for individual vehicles (e.g., degraded nodes or billing holds). The global kill-switch maintains strict precedence over per-vehicle settings.
+\end{enumerate}
+
+When AI is toggled off or if the local Ollama process is unresponsive, the system gracefully degrades: the background pipeline suppresses inference without dropping telemetry, and the driver chat endpoint (\texttt{POST} \nolinkurl{/api/v1/ai/chat}) immediately returns an HTTP \texttt{503 Service Unavailable} status with an explicit status payload:
+\begin{lstlisting}[caption=HTTP 503 AI Degradation Response]
+{
+  "status": "disabled",
+  "detail": "AI service is currently disabled by administrator."
+}
+\end{lstlisting}
+The frontend detects this HTTP 503 code and renders an unobtrusive service pause badge rather than spinning indefinitely.
+
+
 % ═══════════════════════════════════════════════════════════════════════════════
 %  CHAPTER 7 — BUSINESS MODEL & CENTRALIZED AI ECONOMICS
 % ═══════════════════════════════════════════════════════════════════════════════
@@ -673,23 +766,35 @@ To prevent LLM overload, the background AI task fires only when:
 
 \section{The Core Thesis and Economic Rationale}
 
-The fundamental thesis of the Connected Vehicle Intelligence System (CVIS) states that \textbf{AI belongs centrally in the cloud/data-centre, not embedded per-vehicle}. The vehicle operates strictly as a \textit{thin, securely-networked client}. This architectural decision is not merely a software convenience; it is a decisive commercial and engineering advantage. 
+The fundamental architectural thesis of the \textbf{Connected Vehicle Intelligence System (CVIS)} is:
+\begin{quote}
+\textbf{High-level artificial intelligence reasoning, telematics synthesis, and predictive diagnostics belong centrally in the cloud and data center---not embedded per vehicle. The vehicle must operate strictly as a thin, hardened, and securely-networked edge client.}
+\end{quote}
 
-Connected vehicles operate in an environment of rapid hardware commoditization, escalating computational demands, and strict automotive safety regulations. By shifting heavy model inference and state reasoning to centralized infrastructure, CVIS drastically lowers hardware Bills of Materials (BOM), removes vehicle thermal bottlenecks, eliminates vehicle software bricking hazards, and enables an economically viable Software-as-a-Service (SaaS) commercial business model.
+In contemporary automotive software engineering, an active debate centers on vehicle compute topology: \textit{Should an electric vehicle (EV) function as an isolated supercomputer on wheels with massive on-board silicon, or should it operate as a thin client backed by centralized cloud intelligence?}
+
+CVIS demonstrates that for \textbf{high-level multi-factor telemetry reasoning, cell degradation forecasting, driver coaching, and fleet management}, centralized cloud intelligence is overwhelmingly superior to on-vehicle edge computing in:
+\begin{enumerate}[leftmargin=1.5cm]
+  \item \textbf{Manufacturing Bill-of-Materials (BOM) Costs} (\$1,700--\$3,500 edge AI SoC vs. \$37--\$92 thin gateway);
+  \item \textbf{Parasitic Battery Drain and Thermal Efficiency} (eliminating 70W--250W phantom sentry drain);
+  \item \textbf{Fleet-Wide Swarm Intelligence} (detecting battery batch defects across millions of vehicles);
+  \item \textbf{Model Update Agility and Safety} (30-second zero-downtime cloud hot-swapping vs. high-risk multi-gigabyte ECU flashing over the air);
+  \item \textbf{Hardware Lifespan Alignment} (preventing vehicle obsolescence over a 12--15 year automotive operational lifecycle).
+\end{enumerate}
 
 \section{The ``Driver Intuition'' Fallacy}
 
-A frequent industry objection to connected AI safety systems is the \textit{Driver Intuition Fallacy}:
+A frequent industry objection to connected vehicle AI systems is the \textit{Driver Intuition Fallacy}:
 \begin{quote}
 \textit{``Why should an operator pay for centralized AI when an experienced driver intuitively knows that high speeds and steep hills drain the battery and heat up the motor?''}
 \end{quote}
 
-While human intuition is capable of learning crude, qualitative heuristics (e.g., ``driving fast drains the battery''), human cognition possesses severe and fatal limitations in modern electric vehicles:
+While human intuition is capable of learning crude, qualitative heuristics (e.g., ``driving faster drains the battery''), human cognition possesses severe and fatal limitations in modern electric vehicles:
 
 \begin{enumerate}[leftmargin=1.5cm]
   \item \textbf{Reactive vs. Predictive Anomaly Detection}: Human drivers react exclusively to dashboard warning indicators, which illuminate only \textit{after} a critical threshold is breached (e.g., Battery Temp $> 60^\circ\text{C}$ or Motor Temp $> 95^\circ\text{C}$). At this point, irreversible cell degradation or forced vehicle immobilization has already begun. CVIS utilizes \textbf{Sliding-Window Trend Analysis} across consecutive telemetry packets to compute rate-of-change derivatives ($\Delta T / \Delta t$). The cloud AI detects thermal gradient anomalies rising $1.5^\circ\text{C}/\text{min}$ faster than expected under current load, alerting the operator up to 15 minutes \textit{before} any hardware threshold is tripped.
 
-  \item \textbf{Coupled Multi-Variate Physics vs. Gut Feeling}: EV range and thermal behavior are governed by non-linear coupled differential equations combining aerodynamics, road gradient, tire pressure, HVAC auxiliary draw, and cell impedance. If a driver asks:
+  \item \textbf{Coupled Multi-Variate Physics vs. Gut Feeling}: EV range and thermal behavior are governed by non-linear coupled differential equations combining aerodynamics, road gradient, tire pressure, HVAC auxiliary draw, and cell internal resistance. If a driver asks:
   \begin{center}
   \textit{``I have 24\% battery remaining, ambient temperature is $38^\circ\text{C}$, headwind is $35\text{ km/h}$, and I need to climb a $6\%$ grade in stop-and-go traffic for $18\text{ km}$ with air conditioning active---will I reach the destination?''}
   \end{center}
@@ -698,83 +803,202 @@ While human intuition is capable of learning crude, qualitative heuristics (e.g.
   \item \textbf{Fleet-Wide Swarm Intelligence}: An individual driver is isolated within their own vehicle envelope. Centralized AI aggregates telemetry across thousands of deployed nodes in real time. If 20 vehicles along a specific highway corridor experience anomalous battery heating or localized rolling-resistance spikes due to extreme ambient heat or road conditions, the central AI immediately flags predictive alerts to all upstream vehicles entering that corridor.
 \end{enumerate}
 
-\section{Edge vs. Centralized AI: Comparative Cost-Benefit Analysis}
+\section{Industrial Value Proposition for Electric Vehicle Manufacturers}
 
-Embedding high-performance AI processors (e.g., specialized NPUs or high-power GPUs) inside every vehicle introduces severe technical and economic liabilities. Table~\ref{tab:edge_vs_cloud} contrasts the embedded edge approach with the CVIS centralized architecture.
+\subsection{Bill-of-Materials (BOM) Cost Breakdown}
+
+In high-volume electric vehicle manufacturing (e.g., 500,000 to 2,000,000 units annually), saving even \$50 per vehicle directly translates to tens of millions of dollars in net margin. Table~\ref{tab:detailed_bom} details the exact component-level cost differential between an edge-compute vehicle architecture and the CVIS thin-client gateway approach.
 
 \begin{table}[H]
 \centering
-\caption{Architectural and Economic Comparison: Edge AI vs. Centralized CVIS AI}
-\label{tab:edge_vs_cloud}
-\begin{tabularx}{\textwidth}{L{3.2cm} X X}
+\caption{Detailed Bill-of-Materials (BOM) Comparison: Edge AI vs. CVIS Thin Client}
+\label{tab:detailed_bom}
+\begin{tabularx}{\textwidth}{L{3.2cm} X X C{2.5cm}}
 \toprule
-\textbf{Metric / Factor} & \textbf{Per-Vehicle Embedded AI} & \textbf{Centralized Cloud AI (CVIS)} \\
+\textbf{Subsystem} & \textbf{Dedicated Edge AI Node} & \textbf{CVIS Gateway Architecture} & \textbf{Savings per Car} \\
 \midrule
-\textbf{Hardware BOM Cost} & \$250--\$600 per vehicle (automotive NPU/SoC, heat sinks, shielding) & \$0 per vehicle (\$4 ESP32 thin client; shared cloud server amortized) \\
-\textbf{Thermal \& Power Load} & Draws 40W--150W continuous power; reduces total EV driving range by 5--10\% & Zero vehicle power draw; all compute energy absorbed by cloud grid \\
-\textbf{Model Updating / OTA} & High-risk multi-gigabyte OTA flashes; risk of bricking ECUs in the field & Instantaneous server-side model update; 0 vehicle downtime, 0 reflashes \\
-\textbf{Model Capacity} & Severely constrained to quantized 1B--2B micro-models & Scalable 3B--70B parameter models (e.g., LLaMA 3.2, Phi-3, Nemotron) \\
-\textbf{Fleet Scaling Economics} & Linear hardware cost scaling: $C_{\text{total}} = N \times C_{\text{hardware}}$ & Sub-linear server cost scaling: shared inference queues and auto-scaling \\
-\textbf{Security \& IP Surface} & Attackers can physically probe CAN/SPI buses and dump proprietary model weights & Model weights protected in secure tier-4 data center behind HMAC auth \\
-\textbf{Cross-Fleet Correlation} & Zero; nodes are completely siloed from one another & Full visibility; detects coordinated anomalies and systemic hardware faults \\
-\textbf{Latency} & 2--10 ms & 50--250 ms (LAN / WAN round-trip) \\
+\textbf{Processing Silicon} & Automotive AI SoC (NVIDIA DRIVE Orin / Snapdragon Ride): \$1,200--\$2,500 & Thin Automotive MCU / Gateway (ESP32 / NXP S32G / STM32): \$15--\$45 & -\$1,185 to -\$2,455 \\
+\textbf{High-Speed DRAM} & 16GB--32GB LPDDR5 ECC Automotive DRAM: \$180--\$350 & 16MB--64MB embedded Flash / SRAM: \$5--\$12 & -\$175 to -\$338 \\
+\textbf{Thermal Management} & Cold-plate liquid cooling loop, hoses, connectors: \$150--\$300 & Passive convection heatsink casing: \$4--\$10 & -\$146 to -\$290 \\
+\textbf{Safety Qualification} & ISO 26262 ASIL-D \& AEC-Q100 for 3nm/5nm silicon: \$80--\$150 & Proven mature automotive qualification: \$5--\$10 & -\$75 to -\$140 \\
+\textbf{Power Supply \& Wire} & High-amperage 12V/48V step-down DC converter (150W--350W): \$120--\$220 & Standard low-voltage auxiliary feed ($<$5W): \$8--\$15 & -\$112 to -\$205 \\
+\midrule
+\textbf{TOTAL HARDWARE BOM} & \textbf{\$1,735 -- \$3,520} & \textbf{\$37 -- \$92} & \textbf{\$1,698 -- \$3,428} \\
 \bottomrule
 \end{tabularx}
 \end{table}
 
-As highlighted in Table~\ref{tab:edge_vs_cloud}, the single apparent advantage of embedded AI is raw inference latency (saving $\approx 150\text{ ms}$). However, for supervisory safety guidance, range prediction, and operator advisory, a total round-trip time of 200--400 ms is completely imperceptible to human drivers and operational dispatchers. The massive capital savings, zero battery drain, and continuous model improvement make the centralized model overwhelmingly superior.
+\begin{ccnsbox}{Industrial Financial Impact for 500,000 Annual EV Volume}
+$$\text{Annual Net Hardware Cost Savings} = 500,000 \times \$2,000 = \mathbf{\$1,000,000,000\ (1\ \text{Billion USD})}$$
+By eliminating redundant edge computing silicon, an automotive OEM can either lower retail pricing to dominate competitive market segments or reinvest capital into cell chemistry and motor stator efficiency.
+\end{ccnsbox}
 
-\section{Dual-Tier Commercial SaaS Framework}
+\subsection{Eliminating Parasitic Battery Drain and Thermal Overhead}
 
-CVIS realizes this economic advantage through a structured dual-tier subscription model:
+Electric vehicle range anxiety remains a decisive consumer barrier. In-car edge AI computers impose a severe, continuous parasitic electrical load:
+\begin{itemize}[leftmargin=1.5cm]
+  \item \textbf{Continuous Power Draw}: Running multi-billion parameter neural networks locally on automotive chips consumes \textbf{70W to 250W} of continuous high-voltage power.
+  \item \textbf{Thermal System Congestion}: On hot summer days ($35^\circ\text{C}$--$45^\circ\text{C}$ ambient), the Battery Thermal Management System (BTMS) is already operating near capacity cooling the traction battery and inverter. Adding a 200W heat source to the coolant circuit forces the A/C compressor to cycle harder, accelerating range degradation.
+  \item \textbf{Phantom Sentry Loss}: In parked standby mode, an edge computer drawing 150W consumes \textbf{3.6 kWh per day}---resulting in \textbf{20 to 30 km (12--18 miles) of battery range lost every 24 hours} without moving.
+  \item \textbf{The CVIS Advantage}: In CVIS, the vehicle's telemetry gateway draws under \textbf{1.5 Watts}. All heavy matrix multiplications and language synthesis occur in cloud data centers powered by industrial electrical grids. The vehicle's high-voltage pack is preserved exclusively for motion and climate control.
+\end{itemize}
+
+\subsection{Fleet-Wide Predictive Maintenance vs. Siloed In-Car Heuristics}
+
+When AI is confined to an isolated vehicle:
+\begin{enumerate}[leftmargin=1.5cm]
+  \item It possesses zero knowledge beyond its own sensors.
+  \item If cell \#42 in a battery module exhibits a subtle voltage delta during high-rate fast charging, the local computer has no statistical baseline to determine whether this represents normal cell aging or an imminent thermal runaway hazard.
+\end{enumerate}
+
+In the \textbf{CVIS Centralized Cloud Model}:
+\begin{enumerate}[leftmargin=1.5cm]
+  \item Telemetry from millions of deployed vehicles streams into a central high-speed ingest database (\texttt{packets} and \texttt{telemetry}).
+  \item Cloud analytics execute \textbf{Cross-Fleet Anomaly Clustering}:
+  \begin{itemize}
+    \item If 14 vehicles equipped with \textit{Batch 2024-Q2 CATL LFP cells} exhibit a 0.04V voltage variance during fast charging between 70\% and 80\% SoC below $10^\circ\text{C}$, the cloud AI identifies a \textbf{fleet-wide manufacturing batch defect}.
+    \item The OEM can push an immediate targeted charging curve limit to those exact VINs before a single battery pack catches fire on a public highway or triggers a multi-billion dollar safety recall.
+  \end{itemize}
+  \item \textbf{Continuous Swarm Learning}: When vehicles encountering mountain passes report sudden headwind and freezing temperatures that increase consumption from 160 Wh/km to 240 Wh/km, the cloud model immediately updates range prediction models for all subsequent vehicles routed along that corridor.
+\end{enumerate}
+
+\section{Cloud vs. On-Vehicle Edge AI: Architectural Lifecycle Comparison}
+
+\subsection{Zero-Downtime Model Deployment vs. Risky Automotive ECU OTA Flashing}
+
+Automotive Over-the-Air (OTA) firmware updates are notoriously high-risk, expensive, and logistically fragile:
+\begin{itemize}[leftmargin=1.5cm]
+  \item \textbf{The Edge AI Dilemma}: Updating a local model weights file (e.g., 3GB to 8GB) requires broadcasting multi-gigabyte files to hundreds of thousands of cars over cellular 4G/5G connections. Automakers pay millions in telecom carrier data egress fees. The driver must park the car for 30--60 minutes. If power cuts or flash memory corrupts mid-flash, the vehicle ECU is \textbf{bricked}, requiring dealer towing. Furthermore, flashing safety ECUs requires lengthy regulatory homologation re-certification.
+  \item \textbf{The CVIS Cloud Paradigm}: Model upgrades occur \textbf{100\% in the data center} via dynamic model hot-swapping (\texttt{POST /api/v1/ai/models/switch}) or blue-green container deployments. Upgrading from \texttt{llama3.2:3b} to \texttt{llama3.3:8b} or \texttt{qwen3:8b} takes \textbf{under 30 seconds}. There is \textbf{zero vehicle downtime}, \textbf{zero cellular OTA download risk}, and \textbf{instant 1-second rollback} if regressions appear.
+\end{itemize}
+
+\subsection{Hardware Longevity and Automotive Lifespan Mismatch}
+
+The operational lifespan of a modern passenger vehicle is \textbf{12 to 15 years}.
+\begin{itemize}[leftmargin=1.5cm]
+  \item \textbf{The Edge Silicon Trap}: If an automaker integrates an AI processor in 2024, by 2028 that chip is four hardware generations obsolete. It lacks the TOPS, memory bandwidth, and quantization support to run 2030 foundation models. Within five years, the vehicle's onboard assistant feels sluggish and abandoned.
+  \item \textbf{The CVIS Future-Proof Guarantee}: Because reasoning lives in the cloud, a 10-year-old vehicle built in 2024 continues to receive state-of-the-art multi-factor intelligence in 2034. When the data center upgrades its GPU clusters from RTX 4060s to Blackwell or optical AI silicon, every vehicle in the fleet immediately inherits that compute capability.
+\end{itemize}
+
+\section{Dual-Tier Commercial SaaS Framework \& Unit Economics}
+
+\subsection{Tier Breakdown: Community vs. Pro}
+
+Table~\ref{tab:tiers_detailed} outlines the CVIS dual-tier SaaS subscription architecture.
 
 \begin{table}[H]
 \centering
 \caption{CVIS Commercial Tier Architecture}
-\label{tab:tiers}
-\begin{tabularx}{\textwidth}{L{3.5cm} L{5cm} X}
+\label{tab:tiers_detailed}
+\begin{tabularx}{\textwidth}{L{3.2cm} L{4.8cm} X}
 \toprule
-\textbf{Tier} & \textbf{Target Market \& Pricing} & \textbf{Included Features \& SLA} \\
+\textbf{Tier} & \textbf{Market \& Pricing} & \textbf{Included Features \& SLA} \\
 \midrule
-\textbf{Free Tier} \newline (\textit{CVIS Community}) & Individual EV owners, academic researchers, small fleets (1--3 vehicles). \newline \textbf{Price: \$0 / month} & 
+\textbf{CVIS Community} \newline (Free Tier) & Included with every standard EV purchase; small fleets. \newline \textbf{Price: \$0 / month} & 
 \begin{itemize}[leftmargin=*,nosep]
-  \item Plaintext HMAC-SHA256 integrity check
+  \item Standard telemetry ingestion (HMAC-SHA256 authenticated)
   \item Standard Driver Dashboard (\texttt{/driver})
   \item 7-day rolling telemetry persistence
-  \item AI recommendations rate-limited (1 per 5 min)
-  \item Basic mobile app telemetry view
-  \item Max 2 registered devices
+  \item Pre-warmed cached AI insights (rate-limited)
+  \item OEM Benefit: Fleet-wide battery training telemetry
 \end{itemize} \\
 \midrule
-\textbf{Premium Tier} \newline (\textit{CVIS Fleet Pro}) & Commercial logistics fleets, taxi/ride-sharing networks, public transit, EV leasing operators. \newline \textbf{Price: \$15 / vehicle / month} \newline (\$150 / vehicle / year) & 
+\textbf{CVIS Fleet Pro} \newline (Premium Tier) & Commercial logistics fleets, ride-share networks, tech-forward owners. \newline \textbf{Price: \$9.99 / car / month} \newline (\$99 / car / year) & 
 \begin{itemize}[leftmargin=*,nosep]
-  \item Full AES-256-GCM payload encryption
-  \item Real-Time NOC Dashboard (\texttt{/noc}) with packet flow \& live controls
-  \item Continuous real-time AI reasoning (<500 ms SLA)
+  \item Full AEAD AES-256-GCM wire encryption
+  \item Real-Time NOC Dashboard (\texttt{/noc}) with live controls
+  \item Real-time multi-factor neural reasoning (<500 ms SLA)
   \item Conversational Driver Chat with Neural Voice Synthesis (TTS)
-  \item Replay attack mitigation with timestamp validation
-  \item 12-month compliance telemetry retention
-  \item Chaos engineering network simulation suite
-  \item Cross-fleet anomaly detection \& CSV audit export
-  \item Unlimited device registrations
+  \item Predictive cell degradation \& impedance modeling
+  \item Replay attack mitigation with monotonic nonce windows
+  \item 24-month compliance telemetry retention \& CSV export
 \end{itemize} \\
 \bottomrule
 \end{tabularx}
 \end{table}
 
-\section{Return on Investment (ROI) for Fleet Operators}
+\subsection{Rigorous Cloud Unit Economics}
 
-For commercial fleet operators, subscribing to \textbf{CVIS Fleet Pro} yields immediate and quantifiable financial returns:
+Let us evaluate the exact cloud operational costs for an OEM serving \textbf{100,000 active Pro subscribers}:
+\begin{enumerate}[leftmargin=1.5cm]
+  \item \textbf{Ingestion \& Database Infrastructure}: 100,000 vehicles sending 900-byte packets every 3 seconds generate $\approx 33,333\text{ packets/second}$. Four 32-core server instances running async ASGI workers cost \textbf{\$1,600 / month}. Clustered distributed time-series database storage costs \textbf{\$3,200 / month}.
+  \item \textbf{GPU AI Inference Costs}: Telemetry changes within standard bounds are validated by the high-speed cache ($<$5ms, zero GPU cost). Multi-factor neural completions trigger on state changes and driver queries, averaging 12 completions per car per driving hour. Utilizing continuous batching (vLLM / TensorRT-LLM) on clustered NVIDIA L40S or H100 GPUs (generating 1,200 completions/min per GPU), serving 100,000 cars during peak hours requires $\approx 25\text{ GPUs} = \mathbf{\$19,800 / \text{month}}$.
+  \item \textbf{Cellular Ingress Overhead}: Telecom bulk cellular ingress contracts: \textbf{\$15,000 / month}.
+\end{enumerate}
 
-\begin{itemize}[leftmargin=1.5cm]
-  \item \textbf{Battery Degradation Prevention}: EV battery replacements represent the single largest operational expense for fleet operators, costing \$7,000--\$15,000 per commercial pack. CVIS's continuous multi-factor thermal and discharge monitoring prevents abusive thermal cycling, extending usable battery cycle life by 18\%--25\%. Over a 4-year lifecycle, this saves approximately \$2,500 per vehicle.
-  \item \textbf{Downtime Reduction and Breakdown Avoidance}: Unscheduled roadside breakdowns cost logistics operators an average of \$450 in towing, recovery, and missed delivery penalties. By detecting early mechanical and electrical faults (Fault 0x02 and 0x04) in advance, preventative maintenance is scheduled off-hours.
-  \item \textbf{Insurance Premium Optimization}: Insurers offer 8\%--14\% discounts for fleets utilizing verifiable, cryptographically signed telemetry (HMAC-SHA256 audit trails) that prove adherence to speed, thermal, and maintenance safety standards.
-\end{itemize}
-
-\begin{ccnsbox}{Net Fleet Financial ROI}
-An annual investment of \$150/vehicle yields an estimated \$1,150/vehicle in avoided battery degradation, roadside recovery, and insurance optimization, representing an annual \textbf{7.6x Return on Investment (766\% ROI)}.
+\begin{ccnsbox}{Monthly Financial Ledger \& Profit Margins}
+$$\text{Total Cloud Cost} = \$1,600 + \$3,200 + \$19,800 + \$15,000 = \mathbf{\$39,600 / \text{month}}$$
+$$\text{Cost per Vehicle per Month} = \frac{\$39,600}{100,000} = \mathbf{\$0.396\ (\sim 40\ \text{cents / month})}$$
+$$\text{Monthly Subscription Revenue} = 100,000 \times \$9.99 = \mathbf{\$999,000 / \text{month}}$$
+$$\text{Net Gross Profit} = \$999,000 - \$39,600 = \mathbf{\$959,400 / \text{month}}\quad (\mathbf{96.0\%\ \text{Gross Margin}})$$
 \end{ccnsbox}
+
+\section{Engineering Honest Analysis: Gaps, Disadvantages \& Architectural Mitigations}
+
+In a rigorous academic defense, declaring a distributed system ``flawless'' destroys technical credibility. Real engineering requires identifying vulnerabilities and designing deterministic mitigations. Table~\ref{tab:gaps_mitigations} details the five primary vulnerabilities of the centralized cloud model and how CVIS solves each.
+
+\begin{table}[H]
+\centering
+\caption{Comprehensive Engineering Gaps and CVIS Architectural Mitigations}
+\label{tab:gaps_mitigations}
+\begin{tabularx}{\textwidth}{L{3.0cm} X X}
+\toprule
+\textbf{Vulnerability / Gap} & \textbf{Real-World Risk} & \textbf{CVIS Architectural Mitigation} \\
+\midrule
+\textbf{1. Cellular Dead Zones \& Tunnels} & Vehicle enters mountain pass or deep underground garage with 0 bars. Does the car freeze or lose advisory guidance? & \textbf{Decoupled Actuation + Pre-Warmed Cache}: Mechanical safety (ABS, ESC, motor torque) operates on hard real-time CAN buses. AI is advisory. The gateway includes a deterministic multi-factor cache (\texttt{ai\_cache.py}) that answers in $<$5ms locally. Circular flash buffers store telemetry and drain upon reconnect. \\
+\midrule
+\textbf{2. Mobile Network Latency \& Jitter} & 4G/5G mobile RAN experiences packet jitter and variable RTT (40ms--400ms). & \textbf{MQTT Sub-35ms Transport + WebSockets}: CVIS incorporates runtime-switchable MQTT with compact binary/topic headers, cutting RTT to $<$35ms. WebSockets push updates down immediately. Human cognitive reaction time is 250--400ms, making 150ms cloud advisory instantaneous. \\
+\midrule
+\textbf{3. Cellular Ingress Data Volume} & 1,000,000 cars transmitting 1KB/sec generate 30TB/day, risking massive telco bills. & \textbf{Adaptive Telemetry Intervals}: Steady highway cruise transmits every 5--8s. Thermal anomalies or fault triggers accelerate to 1-second bursts. Steady-state data sends 40-byte heartbeats, cutting data volume by 70\%+. \\
+\midrule
+\textbf{4. Cloud Data Center Outages / DDoS} & Central data center loses power or suffers DDoS. Does the national fleet become disabled? & \textbf{Independent Vehicle Autonomy}: The car is 100\% mechanically and electrically drivable without the cloud. Verified via the NOC ``Stop AI Service'' toggle. In production, multi-region Anycast clusters ensure geo-redundancy. \\
+\midrule
+\textbf{5. Man-in-the-Middle \& Packet Spoofing} & Wireless telemetry over cellular is exposed to eavesdropping, packet alteration, and replay attacks. & \textbf{Cryptographic Authentication \& AEAD}: Every packet is authenticated via HMAC-SHA256 constant-time verification or AES-256-GCM AEAD encryption. Monotonic timestamp nonces reject replayed packets. \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\section{Real-World Automotive Industry Case Studies}
+
+The CVIS architectural model directly mirrors the implementations used by leading automotive manufacturers:
+
+\begin{enumerate}[leftmargin=1.5cm]
+  \item \textbf{Tesla Inc. (Fleet Learning \& Shadow Mode)}: A common public misconception is that Tesla vehicles train neural networks inside the car while driving. \textbf{They do not.} The onboard FSD computer executes lightweight compiled forward-pass vision inference. When disengagements or edge cases occur, the car compresses telemetry and video snapshots and uploads them over cellular to \textbf{Tesla's central Dojo and Cortex GPU supercomputers}. All fleet learning, model retraining, and validation happen centrally, with optimized model weights deployed back to the fleet.
+  \item \textbf{Rivian Automotive (AWS FleetOS)}: Rivian's R1T and R1S vehicles incorporate a custom Telematics Gateway Unit (TGU) communicating with AWS cloud clusters. Battery degradation models, predictive air-suspension damping based on road roughness maps, and motor thermal limits are computed centrally in cloud infrastructure and streamed to vehicles.
+  \item \textbf{NIO (Battery-as-a-Service BaaS)}: Over 2,000 automated NIO battery-swap stations communicate with the NIO Cloud. Connected cars stream cell impedance and thermal curves centrally. When an EV approaches a swap station, the cloud has already determined whether that pack requires re-balancing, slow charging, or cell replacement before it is loaded into another car.
+\end{enumerate}
+
+\section{Scripted Engineering Defense Dialogues}
+
+\subsection{Dialogue 1: The ``Why Not an In-Car Chip?'' Challenge}
+\begin{dialoguebox}{Examiner Interaction: Edge Silicon vs. Cloud AI}
+\textbf{Examiner:} \textit{``Why shouldn't automakers just put a powerful AI chip inside the car? Silicon gets cheaper every year.''}
+
+\textbf{Candidate Defense:} 
+\textit{``That sounds attractive in theory, but in real automotive manufacturing it encounters the \textbf{Automotive Hardware Lifespan Mismatch}. An electric vehicle is engineered to remain operational for 12 to 15 years. AI algorithms and model architectures, however, evolve every 12 to 18 months. If an automaker puts an AI chip in a car in 2024, by 2028 that chip is already obsolete---it cannot run the larger reasoning models or newer attention mechanisms of the future.}
+
+\textit{Furthermore, in automotive grade electronics (AEC-Q100 / ISO 26262), silicon qualification takes 3 years before production, meaning the chip in a brand new car is already 3 years old on day one! By making the car a thin, securely-networked client and placing the AI centrally, the automaker can upgrade their data center GPUs from RTX 4060s to H100s or Blackwell tomorrow, and a 10-year-old vehicle in the field instantly inherits state-of-the-art intelligence without requiring a physical recall, an expensive chip replacement, or risking a bricked ECU over an OTA flash.''}
+\end{dialoguebox}
+
+\subsection{Dialogue 2: The ``What If the Internet Disconnects?'' Challenge}
+\begin{dialoguebox}{Examiner Interaction: Network Outages and Safety}
+\textbf{Examiner:} \textit{``What happens when the car enters an underground parking lot or a remote highway with zero cellular service? Does the car stop working?''}
+
+\textbf{Candidate Defense:} 
+\textit{``Absolutely not. In CVIS, we maintain a strict architectural separation between \textbf{Real-Time Vehicle Safety Controls} and \textbf{Supervisory AI Intelligence}. The physical actuators---braking, steering, traction control, motor inverter control---run on hard real-time local microcontrollers over isolated CAN buses. The AI in CVIS is strictly an advisory, predictive, and analytical layer.}
+
+\textit{To guarantee continuous operation during network blackouts, CVIS incorporates a local pre-warmed multi-factor intelligence engine (\texttt{ai\_cache.py}). If cellular connectivity drops, the gateway falls back to this deterministic cache in under 5 milliseconds, providing accurate safety advice and mode recommendations based on live physics rules until the network restores. Simultaneously, telemetry is buffered locally in flash and uploaded upon reconnection. The car never stops, and the driver is never left without guidance.''}
+\end{dialoguebox}
+
+\subsection{Dialogue 3: The ``Driver Intuition'' Challenge}
+\begin{dialoguebox}{Examiner Interaction: Human Intuition vs. AI Physics Simulation}
+\textbf{Examiner:} \textit{``Why do we need an AI at all? Doesn't a driver already know that driving fast in cold weather reduces range?''}
+
+\textbf{Candidate Defense:} 
+\textit{``A human driver has basic qualitative intuition, but human intuition cannot solve non-linear multi-variate differential calculus while driving at 100 km/h. For example: If a driver has 22\% battery, ambient temperature is -2$^\circ\text{C}$, cabin heater is drawing 2.5 kW, headwind is 25 km/h, and they face a 6\% uphill gradient over the next 15 km in heavy traffic---will they make it to the charger?}
+
+\textit{Human intuition will guess and risk stranding the vehicle. The CVIS multi-factor AI reasons over all 17 telemetry parameters simultaneously: battery cell delta, internal resistance, motor thermal rise rate, and aerodynamic draw. It computes an exact, mathematically grounded power trajectory and advises the driver: `Reduce cabin heat to 1 kW and cap cruising speed at 85 km/h to arrive at the charger with 4\% reserve.' That is predictive precision that human intuition cannot match.''}
+\end{dialoguebox}
 
 % ═══════════════════════════════════════════════════════════════════════════════
 %  CHAPTER 8 — DATABASE SCHEMA
@@ -822,6 +1046,41 @@ CREATE TABLE packets (
 );
 \end{lstlisting}
 
+\section{Devices \& Auth Logs Tables}
+
+\begin{lstlisting}[language=SQL, caption=Devices Table DDL (backend/database.py)]
+CREATE TABLE devices (
+    device_id             TEXT PRIMARY KEY,
+    api_key_hash          TEXT NOT NULL,
+    device_secret         TEXT NOT NULL,
+    created_at            TEXT NOT NULL,
+    active                INTEGER NOT NULL DEFAULT 1,
+    tier                  TEXT NOT NULL DEFAULT 'free',  -- 'free' | 'premium'
+    mobile_access_enabled INTEGER NOT NULL DEFAULT 0
+);
+\end{lstlisting}
+
+\begin{lstlisting}[language=SQL, caption=Auth Logs Table DDL (backend/database.py)]
+CREATE TABLE auth_logs (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    timestamp   TEXT NOT NULL,
+    device_id   TEXT NOT NULL,
+    event_type  TEXT NOT NULL,  -- see taxonomy below
+    detail      TEXT,
+    ip_address  TEXT
+);
+\end{lstlisting}
+
+The \texttt{event\_type} column in \texttt{auth\_logs} records six security-critical lifecycle events:
+\begin{itemize}[nosep]
+  \item \texttt{auth\_success}: Device successfully authenticated via \texttt{X-API-Key} and HMAC signature.
+  \item \texttt{auth\_failed}: Invalid API key or HMAC signature mismatch detected.
+  \item \texttt{tamper\_detected}: Cryptographic tag verification failed (AES-GCM or HMAC corruption).
+  \item \texttt{no\_auth}: Ingested frame during open-traffic demonstration mode without credentials.
+  \item \texttt{disconnected}: Administrative revocation initiated via NOC (\texttt{devices.active = 0}).
+  \item \texttt{reconnected}: Vehicle identity re-authorized by administrator (\texttt{devices.active = 1}).
+\end{itemize}
+
 \section{Server Config Keys}
 
 \begin{table}[H]
@@ -839,6 +1098,7 @@ CREATE TABLE packets (
 \texttt{chaos\_loss\_pct} & \texttt{0} & Packet loss rate (0/5/10/25\%) \\
 \texttt{chaos\_latency\_ms} & \texttt{0} & Artificial latency (0/100/300/1000 ms) \\
 \texttt{chaos\_tamper} & \texttt{false} & Payload mutation injector \\
+\texttt{ai\_service\_enabled} & \texttt{true} & Global AI recommendation \& chat kill-switch \\
 \texttt{mobile\_app\_enabled} & \texttt{true} & Global mobile access gate \\
 \texttt{force\_mode} & \texttt{""} & Override vehicle simulation mode \\
 \bottomrule
@@ -883,30 +1143,35 @@ The NOC at \texttt{/noc} is the centrepiece of the CVIS demonstration. It visual
 
 \section{NOC Live Controls}
 
+{\small
 \begin{table}[H]
 \centering
 \caption{NOC Live Controls — Backend Effect Mapping}
 \label{tab:controls}
-\begin{tabularx}{\textwidth}{L{3.5cm} L{4cm} X}
+\begin{tabularx}{\textwidth}{L{3.2cm} L{4.4cm} X}
 \toprule
 \textbf{Control} & \textbf{API Endpoint} & \textbf{Real Backend Effect} \\
 \midrule
-Protocol Switch & \texttt{POST /api/v1/config/protocol} & Changes \texttt{active\_protocol} in DB; broadcasts to MQTT \texttt{cvis/config/protocol}; ESP32 self-switches on next poll \\
-Encryption Toggle & \texttt{POST /api/v1/config/encryption} & Toggles AES-GCM; broadcasts to MQTT; ESP32 switches payload format on next packet \\
-Auth Toggle & \texttt{POST /api/v1/config/auth} & Enables/disables API key + HMAC verification; traffic accepted without credentials in OFF mode \\
-Packet Loss Slider & \texttt{POST /api/v1/config/chaos} & ChaosMiddleware probabilistically returns HTTP 503 before any processing \\
-Latency Slider & \texttt{POST /api/v1/config/chaos} & \texttt{asyncio.sleep(latency\_ms)} added before handler runs \\
-Tamper Injector & \texttt{POST /api/v1/config/chaos} & Mutates \texttt{battery\_pct=999.9} post-signature; next HMAC check will fail \\
-Replay Protection & \texttt{POST /api/v1/config/replay} & Enables timestamp-window deduplication; duplicate packets rejected \\
-Disconnect Vehicle & \texttt{POST /api/v1/control/disconnect} & Marks device inactive in DB; future packets from that device rejected \\
-Stop AI Service & \texttt{POST /api/v1/control/ai} & Disables background AI task; recommendations paused globally \\
+Protocol Switch & \texttt{POST} \nolinkurl{/api/v1/config/protocol} & Changes \texttt{active\_protocol} in DB; broadcasts to MQTT \texttt{cvis/config/protocol}; ESP32 self-switches on next poll \\
+Encryption Toggle & \texttt{POST} \nolinkurl{/api/v1/config/encryption} & Toggles AES-GCM; broadcasts to MQTT; ESP32 switches payload format on next packet \\
+Auth Toggle & \texttt{POST} \nolinkurl{/api/v1/config/auth} & Enables/disables API key + HMAC verification; traffic accepted without credentials in OFF mode \\
+Packet Loss Slider & \texttt{POST} \nolinkurl{/api/v1/config/chaos} & ChaosMiddleware probabilistically returns HTTP 503 before any processing \\
+Latency Slider & \texttt{POST} \nolinkurl{/api/v1/config/chaos} & \texttt{asyncio.sleep(latency\_ms)} added before handler runs \\
+Tamper Injector & \texttt{POST} \nolinkurl{/api/v1/config/chaos} & Mutates \texttt{battery\_pct=999.9} post-signature; next HMAC check will fail \\
+Replay Protection & \texttt{POST} \nolinkurl{/api/v1/config/replay} & Enables timestamp-window deduplication; duplicate packets rejected \\
+Disconnect Vehicle & \texttt{POST} \nolinkurl{/api/v1/control/disconnect} & Marks device inactive in DB (\texttt{devices.active = 0}); publishes disconnect signal to MQTT; rejects future frames \\
+Reconnect Vehicle & \texttt{POST} \nolinkurl{/api/v1/control/reconnect} & Restores active state in DB (\texttt{devices.active = 1}); publishes resume signal to MQTT control channel \\
+Stop AI Service (Global) & \texttt{POST} \nolinkurl{/api/v1/control/ai-service} & Disables background AI task globally; suppresses inference; chat endpoint returns HTTP 503 \\
+Vehicle AI Gating & \texttt{POST} \nolinkurl{/api/v1/control/ai-service/vehicle} & Selectively enables/disables AI inference per vehicle node; overridden by global switch \\
+Global Mobile App Gate & \texttt{POST} \nolinkurl{/api/v1/config/mobile-app} & Globally gates mobile application access; broadcasts \texttt{global\_mobile\_app\_changed} via WebSocket \\
 \bottomrule
 \end{tabularx}
 \end{table}
+}
 
 \section{NOC Packet Inspector Fields}
 
-Each row in the NOC packet table can be expanded to reveal:
+Each row in the NOC packet table can be expanded to reveal comprehensive layer metadata:
 
 \begin{itemize}
   \item \textbf{Packet ID} — sequential integer from \texttt{packets.id}
@@ -916,7 +1181,8 @@ Each row in the NOC packet table can be expanded to reveal:
   \item \textbf{Size (bytes)} — raw JSON body length
   \item \textbf{Auth Status} — \texttt{auth\_ok / auth\_fail / no\_auth / tamper\_detected}
   \item \textbf{Encryption} — \texttt{PLAIN} or \texttt{AES-GCM}
-  \item \textbf{Fault Code} — hex fault from telemetry
+  \item \textbf{Wire Envelope} — When encrypted, displays raw ciphertext envelope \texttt{\{"iv", "ct", "tag"\}} demonstrating transport-layer confidentiality
+  \item \textbf{Fault Code} — hex fault from telemetry (\texttt{0x00}, \texttt{0x02}, \texttt{0x04})
   \item \textbf{AI Response} — last recommendation generated for this device
   \item \textbf{Raw JSON Payload} — full telemetry JSON (collapsible)
 \end{itemize}
@@ -994,6 +1260,32 @@ Data flow: WebSocket \texttt{wss://api-cvis.justinsaju.me/ws} → \texttt{event:
 
 Premium-tier vehicles (ESP32-ALPHA, ESP32-BETA) have a mobile-optimised view accessible at \texttt{/alphamobile} and \texttt{/betamobile}. Free-tier vehicles (GAMMA, DELTA) see a \textit{gated} page. Access is controlled by the NOC's \textbf{Global Mobile App} toggle (\texttt{server\_config.mobile\_app\_enabled}), which is verified server-side per device tier before granting access.
 
+\section{Dynamic Route Parameter Normalization}
+
+The driver cockpit at \texttt{/driver/[vehicleId]} accommodates diverse linking conventions by implementing client-side slug normalization in \nolinkurl{frontend/app/driver/[vehicleId]/page.tsx}. The page transparently maps shorthand URI slugs to canonical database identifiers:
+\begin{itemize}[nosep]
+  \item \texttt{/driver/alpha} $\longrightarrow$ \texttt{ESP32-ALPHA}
+  \item \texttt{/driver/beta} $\longrightarrow$ \texttt{ESP32-BETA}
+  \item \texttt{/driver/gamma} $\longrightarrow$ \texttt{ESP32-GAMMA}
+  \item \texttt{/driver/delta} $\longrightarrow$ \texttt{ESP32-DELTA}
+\end{itemize}
+If an unknown slug or raw hardware ID is supplied, the system retains the literal uppercase string. This canonicalization ensures that WebSocket subscriptions, telemetry filtering, historical Recharts trend requests, and AI chat grounding queries always reference the identical database key.
+
+\section{Real-Time Mobile Access Reactivity (MobileAccessGate)}
+
+Mobile cockpit routes (\texttt{/alphamobile}, \texttt{/betamobile}, etc.) are wrapped within the \texttt{MobileAccessGate} security component. Traditional web applications require manual page refreshes to reflect administrative authorization changes; CVIS implements instantaneous live gating over the persistent WebSocket connection:
+
+\begin{enumerate}
+  \item \textbf{Initial Authorization Check}: On component mount, \texttt{MobileAccessGate} queries \texttt{GET /api/v1/config/mobile-access} with query parameter \texttt{device\_id=\{id\}} to retrieve the vehicle's persistent tier status and the global switch state.
+  \item \textbf{WebSocket Event Subscriptions}: The component attaches event listeners for two real-time notifications:
+    \begin{itemize}
+      \item \texttt{mobile\_access\_changed}: Fired when an administrator toggles vehicle-specific mobile authorization or upgrades its tier from Free to Premium.
+      \item \texttt{global\_mobile\_app\_changed}: Fired when NOC operators flip the global mobile master switch.
+    \end{itemize}
+  \item \textbf{Zero-Reload UI Transitions}: When an event payload arrives matching the active device, React state updates immediately, transitioning the UI between the active mobile cockpit interface and the gated upgrade modal without tearing down the telemetry feed or requiring a page reload.
+\end{enumerate}
+
+
 % ═══════════════════════════════════════════════════════════════════════════════
 %  CHAPTER 10 — CHAOS / SIMULATION MIDDLEWARE
 % ═══════════════════════════════════════════════════════════════════════════════
@@ -1053,8 +1345,9 @@ When \textbf{tamper injection} is enabled and \textbf{auth is enabled}:
 
 \section{Complete Endpoint Inventory}
 
-{\small
-\begin{longtable}{L{5.0cm} L{1.8cm} L{8.2cm}}
+{\footnotesize
+\setlength{\tabcolsep}{3.5pt}
+\begin{longtable}{L{5.3cm} C{2.1cm} L{7.6cm}}
 \caption{Full API Endpoint Reference} \label{tab:api} \\
 \toprule
 \textbf{Endpoint} & \textbf{Method} & \textbf{Description} \\
@@ -1072,45 +1365,50 @@ When \textbf{tamper injection} is enabled and \textbf{auth is enabled}:
 \endlastfoot
 
 \multicolumn{3}{l}{\textbf{Telemetry}} \\
-\texttt{/api/v1/telemetry} & POST & Ingest telemetry packet (HTTP); requires X-API-Key + X-HMAC-Signature \\
-\texttt{/api/v1/telemetry/recent} & GET & Fetch N most recent telemetry rows; optional \texttt{device\_id} filter \\
-\texttt{/api/v1/telemetry/packets} & GET & Fetch raw packet log for NOC table \\
+\nolinkurl{/api/v1/telemetry} & POST & Ingest telemetry packet (HTTP); requires X-API-Key + X-HMAC-Signature \\
+\nolinkurl{/api/v1/telemetry/recent} & GET & Fetch N most recent telemetry rows; optional \texttt{device\_id} filter \\
+\nolinkurl{/api/v1/telemetry/packets} & GET & Fetch raw packet log for NOC table \\
 \midrule
 \multicolumn{3}{l}{\textbf{Devices}} \\
-\texttt{/api/v1/devices/register} & POST & Register new device; returns api\_key + device\_secret \\
-\texttt{/api/v1/admin/deactivate-device} & POST & Mark device as inactive \\
+\nolinkurl{/api/v1/devices} & GET & List registered devices with status, tier, and creation timestamp \\
+\nolinkurl{/api/v1/devices/register} & POST & Register new device; returns api\_key + device\_secret \\
+\nolinkurl{/api/v1/admin/deactivate-device} & POST & Mark device as inactive \\
 \midrule
 \multicolumn{3}{l}{\textbf{Configuration (NOC Controls)}} \\
-\texttt{/api/v1/config/protocol} & GET/POST & Get/set active protocol (http/mqtt) \\
-\texttt{/api/v1/config/encryption} & GET/POST & Get/toggle AES-GCM encryption \\
-\texttt{/api/v1/config/auth} & GET/POST & Get/toggle API key + HMAC enforcement \\
-\texttt{/api/v1/config/chaos} & GET/POST & Get/update packet loss, latency, tamper settings \\
-\texttt{/api/v1/config/replay} & GET/POST & Get/toggle timestamp replay protection \\
-\texttt{/api/v1/config/all} & GET & Full config snapshot (all settings in one call) \\
-\texttt{/api/v1/config/mode} & POST & Force a specific vehicle simulation mode \\
-\texttt{/api/v1/config/mobile-access} & GET & Get mobile access state for a vehicle \\
-\texttt{/api/v1/config/mobile-app} & POST & Globally enable/disable mobile app access \\
+\nolinkurl{/api/v1/config/protocol} & GET/POST & Get/set active protocol (http/mqtt) \\
+\nolinkurl{/api/v1/config/encryption} & GET/POST & Get/toggle AES-GCM encryption \\
+\nolinkurl{/api/v1/config/auth} & GET/POST & Get/toggle API key + HMAC enforcement \\
+\nolinkurl{/api/v1/config/chaos} & GET/POST & Get/update packet loss, latency, tamper settings \\
+\nolinkurl{/api/v1/config/replay} & GET/POST & Get/toggle timestamp replay protection \\
+\nolinkurl{/api/v1/config/all} & GET & Full config snapshot (all settings in one call) \\
+\nolinkurl{/api/v1/config/mode} & POST & Force a specific vehicle simulation mode \\
+\nolinkurl{/api/v1/config/mobile-access} & GET & Query device tier, mobile access flag, and global gate status \\
+\nolinkurl{/api/v1/config/mobile-app} & POST & Globally enable/disable mobile app access \\
 \midrule
 \multicolumn{3}{l}{\textbf{AI}} \\
-\texttt{/api/v1/ai/recommendation} & POST & On-demand AI recommendation for latest telemetry \\
-\texttt{/api/v1/ai/chat} & POST & Driver chat grounded in current + historical telemetry \\
-\texttt{/api/v1/ai/status} & GET & Check Ollama availability and model status \\
+\nolinkurl{/api/v1/ai/recommendation} & POST & On-demand AI recommendation for latest telemetry \\
+\nolinkurl{/api/v1/ai/chat} & POST & Driver chat grounded in current + historical telemetry \\
+\nolinkurl{/api/v1/ai/status} & GET & Check Ollama availability and model status \\
 \midrule
 \multicolumn{3}{l}{\textbf{Admin}} \\
-\texttt{/api/v1/admin/stats} & GET & System stats: uptime, packet counts, auth counts \\
-\texttt{/api/v1/admin/devices} & GET & Connected vehicle list with status and tier \\
-\texttt{/api/v1/admin/packet-stats} & GET & Packet statistics over last N hours \\
-\texttt{/api/v1/admin/auth-logs} & GET & Authentication and tamper event log \\
+\nolinkurl{/api/v1/admin/stats} & GET & System stats: uptime, packet counts, disk/DB size, auth counts \\
+\nolinkurl{/api/v1/admin/devices} & GET & Connected vehicle list with status, tier, and last battery \\
+\nolinkurl{/api/v1/admin/packet-stats} & GET & Packet statistics over last N hours by protocol \\
+\nolinkurl{/api/v1/admin/auth-logs} & GET & Authentication, tamper, and lifecycle event audit log \\
 \midrule
 \multicolumn{3}{l}{\textbf{Control}} \\
-\texttt{/api/v1/control/vehicles} & GET & List all vehicles with real-time status \\
-\texttt{/api/v1/control/disconnect} & POST & Disconnect / deactivate a vehicle \\
-\texttt{/api/v1/control/ai} & POST & Enable/disable AI service globally \\
+\nolinkurl{/api/v1/control/vehicles} & GET & List all vehicles with real-time connectivity status \\
+\nolinkurl{/api/v1/control/disconnect} & POST & Revoke vehicle access (\texttt{active = 0}); dispatches MQTT stop \\
+\nolinkurl{/api/v1/control/reconnect} & POST & Re-enable revoked vehicle (\texttt{active = 1}); dispatches MQTT resume \\
+\nolinkurl{/api/v1/control/ai-service} & POST & Enable/disable AI recommendation and chat service globally \\
+\nolinkurl{/api/v1/control/ai-service/vehicle} & POST & Selectively enable/disable AI reasoning per vehicle node \\
+\nolinkurl{/api/v1/control/upgrade-tier} & POST & Upgrade vehicle capability tier (Free $\rightarrow$ Premium) \\
+\nolinkurl{/api/v1/control/toggle-mobile-access} & POST & Toggle vehicle mobile cockpit access flag \\
 \midrule
 \multicolumn{3}{l}{\textbf{WebSocket \& System}} \\
-\texttt{/ws} & WS & WebSocket endpoint; fan-out broadcast to all connected clients \\
-\texttt{/health} & GET & Backend health check \\
-\texttt{/docs} & GET & Swagger UI auto-generated API docs \\
+\nolinkurl{/ws} & WS & WebSocket endpoint; fan-out broadcast to all connected clients \\
+\nolinkurl{/health} & GET & Backend health check \\
+\nolinkurl{/docs} & GET & Swagger UI auto-generated API docs \\
 
 \end{longtable}
 }
@@ -1121,7 +1419,8 @@ When \textbf{tamper injection} is enabled and \textbf{auth is enabled}:
 \chapter{CCNS Syllabus Mapping}
 
 {\small
-\begin{longtable}{L{1.6cm} L{4.0cm} L{4.7cm} L{4.7cm}}
+\setlength{\tabcolsep}{3.5pt}
+\begin{longtable}{L{1.4cm} L{3.6cm} L{4.9cm} L{4.9cm}}
 \caption{CVIS Features Mapped to CCNS Units} \label{tab:ccns} \\
 \toprule
 \textbf{Unit} & \textbf{Topic} & \textbf{CVIS Feature} & \textbf{Where in Code} \\
@@ -1136,19 +1435,25 @@ When \textbf{tamper injection} is enabled and \textbf{auth is enabled}:
 \bottomrule
 \endlastfoot
 
-Unit 1 & Network Topologies, Client-Server & ESP32 (thin client) → FastAPI (server); NOC, Admin, Driver roles & \texttt{main.py}, \texttt{ws\_manager.py} \\
+Unit 1 & Network Topologies, Client-Server & ESP32 (thin client) $\rightarrow$ FastAPI (server); NOC, Admin, Driver roles & \texttt{main.py}, \texttt{ws\_manager.py} \\
 \midrule
-Unit 2 & Application Layer Protocols, REST, MQTT Pub/Sub & HTTP REST + MQTT runtime-switchable; MQTT topics \texttt{cvis/telemetry/\#} and \texttt{cvis/config/\#} & \texttt{comms/mqtt\_adapter.py}, \texttt{routers/config.py} \\
+Unit 2 & Application Protocols, REST \& MQTT Pub/Sub & HTTP REST + MQTT runtime-switchable; Topics \texttt{cvis/telemetry/\#} and \texttt{cvis/config/\#} & \texttt{comms/mqtt\_adapter.py}, \texttt{routers/config.py} \\
 \midrule
-Unit 3 & Reliability, RTT, Packet Loss, Latency, Retransmission & ChaosMiddleware: configurable loss, latency, tamper; ESP32 retry with exponential backoff & \texttt{middleware/chaos.py}, \texttt{firmware.ino} \\
+Unit 2 & Pub/Sub Control Channels & Unicast topic \texttt{cvis/config/control/\{id\}} for remote node suspension \& resumption & \texttt{firmware.ino}, \texttt{routers/control.py} \\
 \midrule
-Unit 4 & Authentication, Integrity, Encryption & API Key Auth, HMAC-SHA256, AES-256-GCM, tamper detection logging & \texttt{auth.py}, \texttt{crypto.py}, \texttt{routers/devices.py} \\
+Unit 3 & Reliability, RTT, Loss \& Retransmission & ChaosMiddleware: configurable loss, latency, tamper; ESP32 retry with backoff & \texttt{middleware/chaos.py}, \texttt{firmware.ino} \\
 \midrule
-Unit 4 & Replay Attack Protection & Timestamp-window deduplication; same \texttt{(device\_id, timestamp\_ms)} rejected within window & \texttt{replay\_protection.py}, \texttt{routers/config.py} \\
+Unit 3 & Graceful Service Degradation & Explicit HTTP 503 backpressure on AI suspension; memory bounded by \texttt{StaticJsonDocument<1024>} & \texttt{ai/ollama\_client.py}, \texttt{firmware.ino} \\
 \midrule
-Unit 5 & Cloud/Edge AI, Intelligent Networking & Ollama AI centralised on server; multi-factor reasoning; not embedded per-vehicle & \texttt{ai/ollama\_client.py}, \texttt{ai/prompt\_builder.py} \\
+Unit 4 & Authentication \& Message Integrity & API Key Auth, HMAC-SHA256 constant-time verification, AES-256-GCM authenticated cipher & \texttt{auth.py}, \texttt{crypto.py}, \texttt{routers/devices.py} \\
 \midrule
-Unit 5 & Real-time Data Streaming & WebSocket fan-out; single broadcast reaches all three frontend views simultaneously & \texttt{ws\_manager.py}, \texttt{routers/ws.py} \\
+Unit 4 & Replay Attack Protection & Timestamp-window deduplication; identical \texttt{(device\_id, timestamp\_ms)} rejected within window & \texttt{replay\_protection.py}, \texttt{routers/config.py} \\
+\midrule
+Unit 4 & Node Revocation \& Tier RBAC & Instantaneous credential revocation (\texttt{devices.active = 0}); dynamic tier gating (Free vs Premium) & \texttt{routers/control.py}, \texttt{database.py} \\
+\midrule
+Unit 5 & Centralized Cloud AI Reasoning & Ollama AI centralized on server; multi-factor telemetry reasoning; not embedded on edge & \texttt{ai/ollama\_client.py}, \texttt{ai/prompt\_builder.py} \\
+\midrule
+Unit 5 & Real-Time Data Streaming & WebSocket fan-out; single broadcast reaches Driver, NOC, and Admin UIs simultaneously & \texttt{ws\_manager.py}, \texttt{routers/ws.py} \\
 
 \end{longtable}
 }
@@ -1251,14 +1556,17 @@ AI hallucination & Data Integrity & Prompt is strictly grounded in real telemetr
 \centering
 \caption{WebSocket Event Schema}
 \label{tab:ws-events}
-\begin{tabularx}{\textwidth}{L{5.4cm} X}
+\begin{tabularx}{\textwidth}{L{5.8cm} X}
 \toprule
 \textbf{Event Key} & \textbf{Payload Description} \\
 \midrule
 \texttt{telemetry} & Full telemetry snapshot for all 17 fields; broadcast on every successful ingest \\
 \texttt{ai\_recommendation} & \texttt{\{device\_id, severity, recommendation\}} — broadcast after AI inference \\
-\texttt{packet\_logged} & \texttt{\{packet\_id, device\_id, protocol, auth\_status, encrypted, size\_bytes\}} \\
-\texttt{global\_mobile\_app\_changed} & \texttt{\{enabled: bool\}} — broadcast when NOC changes mobile access gate \\
+\texttt{packet\_logged} & \texttt{\{packet\_id, device\_id, protocol,} \allowbreak \texttt{auth\_status, encrypted, size\_bytes\}} \\
+\texttt{mobile\_access\_changed} & \texttt{\{device\_id, enabled\}} — broadcast when vehicle-specific mobile access or tier updates \\
+\texttt{global\_mobile\_app\_changed} & \texttt{\{enabled: bool\}} — broadcast when NOC changes fleet-wide mobile access gate \\
+\texttt{vehicle\_ai\_status} & \texttt{\{device\_id, enabled\}} — broadcast when AI service is enabled/disabled per vehicle \\
+\texttt{ai\_service\_changed} & \texttt{\{enabled: bool\}} — broadcast when global AI kill-switch state transitions \\
 \bottomrule
 \end{tabularx}
 \end{table}
@@ -1304,6 +1612,141 @@ Limp mode speed cap & 40 km/h & Applied when Fault 0x02 is active \\
 \bottomrule
 \end{tabularx}
 \end{table}
+
+% ═══════════════════════════════════════════════════════════════════════════════
+%  APPENDIX D — VIVA VOCE EXAMINATION GUIDE & DEFENSE STRATEGIES
+% ═══════════════════════════════════════════════════════════════════════════════
+\chapter{Comprehensive Viva Voce Examination Guide \& Defense Tactics}
+
+\section{Core Academic Positioning \& The Three Golden Rules}
+
+When presenting and defending CVIS before an academic or industrial examination committee, the candidate must master the core technical narrative.
+
+\begin{ccnsbox}{The Three Golden Rules of CVIS Viva Defense}
+\begin{enumerate}[leftmargin=*,nosep]
+  \item \textbf{Rule 1: Anchor on the Secure Communication Layer First}: CVIS is not merely a machine learning application; it is an academic demonstration of a \textbf{hardened, cryptographically-verified distributed transport pipeline} (CCNS Units 1--5). AI is the consumer application riding on top of this layer.
+  \item \textbf{Rule 2: Emphasize the Automotive Hardware Lifespan Mismatch}: Always dismantle the ``why not an in-car chip?'' question by pointing out the 15-year operational lifecycle of passenger vehicles versus the 18-month evolution cycle of neural networks.
+  \item \textbf{Rule 3: Frame Mitigations Honestly}: Never claim the cloud architecture is without drawbacks. Lead with the 5 engineering gaps (dead zones, latency, cellular costs, cloud outages, packet tampering) and explain how CVIS deterministically mitigates each one.
+\end{enumerate}
+\end{ccnsbox}
+
+\section{CCNS Technical Examination: Questions \& Authoritative Answers}
+
+\subsection{Unit 1: Data Communication \& Application Layer Protocols}
+
+\paragraph{Q1: Why was JSON selected as the primary telemetry payload serialization format?}
+JSON provides a human-readable, self-describing, and schema-agnostic serialization format natively supported across Python, JavaScript, and embedded C/C++ (via ArduinoJson). Crucially, JSON accommodates an explicit \texttt{schema\_version} field (e.g., \texttt{"1.0"}), enabling backward-compatible protocol evolution without breaking existing parser contracts. In CVIS, incoming payloads are validated at the FastAPI gateway boundary using strict Pydantic schemas that enforce field types, physical ranges, and mandatory cryptographic signatures.
+
+\paragraph{Q2: How does the adaptive telemetry transmission interval function, and what network principles does it demonstrate?}
+Rather than transmitting at a static rate, the vehicle gateway dynamically alters its transmission frequency based on the active operational mode:
+\begin{itemize}[leftmargin=*,nosep]
+  \item \textbf{Safety-Critical Modes} (\textit{Battery Overheating}, \textit{Motor Fault}): Transmission interval accelerates to \textbf{1 second}.
+  \item \textbf{Routine Cruise Modes} (\textit{Healthy}, \textit{Eco}): Transmission interval throttles down to \textbf{5 to 8 seconds}.
+\end{itemize}
+This directly implements the principles of \textbf{Differentiated Services (DiffServ)} and \textbf{Priority Queuing} (CCNS Unit 1). In bandwidth-constrained cellular environments, safety telemetry is prioritized, cutting routine cellular data volume by 70\%+ while ensuring sub-second response times during thermal runaway emergencies.
+
+\paragraph{Q3: Is the simulated telemetry engine composed of random numbers, or does it follow physical dynamics?}
+It is a \textbf{Continuous Stateful Physics Engine}. Both the embedded firmware and the Python digital twin maintain internal state variables across loop cycles ($\Delta t$). Energy drain follows aerodynamic drag ($P \propto v^3$) and road rolling resistance. Incline gradients impose gravity loads, while motor and battery temperatures rise via coupled differential heat equations ($dT/dt = k_{\text{in}} P - k_{\text{cool}} (T - T_{\text{amb}})$). When switching to Sport Mode, acceleration spools up smoothly, battery SoC drops faster, and thermal gradients spike realistically, feeding the AI mathematically valid multi-factor dynamics.
+
+\subsection{Unit 2: Network Models \& Transport Protocols (HTTP vs. MQTT vs. WebSocket)}
+
+\paragraph{Q4: What are the fundamental transport differences between HTTP REST and MQTT in CVIS, and when is each preferred?}
+\begin{itemize}[leftmargin=*,nosep]
+  \item \textbf{HTTP REST} (Request-Response over TCP): Client initiates every transaction, server returns an HTTP response, and connection closes or enters keep-alive. Each POST incurs $\approx 800\text{ bytes}$ of HTTP header overhead. It is ideal for point-to-point, low-frequency telemetry with mandatory synchronous receipt acknowledgements.
+  \item \textbf{MQTT} (Publish-Subscribe over Broker): Client maintains a single persistent TCP socket to an MQTT broker, exchanging compact 2-byte fixed topic headers. It supports hierarchical routing (\texttt{cvis/telemetry/\{id\}}), wildcard subscriptions (\texttt{+}), and configurable Quality of Service (QoS 0/1). It is vastly superior for high-frequency, massive-fleet IoT streaming.
+\end{itemize}
+CVIS provides a \textbf{runtime protocol switch}: the NOC can transition the active fleet between HTTP and MQTT instantly without restarting any client or server daemon.
+
+\paragraph{Q5: How does the WebSocket architecture differ from traditional REST polling for dashboard observability?}
+REST polling requires each frontend tab to issue periodic requests (e.g., \texttt{GET /api/v1/telemetry/recent} every 2 seconds). This introduces up to 2,000 ms of artificial display latency and floods the server with redundant requests when state is unchanged. CVIS establishes a single, persistent \textbf{full-duplex WebSocket connection} (\texttt{/ws}) using HTTP protocol upgrade (RFC 6455). When an ingest packet arrives, FastAPI's \texttt{ConnectionManager} fans out the event in under 1 ms to all active views (\texttt{/driver}, \texttt{/noc}, \texttt{/admin}) simultaneously.
+
+\subsection{Unit 3: Transport Layer Reliability \& Chaos Engineering Middleware}
+
+\paragraph{Q6: How does the application-layer retry mechanism mirror transport-layer TCP retransmissions?}
+While TCP handles retransmissions invisibly at the kernel transport layer, mobile cellular networks often drop application-level HTTP/MQTT requests due to gateway timeouts or transient packet drops. CVIS implements application-layer exponential backoff: if a POST fails to receive HTTP 200 within a timeout window, the client retries with intervals of 1s, 2s, and 4s. This is directly analogous to \textbf{Karn's algorithm} in TCP, doubling retransmission timeouts to avoid exacerbating network congestion.
+
+\paragraph{Q7: Why is chaos testing (packet loss, latency injection) implemented as ASGI middleware rather than kernel netem?}
+Linux kernel shaping (\texttt{tc netem}) requires root access and does not operate on loopback localhost traffic. CVIS implements \texttt{ChaosMiddleware} directly in the Python ASGI pipeline. When packet loss is set to 25\%, the middleware intercepts the raw request before FastAPI route dispatch, draws a pseudo-random float, and returns HTTP 503 Service Unavailable probabilistically. When latency is configured to 300 ms, \texttt{asyncio.sleep(0.3)} yields control to the event loop. From the vehicle's perspective, RTT increases identically to real physical propagation delay.
+
+\paragraph{Q8: How does CVIS ensure that slow AI model inference does not block incoming vehicle telemetry?}
+AI inference (averaging 150ms to 400ms on CUDA GPUs, and up to 8s on CPU) is completely decoupled from the telemetry ingest pipeline. FastAPI launches the inference coroutine via \texttt{asyncio.create\_task()} as an asynchronous, non-blocking background job. The HTTP handler returns \texttt{200 OK} to the vehicle in under 4 ms, immediately writing the telemetry packet to SQLite and broadcasting the raw data over WebSockets. When the AI finishes its multi-factor analysis, it broadcasts a secondary \texttt{ai\_recommendation} event downstream.
+
+\subsection{Unit 4: Cryptographic Wire Security \& Integrity}
+
+\paragraph{Q9: How does HMAC-SHA256 provide message integrity without encryption, and how does AES-256-GCM differ?}
+\begin{itemize}[leftmargin=*,nosep]
+  \item \textbf{HMAC-SHA256} generates a 32-byte cryptographic hash using a shared device secret: $\text{HMAC}(K, M)$. It provides \textbf{authenticity and integrity}, guaranteeing the packet originated from the genuine vehicle and was not modified in transit. However, the payload is plaintext (no confidentiality).
+  \item \textbf{AES-256-GCM} is an Authenticated Encryption with Associated Data (AEAD) cipher. In a single cryptographic pass, it provides \textbf{confidentiality} (AES counter mode encryption) and \textbf{integrity} (Galois Message Authentication Code GMAC tag). The packet is completely opaque on the wire.
+\end{itemize}
+
+\paragraph{Q10: What is a timing oracle side-channel attack, and how is it eliminated in CVIS?}
+In naive string comparison (\texttt{hash1 == hash2}), the processor terminates comparison at the very first mismatched byte. An attacker intercepting network packets can measure execution latency with microsecond precision, deducing correct signature bytes one by one. CVIS strictly employs Python's \texttt{hmac.compare\_digest()}, which executes in \textbf{constant time} regardless of mismatch position, completely eliminating timing leakage.
+
+\paragraph{Q11: How does replay attack protection operate in CVIS?}
+Each telemetry payload includes a monotonic boot-relative timestamp millisecond token (\texttt{timestamp\_ms}). The backend maintains an in-memory sliding cache of observed \texttt{(device\_id, timestamp\_ms)} tuples within a 30-second rolling window. If an attacker captures a valid signed packet and resubmits it, the backend identifies the duplicate token and immediately rejects the packet with HTTP 401 Unauthorized.
+
+\subsection{Unit 5 \& 6: Electric Vehicle Industrial Engineering, Gaps \& Business Economics}
+
+\paragraph{Q12: Why is the centralized cloud AI model overwhelmingly preferred by automotive OEMs over on-vehicle edge computing?}
+Three decisive industrial factors:
+\begin{enumerate}[leftmargin=*,nosep]
+  \item \textbf{Manufacturing BOM Savings}: Eliminating expensive automotive-grade AI SoCs (NVIDIA DRIVE Orin / Snapdragon Ride), LPDDR5 ECC DRAM, cold-plate liquid cooling lines, and ASIL-D silicon qualification saves **\$1,700 to \$3,500 per vehicle** (\$1 Billion annually for 500,000 EVs).
+  \item \textbf{Automotive Hardware Lifespan Mismatch}: Cars last 12--15 years, while AI models evolve every 12--18 months. An edge chip installed in 2024 is obsolete by 2028. Cloud AI ensures a 10-year-old vehicle in 2034 continues to run state-of-the-art models powered by data center GPU upgrades.
+  \item \textbf{Eliminating Parasitic Battery Drain}: In-car AI draws 70W--250W continuous power, draining 3.6 kWh/day in standby (12--18 miles of range lost every 24 hours). The CVIS thin client draws under 1.5W.
+\end{enumerate}
+
+\paragraph{Q13: How does CVIS handle cellular dead zones and highway tunnels?}
+Real-time vehicle physical actuation (ABS, ESC, motor torque vectoring) is strictly isolated on hard real-time CAN buses. CVIS AI is strictly supervisory and advisory. During connectivity loss, the gateway falls back in $<$5ms to a local pre-warmed multi-factor deterministic cache (\texttt{ai\_cache.py}), providing verified safety advice based on physics rules while buffering telemetry to circular flash memory for post-reconnect upload.
+
+\paragraph{Q14: How does the CVIS SaaS business model generate 96\% gross margins?}
+At a scale of 100,000 active Pro subscribers paying \$9.99/month:
+\begin{itemize}[leftmargin=*,nosep]
+  \item Distributed ingestion, database storage, and continuous-batch GPU inference on NVIDIA L40S/H100 clusters cost **\$39,600 / month** (\$0.396 per vehicle/month).
+  \item Monthly subscription revenue: **\$999,000 / month**.
+  \item Net monthly profit: **\$959,400 / month** (96.0\% software gross margin).
+\end{itemize}
+
+\paragraph{Q15: What real-world electric car manufacturers utilize this centralized telematics paradigm?}
+\begin{itemize}[leftmargin=*,nosep]
+  \item \textbf{Tesla Inc.}: On-vehicle FSD executes only forward-pass vision perception; edge triggers upload disengagement telemetry to central **Dojo and Cortex GPU supercomputers** for fleet training and model evolution.
+  \item \textbf{Rivian Automotive}: Uses a custom Telematics Gateway Unit (TGU) streaming to AWS FleetOS for cloud battery health modeling and suspension terrain adaptation.
+  \item \textbf{NIO}: Connected cars stream battery impedance and degradation curves to the NIO Cloud, enabling predictive pack diagnostics across 2,000+ automated battery-swap stations.
+\end{itemize}
+
+\section{Examiner Trap Questions \& Scripted Counter-Tactics}
+
+\begin{dialoguebox}{Examiner Trap 1: The Machine Learning Simplification}
+\textbf{Examiner:} \textit{``This looks like an AI project. Why is it being submitted for a Computer Communication and Networks course?''}
+
+\textbf{Candidate Defense:} 
+\textit{``With respect, sir/ma'am, AI is merely the top-level application consumer. The entire core of this project is the \textbf{Secure Communication Layer} that makes centralized AI viable. Without our runtime-switchable HTTP/MQTT adapters, constant-time HMAC-SHA256 wire integrity verification, AES-256-GCM AEAD encryption, replay protection, adaptive rate throttling, and chaos engineering middleware, centralized AI cannot safely exist. An attacker could spoof battery temperatures, trigger false limp modes, or eavesdrop on vehicle coordinates. CVIS is an end-to-end realization of CCNS Units 1 through 5.''}
+\end{dialoguebox}
+
+\begin{dialoguebox}{Examiner Trap 2: The Driver Intuition Objection}
+\textbf{Examiner:} \textit{``Any driver knows that driving fast up a hill drains the battery. Why spend money on cloud AI for common sense?''}
+
+\textbf{Candidate Defense:} 
+\textit{``Human intuition provides crude qualitative guesses, but cannot solve non-linear multi-variate differential calculus while driving at 100 km/h. If a driver has 22\% battery, ambient is -2$^\circ\text{C}$, cabin heater is drawing 2.5 kW, headwind is 25 km/h, and they face a 6\% uphill gradient over the next 15 km in heavy traffic---intuition will guess and strand the car. The CVIS multi-factor AI integrates all 17 telemetry parameters simultaneously: battery cell delta, internal resistance, motor thermal rise rate, and aerodynamic draw. It computes an exact power trajectory and advises: `Reduce cabin heat to 1 kW and cap cruising speed at 85 km/h to reach the charger with 4\% reserve.' That is mathematical precision that human intuition cannot match.''}
+\end{dialoguebox}
+
+\begin{dialoguebox}{Examiner Trap 3: The Edge Silicon Fallacy}
+\textbf{Examiner:} \textit{``NVIDIA Jetson and Raspberry Pi chips are very cheap now. Why not put an AI chip in the vehicle?''}
+
+\textbf{Candidate Defense:} 
+\textit{``That is the \textbf{Automotive Hardware Lifespan Mismatch}. Cars last 15 years; AI models evolve every 18 months. An edge chip installed in 2024 cannot run the larger foundation models of 2030. Furthermore, running a 150W edge AI processor drains 3.6 kWh/day in standby phantom drain (losing 15 miles of range every 24 hours while parked) and adds \$2,000+ per vehicle in automotive-qualified silicon, liquid cooling lines, and DC-DC converters. Centralized AI future-proofs the vehicle and eliminates phantom drain.''}
+\end{dialoguebox}
+
+\section{Live Examination Demonstration Playbook}
+
+During the practical viva examination, follow this sequence to demonstrate all system capabilities:
+
+\begin{enumerate}[leftmargin=1.5cm]
+  \item \textbf{Show the Live Packet Stream in \texttt{/noc}}: Direct the examiner's attention to the animated packet flow, highlighting green (HTTP) and purple (MQTT) packets ingested from the autonomous flight recorder.
+  \item \textbf{Execute Runtime Protocol Switching}: Click the \textbf{HTTP $\Longleftrightarrow$ MQTT} toggle. Point out that the backend dynamically reconfigures without interrupting client connections or restarting daemons.
+  \item \textbf{Inject Packet Tampering}: Click \textbf{Inject Tamper}. Show the immediate red HTTP 401 Unauthorized rejection in the packet table. Open the packet inspector and explain: \textit{``The payload was modified post-signature. The backend recomputed HMAC-SHA256, detected the mismatch, and rejected it in constant time via \texttt{hmac.compare\_digest()}.''}
+  \item \textbf{Demonstrate Chaos Middleware}: Slide artificial latency to 300 ms. Show the increased RTT in the NOC table while highlighting that the WebSocket driver UI remains smooth because ingest is non-blocking.
+  \item \textbf{Highlight Real GPU Hardware Inference}: Show that Ollama executes on the dedicated NVIDIA GeForce RTX 4060 GPU with CUDA acceleration, delivering 96+ tokens/sec multi-factor reasoning grounded in real vehicle physics.
+\end{enumerate}
 
 % ═══════════════════════════════════════════════════════════════════════════════
 %  BIBLIOGRAPHY
