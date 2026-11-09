@@ -258,6 +258,22 @@ python test_phase3.py
 
 ---
 
+## Phase 7.4 — Comprehensive CCNS Academic Project Report (LaTeX & PDF)
+**Status:** ✅ Complete — 32-page publication-grade academic report matching `Project_Report_CCNS.docx` format and `IOT LAB.docx` structure compiled cleanly with `pdflatex` to `Project_Report_CCNS.pdf` (1.75 MB).
+**Target:** CCNS Final Course Submission & External Evaluation
+
+### What was built & verified
+| Component | File(s) | Description & Verification |
+|---|---|---|
+| **LaTeX Project Report** | `Project_Report_CCNS.tex` | Full academic document conforming to SRM IST formatting guidelines (Justin Jacob Saju, Reg No: RA2311053010097). Covers Abstract, Literature Survey (Table 2.1), System Design, Security Engineering (HMAC-SHA256, AES-256-GCM, ChaosMiddleware), Experimental Results, CCNS Units 1–5 Syllabus Mapping, and Appendices. |
+| **Literature Survey Table** | `Project_Report_CCNS.tex` (Table 2.1) | Direct replication of the tabular literature review format from `IOT LAB.docx` (S.No, Title, Authors, Venue, Year, Findings & Limitations) analyzing 6 benchmark papers (Checkoway, Koscher, Touati & Challal, Rodriguez & Rios, Martin et al., El-Hajj) and formulating the CVIS research gap. |
+| **Authentic Dashboard Screenshots** | `screenshots/*.png` | Integrated 4 authentic web UI captures: Driver Cockpit (`driver_dashboard.png`), NOC Packet Stream (`noc_dashboard.png`), Administrator Console (`admin_dashboard.png`), and NOC Packet Inspector (`noc_packet_table.png`). |
+| **System Flow & Architecture Diagrams** | `Project_Report_CCNS.tex` | Reused verified vector diagrams from guide PDF (System Architecture, Ingestion & Security Pipeline, ChaosMiddleware) with bounded scaling to prevent any margin overflow. |
+| **Streamlined Equations & Metrics** | `Project_Report_CCNS.tex` | Grounded strictly in measured telemetry: Mean Latency (Eq. 2.1), Throughput (Eq. 2.2), Packet Loss Rate (Eq. 2.3), HMAC-SHA256 Authentication (Eq. 2.4), Exponential Backoff (Eq. 2.5). |
+| **Dual Backup & Version Control** | `Project_Report_CCNS.pdf`, `docs/04-academic-materials/latex/` | Compiled with 0 errors across 32 pages and committed/pushed to GitHub `origin/main`. |
+
+---
+
 ## What's deferred
 
 | Item | Phase | Status |
@@ -266,6 +282,6 @@ python test_phase3.py
 
 ---
 
-*Last updated: Phase 7.3 Complete — Dynamic Runtime Protocol Switching (HTTP ↔ MQTT) verified live end-to-end.*
+*Last updated: Phase 7.4 Complete — 32-page CCNS Academic Project Report (LaTeX & PDF) generated and verified.*
 
 
