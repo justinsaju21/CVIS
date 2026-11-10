@@ -274,6 +274,20 @@ python test_phase3.py
 
 ---
 
+## Phase 7.5 — High-Fidelity Continuous EV Driving Dynamics & Homelab Replay Deployment
+**Status:** ✅ Complete — High-fidelity physical vehicle simulation deployed on homelab under PM2 daemon (`cvis-replay`). Realistic $S$-curve acceleration, regenerative braking, continuous thermal inertia, 4-wheel TPMS sensor distribution, and extended 45–90s journey cycles.
+**Target:** Live Demonstration Realism & Homelab Deployment
+
+### What was built & verified
+| Component | File(s) | Description & Verification |
+|---|---|---|
+| **Continuous Dynamics Engine** | `backend/simulate_vehicle.py` | Built progressive acceleration ($a = F/m$) with drag dissipation, stop-and-go wave dynamics in Heavy Traffic, strictly monotonic battery discharge during driving, and smooth charging curves. |
+| **4-Wheel TPMS Monitoring** | `backend/simulate_vehicle.py`, `frontend/components/driver/DriverDashboard.tsx` | Modeled dynamic tire pressure (33.8–34.7 PSI) scaling with tire thermal build-up during highway speeds. Eliminated `UNAVAILABLE` fallback state. |
+| **Calibrated Mode Cycles** | `backend/routers/control.py` | Lengthened journey phase durations (Alpha: 75s, Beta: 60s, Gamma: 90s, Delta: 45s) for realistic driving sessions. |
+| **Homelab Replay Deployment** | `deploy.sh`, Homelab PM2 | Deployed `cvis-replay` alongside `cvis-backend` and `cvis-frontend` under PM2 on `justin-k55vd` (`192.168.1.8`). Verified continuous live streaming across Alpha, Beta, Gamma, and Delta. |
+
+---
+
 ## What's deferred
 
 | Item | Phase | Status |
@@ -282,6 +296,6 @@ python test_phase3.py
 
 ---
 
-*Last updated: Phase 7.4 Complete — 32-page CCNS Academic Project Report (LaTeX & PDF) generated and verified.*
+*Last updated: Phase 7.5 Complete — Continuous EV Physics Engine & Homelab Replay Daemon live on production.*
 
 
