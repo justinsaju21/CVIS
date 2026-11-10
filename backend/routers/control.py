@@ -41,7 +41,7 @@ FLEET = [
         "color":       "#00d4ff",
         "personality": "City driving — heavy traffic & charging cycles",
         "start_mode":  0,
-        "cycle_secs":  12,
+        "cycle_secs":  75,
     },
     {
         "device_id":   "ESP32-BETA",
@@ -50,7 +50,7 @@ FLEET = [
         "color":       "#ff4757",
         "personality": "High-speed sport — motor fault risk",
         "start_mode":  2,
-        "cycle_secs":  10,
+        "cycle_secs":  60,
     },
     {
         "device_id":   "ESP32-GAMMA",
@@ -59,7 +59,7 @@ FLEET = [
         "color":       "#2ed573",
         "personality": "Eco-focused — long range, low stress",
         "start_mode":  1,
-        "cycle_secs":  18,
+        "cycle_secs":  90,
     },
     {
         "device_id":   "ESP32-DELTA",
@@ -68,7 +68,7 @@ FLEET = [
         "color":       "#ffb347",
         "personality": "Cycles all 8 modes — used for demo & debug",
         "start_mode":  4,
-        "cycle_secs":  8,
+        "cycle_secs":  45,
     },
 ]
 
