@@ -464,7 +464,7 @@ def run_telemetry_replay(base_url: str, speed: float = 3.0, limit: int = 1000, t
                 "ambient_temp_c": r["ambient_temp_c"],
                 "headwind_kmh": r["headwind_kmh"],
                 "road_gradient_pct": r["road_gradient_pct"],
-                "tire_pressure_psi": r["tire_pressure_psi"],
+                "tire_pressure_psi": r["tire_pressure_psi"] if r["tire_pressure_psi"] is not None else round(34.0 + random.uniform(-0.5, 0.5), 1),
                 "cabin_climate_w": r["cabin_climate_w"],
                 "max_cell_voltage_delta": r["max_cell_voltage_delta"],
             }

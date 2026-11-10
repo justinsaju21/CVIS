@@ -20,6 +20,7 @@ import argparse
 import hashlib
 import hmac
 import json
+import math
 import os
 import random
 import sys
@@ -115,10 +116,11 @@ class VehicleSimulator:
         
         # Initial physics state based on starting mode
         m_name, m_spd, m_bat, m_bt, m_mt, m_rng, m_f, m_c = MODES[self.mode_index]
-        self.state_speed      = m_spd
-        self.state_batt_pct   = m_bat
-        self.state_batt_temp  = m_bt
-        self.state_motor_temp = m_mt
+        self.state_speed      = 0.0 if m_name in ("Charging", "Motor Fault") else m_spd
+        self.state_batt_pct   = float(m_bat)
+        self.state_batt_temp  = float(m_bt)
+        self.state_motor_temp = float(m_mt)
+        self.tire_base_psi    = round(33.8 + random.uniform(-0.2, 0.2), 1)
 
         # Realistic story-arc personality sequences
         if "ALPHA" in device_id:
@@ -171,82 +173,128 @@ class VehicleSimulator:
         
         now = time.time()
         dt = now - self.last_update
-        if dt > 10: dt = 0.1 # prevent huge jumps if paused
+        if dt > 10 or dt <= 0:
+            dt = self.interval
         self.last_update = now
 
-        # 1. Speed Physics
-        # Accelerate or decelerate smoothly toward target speed
-        accel_rate = 12.0 if mode_name == "Sport" else (5.0 if mode_name == "Eco" else 8.0)
-        
-        # Physics overrides for critical states
-        if mode_name == "Motor Fault": 
-            target_speed = 0.0 # Force stop on fault
-            accel_rate = 20.0  # Hard brake
-            
+        # 1. High-Fidelity Speed Physics & Traffic Waves
+        if mode_name in ("Charging", "Motor Fault"):
+            dynamic_target = 0.0
+            accel_rate = 22.0  # Safe braking to stop
+        elif mode_name == "Heavy Traffic":
+            # Real traffic wave cycle (36-second period): crawl -> slow -> stop -> re-accelerate
+            t_wave = (now - self.start_time) % 36.0
+            if t_wave < 12.0:
+                dynamic_target = 13.0 + 3.0 * math.sin(t_wave * 0.5)
+                accel_rate = 5.0
+            elif t_wave < 20.0:
+                # Coming to a smooth halt
+                dynamic_target = max(0.0, 13.0 * (1.0 - (t_wave - 12.0) / 8.0))
+                accel_rate = 6.0
+            elif t_wave < 27.0:
+                # Stopped in queue / red light
+                dynamic_target = 0.0
+                accel_rate = 10.0
+            else:
+                # Smooth acceleration away
+                dynamic_target = 16.0 * ((t_wave - 27.0) / 9.0)
+                accel_rate = 4.5
+        elif mode_name == "Sport":
+            # Dynamic spirited driving (102 - 114 km/h)
+            surf = math.sin((now - self.start_time) / 14.0) * 4.5
+            dynamic_target = 108.0 + surf
+            accel_rate = 9.5 if dynamic_target > self.state_speed else 12.0
+        elif mode_name == "Eco":
+            # Steady efficient highway cruise (40 - 44 km/h)
+            surf = math.sin((now - self.start_time) / 22.0) * 2.0
+            dynamic_target = 42.0 + surf
+            accel_rate = 4.5 if dynamic_target > self.state_speed else 6.0
+        else:  # Healthy / Low Battery / Battery Overheating
+            surf = math.sin((now - self.start_time) / 18.0) * 3.0
+            dynamic_target = 58.0 + surf
+            accel_rate = 6.5 if dynamic_target > self.state_speed else 8.5
+
         if self.state_batt_pct <= 0.0 and mode_name != "Charging":
-            target_speed = 0.0 # Out of battery, lose power
-            accel_rate = 5.0   # Coast to a stop
-            
-        speed_diff = target_speed - self.state_speed
-        if abs(speed_diff) < accel_rate * dt:
-            self.state_speed = target_speed
+            dynamic_target = 0.0
+            accel_rate = 5.0
+
+        # Smooth inertia-based acceleration
+        speed_diff = dynamic_target - self.state_speed
+        max_delta = accel_rate * dt
+        if abs(speed_diff) <= max_delta:
+            self.state_speed = dynamic_target
         else:
-            self.state_speed += (accel_rate * dt) * (1 if speed_diff > 0 else -1)
-            
-        # 2. Battery Physics
-        # Base drain + speed-based power consumption
-        base_drain = 0.02 # 2% per 100s idle
-        eff = 1.0
-        if mode_name == "Eco": eff = 0.6
-        if mode_name == "Sport": eff = 2.5
-        if mode_name == "Heavy Traffic": eff = 1.5
-        
-        power_usage = base_drain + (self.state_speed / 100.0)**2 * 0.15 * eff
-        
+            self.state_speed += max_delta * (1.0 if speed_diff > 0 else -1.0)
+        self.state_speed = max(0.0, min(140.0, self.state_speed))
+
+        # Output speed with subtle road breath only when moving
+        reported_speed = self.state_speed
+        if reported_speed > 1.0:
+            reported_speed += 0.35 * math.sin((now - self.start_time) * 1.8)
+        reported_speed = max(0.0, round(reported_speed, 1))
+
+        # 2. Continuous Physical Battery Modeling (Strictly Monotonic while Driving)
         if mode_name == "Charging":
-            self.state_batt_pct += 1.0 * dt # Charge rapidly for demo
+            # Charging: vehicle stopped, battery smoothly climbs
+            self.state_batt_pct = min(100.0, self.state_batt_pct + 0.08 * dt)
         else:
-            self.state_batt_pct -= power_usage * dt
-            
-        # If the mode is a forced situation, we drift the battery towards the situation's target
-        if mode_name in ["Low Battery", "Battery Overheating"]:
-            batt_diff = target_batt - self.state_batt_pct
-            if abs(batt_diff) > 1.0:
-                self.state_batt_pct += (5.0 * dt) * (1 if batt_diff > 0 else -1)
-                
-        self.state_batt_pct = max(0.0, min(100.0, self.state_batt_pct))
-        
-        # 3. Thermal Physics
-        # Temps rise under load and drop when idle
-        self.state_batt_temp += (target_batt_t - self.state_batt_temp) * 0.2 * dt
-        self.state_motor_temp += (target_motor_t - self.state_motor_temp) * 0.2 * dt
-        
-        # 4. Range Calculation
-        # Eco gives more range per percent, Sport gives less
-        range_factor = 3.0
-        if mode_name == "Eco": range_factor = 3.8
-        if mode_name == "Sport": range_factor = 1.8
-        if mode_name == "Heavy Traffic": range_factor = 2.2
-        estimated_range = self.state_batt_pct * range_factor
+            # Physical drag & auxiliary consumption (never increases while driving)
+            v_ratio = reported_speed / 100.0
+            eff = 0.7 if mode_name == "Eco" else (2.0 if mode_name == "Sport" else 1.0)
+            drain = (0.003 + (v_ratio ** 2) * 0.015 * eff) * dt
+            self.state_batt_pct = max(0.0, self.state_batt_pct - drain)
+
+            if mode_name == "Low Battery" and self.state_batt_pct > 14.5:
+                # Believable smooth drift into the low-battery warning range
+                self.state_batt_pct -= 0.12 * dt
+
+        self.state_batt_pct = max(0.0, min(100.0, round(self.state_batt_pct, 2)))
+
+        # 3. Progressive Thermal Modeling with Thermal Inertia
+        motor_target = 35.0 + (reported_speed / 110.0) ** 1.4 * (48.0 if mode_name == "Sport" else 28.0)
+        if mode_name == "Motor Fault":
+            motor_target = 94.0
+        self.state_motor_temp += (motor_target - self.state_motor_temp) * (0.08 * dt)
+
+        batt_target = 29.0 + (reported_speed / 110.0) * 8.0
+        if mode_name == "Battery Overheating":
+            batt_target = 64.0
+        elif mode_name == "Charging":
+            batt_target = 36.0
+        self.state_batt_temp += (batt_target - self.state_batt_temp) * (0.05 * dt)
+
+        # 4. Realistic Physical Range & Multi-Factor Parameters
+        km_per_pct = 3.8 if mode_name == "Eco" else (2.1 if mode_name == "Sport" else 3.1)
+        headwind = max(0.0, round(12.0 + 4.0 * math.sin(now / 15.0), 1))
+        gradient = round(1.2 * math.sin(now / 20.0), 1)
+        estimated_range = max(0.0, round(self.state_batt_pct * km_per_pct * (1.0 - gradient * 0.03), 1))
+
+        # 5. Tire Pressure (TPMS) — Fully Bounded, NEVER NULL
+        tire_thermal = min(0.8, (reported_speed / 100.0) * 0.7)
+        reported_tire_psi = round(self.tire_base_psi + tire_thermal + 0.1 * math.sin(now / 30.0), 1)
+
+        # 6. Cabin Climate & Cell Voltage Balance
+        climate_draw = round(480.0 + 40.0 * math.sin(now / 40.0), 1)
+        cell_delta = round(0.010 + 0.004 * (reported_speed / 110.0), 3)
 
         return {
-            "device_id":      self.device_id,
-            "schema_version": "1.0",
-            "timestamp_ms":   int((time.time() - self.start_time) * 1000),
-            "mode":           mode_name,
-            "speed_kmh":      max(0.0, vary(self.state_speed, 1.5)),
-            "battery_pct":    self.state_batt_pct,  # No variance for smooth UI dropping
-            "battery_temp_c": max(0.0, vary(self.state_batt_temp, 0.5)),
-            "motor_temp_c":   max(0.0, vary(self.state_motor_temp, 1.5)),
-            "range_km":       max(0.0, vary(estimated_range, 2.0)),
-            "fault_code":     fault,
-            "charging_rate_w": charge,
-            "ambient_temp_c": 25.0,
-            "headwind_kmh": max(0.0, vary(10.0, 5.0)),
-            "road_gradient_pct": vary(0.0, 2.0),
-            "tire_pressure_psi": max(28.0, vary(34.0, 1.0)),
-            "cabin_climate_w": vary(500.0, 50.0),
-            "max_cell_voltage_delta": vary(0.01, 0.005),
+            "device_id":              self.device_id,
+            "schema_version":         "1.0",
+            "timestamp_ms":           int((time.time() - self.start_time) * 1000),
+            "mode":                   mode_name,
+            "speed_kmh":              reported_speed,
+            "battery_pct":            self.state_batt_pct,
+            "battery_temp_c":         round(self.state_batt_temp, 1),
+            "motor_temp_c":           round(self.state_motor_temp, 1),
+            "range_km":               estimated_range,
+            "fault_code":             fault,
+            "charging_rate_w":        charge,
+            "ambient_temp_c":         25.0,
+            "headwind_kmh":           headwind,
+            "road_gradient_pct":      gradient,
+            "tire_pressure_psi":      reported_tire_psi,
+            "cabin_climate_w":        climate_draw,
+            "max_cell_voltage_delta": cell_delta,
         }
 
     def send_http(self, packet: dict, encryption_enabled: bool, tamper: bool = False) -> tuple[int, str]:
@@ -454,7 +502,7 @@ if __name__ == "__main__":
             device_id    = v["device_id"],
             name         = v.get("name", v["device_id"]),
             interval     = args.interval,
-            cycle_secs   = 999999 if args.charge else v.get("cycle_secs", 12),
+            cycle_secs   = 999999 if args.charge else v.get("cycle_secs", 60),
             start_mode   = 6 if args.charge else v.get("start_mode", 0),
             force_tamper = args.tamper,
         )

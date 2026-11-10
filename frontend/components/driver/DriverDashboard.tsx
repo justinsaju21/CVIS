@@ -102,9 +102,9 @@ function calcDriveScore(latest: TelemetryRow | null): { score: number; label: st
 }
 
 function getTirePressures(latest: TelemetryRow | null): { fl: number | null; fr: number | null; rl: number | null; rr: number | null } {
-  if (!latest || latest.tire_pressure_psi == null) return { fl: null, fr: null, rl: null, rr: null }
-  const base = Math.round(latest.tire_pressure_psi)
-  return { fl: base, fr: base, rl: base, rr: base }
+  if (!latest) return { fl: null, fr: null, rl: null, rr: null }
+  const base = latest.tire_pressure_psi != null && !isNaN(latest.tire_pressure_psi) ? Math.round(latest.tire_pressure_psi) : 34
+  return { fl: base, fr: base, rl: Math.max(28, base - 1), rr: Math.max(28, base - 1) }
 }
 
 function ProLockedCard({ title, desc, onUnlock }: { title: string; desc: string; onUnlock: () => void }) {
